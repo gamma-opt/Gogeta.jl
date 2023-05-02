@@ -1,14 +1,5 @@
-using Flux
-using Flux: params, train!, mse
-using JuMP
-using HiGHS
 
-# packages for MNIST digits
-using MLDatasets, CUDA, FileIO
-using Flux: train!, onehotbatch, flatten
 
-include("neural_nets.jl")
-include("JuMP_model.jl")
 
 function test1()
     sum_model = create_sum_nn(

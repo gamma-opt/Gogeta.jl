@@ -1,9 +1,3 @@
-using Flux
-using Flux: params, train!, mse
-using Plots
-using Random
-using MLDatasets, CUDA, FileIO, ImageShow
-using Flux: train!, onehotbatch, flatten
 
 function create_sum_nn(train_len, test_len, summand_count, model) # a neural network that solves sum of m variables
 

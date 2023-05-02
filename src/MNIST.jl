@@ -1,15 +1,3 @@
-using Pkg
-Pkg.instantiate()
-
-using Flux, MLDatasets, CUDA, FileIO, ImageShow
-using Flux: train!, onehotbatch, flatten
-using MLJBase # for conf matrix
-using Plots, Images
-using Statistics
-
-include("JuMP_model.jl")
-include("file_read_write.jl")
-using Random
 
 
 # NOTE! This file inclused some functions for training a MNIST digit nn,

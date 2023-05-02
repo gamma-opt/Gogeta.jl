@@ -1,6 +1,4 @@
-using MLDatasets
-include("MNIST.jl")
-include("file_read_write.jl")
+
 
 # some raw data definitions for testing etc.
 x_train, y_train = MNIST(split=:train)[:]

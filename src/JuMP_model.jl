@@ -1,11 +1,3 @@
-using Flux
-using Flux: params, train!, mse
-using JuMP
-using JuMP: Model, value
-using HiGHS
-using Gurobi
-
-using MLDatasets
 
 # creates a JuMP model for arbitrary sized / shaped nn
 # type: what kind of model. adversial_index: index in train set to create new image

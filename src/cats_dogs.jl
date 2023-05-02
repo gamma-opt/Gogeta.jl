@@ -1,7 +1,3 @@
-using Flux
-using Images
-using ImageBinarization
-include("JuMP_model.jl")
 
 # NOTE! The dataset is the one from https://www.kaggle.com/datasets/tongpython/cat-and-dog?resource=download
 # after duplicate images (i.e. all jpg.files having (1) in the title) have been removed

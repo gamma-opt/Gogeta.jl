@@ -28,6 +28,8 @@ include("file_read_write.jl")
 include("MNIST.jl")
 include("neural_nets.jl")
 
+include.(filter(contains(r".jl$"), readdir(current_dir*"/decision_trees/"; join=true)))
+
 
 
 

@@ -1,15 +1,9 @@
-include("initialisation.jl")
-
-config = EvoTreeRegressor(max_depth=5, nbins=32, nrounds=10)
-nobs, nfeats = 1_000, 5
-x_train = randn(nobs, nfeats)
-y_train = Array{Float64}(undef, nobs)
-[y_train[i] = sum(x_train[i,:].^2) for i = 1:nobs]
-
-evo_model = fit_evotree(config; x_train, y_train)
-preds = EvoTrees.predict(evo_model, x_train)
-plot(evo_model, 2)
-
+#= GBtree_MIP(evo model) is a function that converts given gradient boosted tree ensemble to a MIP problem according to Music: Optimization of tree ensembles
+    Parameters:
+        evo_model: EvoTree{} - coontains the trained trees in field `trees` (incl. 1 bias tree) and other info accessible in field `info`(Support only for EvoTrees)
+    Output: 
+        model: a correspodning MIP 
+=#
 function GBtrees_MIP(evo_model)
     
     number_of_trees = length(evo_model.trees)-1 # number of tree in the model (the first element is not a tree)
@@ -80,27 +74,7 @@ function GBtrees_MIP(evo_model)
     end
 
     @objective(model, Min, sum( 0.1 * evo_model.trees[t+1].pred[leaves[t][l]] * y[t,l] for t = 1:number_of_trees, l = 1:number_of_leaves[t]))
+
     return model
-end 
-
-
-gbmodel = GBtrees_MIP(evo_model)
-optimize!(gbmodel)
-x_opt = value.(x)
-y_opt = value.(y)
-
-for f = 1:nfeats 
-    x_opt = Array{Float64}(undef,  n_splits[f])
-    [ x_opt[i] = value.(model[:x])[f,i] for i = 1:n_splits[f]]
-    first_index = findfirst(x -> x==1, x_opt)
-    print("x_$f <= $(splits[f][3,first_index]) \n")
-
-end
-
-minimum(y_train)
-detailed_trees = Array{Any}(undef, number_of_trees)
-for i = 1:number_of_trees
-    evo_tree = evo_model.trees[i+1]
-    detailed_tree = exract_tree_nodes_info(evo_tree)
-    detailed_trees[i] =  detailed_tree
+    
 end

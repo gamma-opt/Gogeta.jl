@@ -12,8 +12,6 @@ plot(evo_model, 2)
 
 gbmodel = GBtrees_MIP(evo_model)
 optimize!(gbmodel)
-x_opt = value.(x)
-y_opt = value.(y)
 
 for f = 1:nfeats 
     x_opt = Array{Float64}(undef,  n_splits[f])
@@ -23,4 +21,3 @@ for f = 1:nfeats
 
 end
 
-minimum(y_train)

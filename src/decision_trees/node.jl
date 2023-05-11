@@ -47,7 +47,7 @@ end
         all_children: an array that should be initialized empty and will be recursively filled with children nodes
     Output: 
         all_children: an array that contains all children nodes
-        * if the node_id node is leaf in the maxumum tree structure the all_children array will be empty
+        * if the node_id node is leaf in the complete tree* structure the all_children array will be empty
 =#
 function find_all_children(node_id, nodes_max, all_children)
     if 2*node_id <= nodes_max # if node has children
@@ -57,3 +57,5 @@ function find_all_children(node_id, nodes_max, all_children)
     end
     return all_children
 end
+
+# complete tree* reffers to the tree of the maximum size (maximum number of nodes)

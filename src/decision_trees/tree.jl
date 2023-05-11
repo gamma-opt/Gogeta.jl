@@ -6,15 +6,15 @@
 =#
 function exract_tree_nodes_info(evo_tree)
 
-    split_nodes = findall(x->x!=0, evo_tree.split) #extract all the split nodes
-    leaf_nodes = getindex.(findall(x->x!=0, evo_tree.pred), 2) #extract all the leaf nodes
+    split_nodes = findall(x->x!=0, evo_tree.split) # extract all the split nodes
+    leaf_nodes = getindex.(findall(x->x!=0, evo_tree.pred), 2) # extract all the leaf nodes
     
     
-    num_all_nodes = length(evo_tree.split) #extract the number of nodes in the maximum tree
-    tree = Array{tree_node}(undef, num_all_nodes) #build an empty strucutree to keep info for each node
+    num_all_nodes = length(evo_tree.split) # extract the number of nodes in the complete tree*
+    tree = Array{tree_node}(undef, num_all_nodes) # build an empty strucutree to keep info for each node
     
     for node_id = 1:num_all_nodes
-        pruned = false #assume the node is not pruned
+        pruned = false # assume the node is not pruned
         if !isempty(findall(x->x==node_id, split_nodes)) # check if the node is a split node
             type = 1 
         elseif  !isempty(findall(x->x==node_id, leaf_nodes)) # check if the node is a leaf 
@@ -55,3 +55,5 @@ function exract_tree_nodes_info(evo_tree)
     end
     return tree
 end
+
+# complete tree* reffers to the tree of the maximum size (maximum number of nodes)

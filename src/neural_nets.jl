@@ -92,15 +92,15 @@ function create_MNIST_nn(model)
 		end
 	end
 
-	accuracy = 0
+	correct_guesses = 0
 	len = length(y_test)
 	for i in 1:len
 		if findmax(model(test_data[1][1][:, i]))[2] - 1  == y_test[i] # -1 to get right index
-			accuracy += 1
+			correct_guesses += 1
 		end
 	end
 
-	accuracy = correct_guesses / test_len
+	accuracy = correct_guesses / len
   println("Accuracy: ", accuracy)
 
 	return model

@@ -1,7 +1,7 @@
 
 # creates a JuMP model for arbitrary sized / shaped nn
 # type: what kind of model. adversial_index: index in train set to create new image
-function create_JuMP_model(nn_model, type, adversial_index = -1, opt_img_digit = 0)
+function create_JuMP_model(nn_model, bounds_U, bounds_L, type, adversial_index = -1, opt_img_digit = 0)
 	@assert type == "predict" || 
 			type == "missclassified L1" ||
 			type == "missclassified L2" 
@@ -25,14 +25,24 @@ function create_JuMP_model(nn_model, type, adversial_index = -1, opt_img_digit =
 	@variable(model, x[k in 0:K, j in 1:node_count[k+1]] >= 0)
 	@variable(model, s[k in 1:K, j in 1:node_count[k+1]] >= 0)
 	@variable(model, z[k in 1:K, j in 1:node_count[k+1]], Bin)
-	# big-M values (currently) fixed for all U[k,j] and L[k,j], input fixed to [0,1] for image pixel values
-	big_M = Dict(:"U" => 1000, :"L" => -1000, "U_input" => 1, "L_input" => 0) 
+	@variable(model, U[k in 0:K, j in 1:node_count[k+1]])
+	@variable(model, L[k in 0:K, j in 1:node_count[k+1]])
+
+	# fix bounds to all U[k,j] and L[k,j] from bounds_U and bounds_L
+	index = 1
+	for k in 0:K
+		for j in 1:node_count[k+1] 
+			fix(U[k,j], bounds_U[index])
+			fix(L[k,j], bounds_L[index])
+			index += 1
+		end
+	end
 
 	# constraint (4a)
 	for input_node in 1:node_count[1]
 		delete_lower_bound(x[0, input_node])
-		@constraint(model, big_M["L_input"] <= x[0, input_node])
-		@constraint(model, x[0, input_node] <= big_M["U_input"])
+		@constraint(model, L[0, input_node] <= x[0, input_node])
+		@constraint(model, x[0, input_node] <= U[0, input_node])
 	end
 
 	# constraint (4b) and (4e) (cases k=1, ..., k=K)
@@ -54,14 +64,14 @@ function create_JuMP_model(nn_model, type, adversial_index = -1, opt_img_digit =
 	end
 
 	# constraint (4d)
-	@constraint(model, [k in 1:K, j in 1:node_count[k+1]], x[k,j] <= big_M["U"] * z[k,j]) 
-	@constraint(model, [k in 1:K, j in 1:node_count[k+1]], s[k,j] <= -big_M["L"] * (1 - z[k,j]))
+	@constraint(model, [k in 1:K, j in 1:node_count[k+1]], x[k,j] <= U[k,j] * z[k,j]) 
+	@constraint(model, [k in 1:K, j in 1:node_count[k+1]], s[k,j] <= -L[k,j] * (1 - z[k,j]))
 
 	# constraint (4f)
 	for output_node in 1:node_count[K+1]
 		delete_lower_bound(x[K, output_node])
-		@constraint(model, big_M["L"] <= x[K, output_node])
-		@constraint(model, x[K, output_node] <= big_M["U"])
+		@constraint(model, L[K, output_node] <= x[K, output_node])
+		@constraint(model, x[K, output_node] <= U[K, output_node])
 	end
 
 	# NOTE! Below if clauses for testing, the type attribute will determine which objective
@@ -136,8 +146,8 @@ end
 
 
 # solves the optimal BT bounds
-function solve_optimal_bounds(nn_model, input_U, input_L, type = "predict")
-	@assert type == "predict" "Invalid type attribute \"$type\""
+# nn_model is the trained nn, bound_U and bounds_L are the initial bounds as of the algorithm
+function solve_optimal_bounds(nn_model, bounds_U, bounds_L)
 
 	K = length(nn_model) # NOTE! there are K+1 layers in the nn
 	nn_parameters = params(nn_model)
@@ -150,15 +160,15 @@ function solve_optimal_bounds(nn_model, input_U, input_L, type = "predict")
 	input_node_count = length(nn_parameters[1][1,:])
 	node_count = [if k == 1 input_node_count else length(nn_parameters[2*(k-1)]) end for k in 1:K+1]
 
+	# store the current optimal bounds in the algorithm
+	curr_bounds_U = bounds_U
+	curr_bounds_L = bounds_L
+	
 	# these store the optimization models to determine the optimal U and L
-	min_models = []
-	max_models = []
-	# for k in 1:K
-	# 	for node in 1:node_count[k+1]
-	# 		println("k: ", k, " j: ", node)
-	# 	end
-	# end
+	opt_L = []
+	opt_U = []
 
+	outer_index = 1
 	for obj_function in 1:2 # 1 for Min, 2 for Max
 		for k in 1:K
 			for node in 1:node_count[k+1]
@@ -170,12 +180,17 @@ function solve_optimal_bounds(nn_model, input_U, input_L, type = "predict")
 				@variable(model, x[k in 0:K, j in 1:node_count[k+1]] >= 0)
 				@variable(model, s[k in 1:K-1, j in 1:node_count[k+1]] >= 0)
 				@variable(model, 0 <= z[k in 1:K-1, j in 1:node_count[k+1]] <= 1)
-				@variable(model, U[k in 0:K, j in 1:node_count[k+1]] == 1000)
-				@variable(model, L[k in 0:K, j in 1:node_count[k+1]] == -1000)
-				# fix input bounds from input_U and input_L
-				for j in 1:node_count[1] 
-					fix(U[0,j], input_U[j])
-					fix(L[0,j], input_L[j])
+				@variable(model, U[k in 0:K, j in 1:node_count[k+1]])
+				@variable(model, L[k in 0:K, j in 1:node_count[k+1]])
+
+				# fix bounds to all U[k,j] and L[k,j] from bounds_U and bounds_L
+				index = 1
+				for k in 0:K
+					for j in 1:node_count[k+1] 
+						fix(U[k,j], curr_bounds_U[index], force = true)
+						fix(L[k,j], curr_bounds_L[index], force = true)
+						index += 1
+					end
 				end
 
 				for input_node in 1:node_count[1] # input constraints (4a)
@@ -191,11 +206,11 @@ function solve_optimal_bounds(nn_model, input_U, input_L, type = "predict")
 				end
 
 				# NOTE! below constraints depending on the layer
-				# we only want to build ALL of the constraints until the PREVIOUS layer, and then go node by node
+				# we only want to build ALL of the constraints until the PREVIOUS layer, and then go node by node. Here we calculate ONLY the constraints until the PREVIOUS layer
 				for k_in in 0:k-1
 					for node_in in 1:node_count[k_in+1]
 						if k_in >= 1
-							temp_sum = sum(W[k_in][node_in,j] * x[k_in-1,j] for j in 1:node_count[k_in]) # NOTE! prev layer [k_in]
+							temp_sum = sum(W[k_in][node_in,j] * x[k_in-1,j] for j in 1:node_count[k_in]) # NOTE! prev layer [k_in], not [k_in-1]
 							@constraint(model,  x[k_in,node_in] <= U[k_in,node_in] * z[k_in,node_in])
 							@constraint(model, s[k_in,node_in] <= -L[k_in,node_in] * (1 - z[k_in,node_in]))
 
@@ -209,7 +224,7 @@ function solve_optimal_bounds(nn_model, input_U, input_L, type = "predict")
 				end
 
 				# NOTE! below constraints depending on the node
-				
+				# Here we calculate the specific constraints depending on the NODE
 				temp_sum = sum(W[k][node,j] * x[k-1,j] for j in 1:node_count[k]) # NOTE! prev layer [k]
 
 				if k <= K-1
@@ -221,7 +236,7 @@ function solve_optimal_bounds(nn_model, input_U, input_L, type = "predict")
 					else
 						@objective(model, Max, x[k,node] - s[k,node])
 					end
-				else # k == K
+				elseif k == K
 					@constraint(model, temp_sum + b[k][node] == x[k,node])
 					@constraint(model, L[k, node] <= x[k, node]) # const (4f) in layer K
 					@constraint(model, x[k, node] <= U[k, node])
@@ -233,52 +248,71 @@ function solve_optimal_bounds(nn_model, input_U, input_L, type = "predict")
 				end
 
 				# println(model)
+				optimize!(model)
+				optimal = objective_value(model)
 				if obj_function == 1
-					push!(min_models, model)
+					push!(opt_U, optimal)
+					curr_bounds_L[784 + outer_index] = optimal
 				else
-					push!(max_models, model)
+					push!(opt_L, optimal)
+					curr_bounds_U[784 + outer_index] = optimal
 				end
+				outer_index += 1
 			end
+			outer_index = 1
 		end
 	end
 
-	return min_models, max_models
+	return opt_L, opt_U
 end
 
-function solve_bounds(opt_models)
-	opt_values = []
-
-	for model in opt_models
-		optimize!(model)
-		if has_values(model)
-			optimal = objective_value(model)
-			push!(opt_values, optimal)
-		else
-	end
-	return opt_values
-end
-
-# sum_U = [1,1]
-# sum_L = [0,0]
-# mdl_min, mdl_max = solve_optimal_bounds(sum_model, sum_U, sum_L)
+# sum_model2 = create_sum_nn(
+#         100, 5, 2, Chain(
+#                    Dense(2, 4, relu),
+#                    Dense(4, 3, relu),
+#                    Dense(3, 1)), 
+# )
+# sum_U = [1,1,1000,1000,1000,1000,1000,1000,1000,1000]
+# sum_L = [0,0,-1000,-1000,-1000,-1000,-1000,-1000,-1000,-1000]
 # mdl2_min, mdl2_max = solve_optimal_bounds(sum_model2, sum_U, sum_L)
-# joo1 = mdl_min[1]
-# joo2 = mdl_min[2]
-# joo3 = mdl_min[3]
-# joo4 = mdl_min[4]
 # opt2_min = solve_bounds(mdl2_min)
 # opt2_max = solve_bounds(mdl2_max)
 
-mnist_U = [1 for i in 1:784]
-mnist_L = [0 for i in 1:784]
-mnist_min, mnist_max = solve_optimal_bounds(nn, mnist_U, mnist_L)
-mnist_opt_min = solve_bounds(mnist_min)
-mnist_opt_max = solve_bounds(mnist_max)
+x_train, y_train = MNIST(split=:train)[:]
+x_test, y_test = MNIST(split=:test)[:]
 
-diff = mnist_opt_min - mnist_opt_max
-min_diff = minimum(diff)
-max_diff = maximum(diff)
+nn, acc = train_mnist_nn(x_train, y_train, x_test, y_test, 1)
+
+bad_U = Float32[if i <= 784 1 else 1000 end for i in 1:784+32+16+10]
+bad_L = Float32[if i <= 784 0 else -1000 end for i in 1:784+32+16+10]
+optimal_L, optimal_U = solve_optimal_bounds(nn, bad_U, bad_L)
+good_U = Float32[if i <= 784 1 else optimal_L[i-784] end for i in 1:784+32+16+10]
+good_L = Float32[if i <= 784 0 else optimal_U[i-784] end for i in 1:784+32+16+10]
+
+println("min good_U: ", minimum(good_U), ", max good_U: ", maximum(good_U), ", min good_L: ", minimum(good_L), ", max good_L: ", maximum(good_L))
+
+function opt_times(U, L, range)
+	times = []
+	images = []
+	for i in range
+		println("Current index is $i")
+		mdl = create_JuMP_model(nn, U, L, "missclassified L2", i)
+		time = @elapsed optimize!(mdl)
+		adversarial = Float32[]
+		for pixel in 1:784
+			pixel_value = value(mdl[:x][0, pixel]) # indexing
+			push!(adversarial, pixel_value)
+		end
+		push!(images, adversarial)
+		push!(times, time)
+	end
+	return times, images
+end
+
+bad_times, bad_imgs = opt_times(bad_U, bad_L, 1:20)
+
+good_times, good_imgs = opt_times(good_U, good_L, 1:20)
+
+difference = bad_times - good_times
 
 
-bad_U = [if i <= 784 1 else 1000 end for i in 1:784+32+16+10]
-bad_L = [if i <= 784 0 else -1000 end for i in 1:784+32+16+10]

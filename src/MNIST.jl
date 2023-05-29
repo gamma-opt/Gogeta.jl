@@ -5,23 +5,25 @@
 # creating adversarial images and a confusion matrix for a train and test set
 
 # trains a mnist digit nn and returns it, (only) train and test data as input
-function train_mnist_nn(train_x, train_y, test_x, test_y, seed = abs(rand(Int)))
+function train_mnist_nn(mnist_nn, seed = abs(rand(Int)))
     Random.seed!(seed) # seed for reproducibility
 
-    mnist_model = Chain(
-        Dense(784, 32, relu),
-        Dense(32, 16, relu),
-        Dense(16, 10)
-    )
+    # mnist_nn = Chain(
+    #     Dense(784, 32, relu),
+    #     Dense(32, 16, relu),
+    #     Dense(16, 10)
+    # )
+    x_train, y_train = MNIST(split=:train)[:]
+    x_test, y_test = MNIST(split=:test)[:]
 
-    parameters = params(mnist_model)
-    train_x_flatten = flatten(train_x)
-    test_x_flatten = flatten(test_x)
-    train_y_oh = onehotbatch(train_y, 0:9)
-    train = [(train_x_flatten, train_y_oh)]
-    test = [(test_x_flatten, test_y)]
+    parameters = params(mnist_nn)
+    x_train_flatten = flatten(x_train)
+    x_test_flatten = flatten(x_test)
+    y_train_oh = onehotbatch(y_train, 0:9)
+    train = [(x_train_flatten, y_train_oh)]
+    test = [(x_test_flatten, y_test)]
 
-    loss(x, y) = Flux.Losses.logitcrossentropy(mnist_model(x), y)
+    loss(x, y) = Flux.Losses.logitcrossentropy(mnist_nn(x), y)
 
     opt = ADAM(0.01) # learning rate of 0.01 gives by far the best results
 
@@ -31,23 +33,23 @@ function train_mnist_nn(train_x, train_y, test_x, test_y, seed = abs(rand(Int)))
     loss_values = zeros(n)
     for i in 1:n
         train!(loss, parameters, train, opt)
-        loss_values[i] = loss(train_x_flatten, train_y_oh)
+        loss_values[i] = loss(x_train_flatten, y_train_oh)
         if i % 10 == 0
             println(loss_values[i])
         end
     end
 
     correct_guesses = 0
-    test_len = length(test_y)
+    test_len = length(y_test)
     for i in 1:test_len
-        if findmax(mnist_model(test[1][1][:, i]))[2] - 1  == test_y[i] # -1 to get right index
+        if findmax(mnist_nn(test[1][1][:, i]))[2] - 1  == y_test[i] # -1 to get right index
             correct_guesses += 1
         end
     end
     accuracy = correct_guesses / test_len
     println("Accuracy: ", accuracy)
 
-    return mnist_model, accuracy
+    return mnist_nn, accuracy
 end
 
 # finds an optimal input to maximize a given output node

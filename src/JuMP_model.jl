@@ -249,12 +249,16 @@ function solve_optimal_bounds(nn_model, bounds_U, bounds_L)
 
 				# println(model)
 				optimize!(model)
-				optimal = objective_value(model)
+
+				optimal = 1e6
+				if has_values(model)
+					optimal = objective_value(model)
+				end
 				if obj_function == 1
-					push!(opt_U, optimal)
+					push!(opt_L, optimal)
 					curr_bounds_L[784 + outer_index] = optimal
 				else
-					push!(opt_L, optimal)
+					push!(opt_U, optimal)
 					curr_bounds_U[784 + outer_index] = optimal
 				end
 				outer_index += 1
@@ -280,23 +284,59 @@ end
 
 x_train, y_train = MNIST(split=:train)[:]
 x_test, y_test = MNIST(split=:test)[:]
+function test_nns(seed)
+	Random.seed!(seed)
+	nn1 = Chain( # 842 nodes
+		Dense(784, 32, relu),
+		Dense(32, 16, relu),
+		Dense(16, 10)
+	)
+	nn2 = Chain( # 840 nodes
+		Dense(784, 32, relu),
+		Dense(32, 32, relu),
+		Dense(32, 16, relu),
+		Dense(16, 10)
+	)
+	nn3 = Chain( # 854 nodes
+		Dense(784, 32, relu),
+		Dense(32, 32, relu),
+		Dense(32, 16, relu),
+		Dense(16, 16, relu),
+		Dense(16, 10)
+	)
+	return nn1, nn2, nn3
+end
 
-nn, acc = train_mnist_nn(x_train, y_train, x_test, y_test, 1)
+raw_nn1, raw_nn2, raw_nn3 = test_nns(2)
 
-bad_U = Float32[if i <= 784 1 else 1000 end for i in 1:784+32+16+10]
-bad_L = Float32[if i <= 784 0 else -1000 end for i in 1:784+32+16+10]
-optimal_L, optimal_U = solve_optimal_bounds(nn, bad_U, bad_L)
-good_U = Float32[if i <= 784 1 else optimal_L[i-784] end for i in 1:784+32+16+10]
-good_L = Float32[if i <= 784 0 else optimal_U[i-784] end for i in 1:784+32+16+10]
+nn1, acc1 = train_mnist_nn(raw_nn1)
+nn2, acc2 = train_mnist_nn(raw_nn2)
+nn3, acc3 = train_mnist_nn(raw_nn3)
 
-println("min good_U: ", minimum(good_U), ", max good_U: ", maximum(good_U), ", min good_L: ", minimum(good_L), ", max good_L: ", maximum(good_L))
+bad_U1 = Float32[if i <= 784 1 else 1000 end for i in 1:842]
+bad_L1 = Float32[if i <= 784 0 else -1000 end for i in 1:842]
+@time optimal_L1, optimal_U1 = solve_optimal_bounds(nn1, bad_U1, bad_L1)
+good_U1 = Float32[if i <= 784 1 else optimal_U1[i-784] end for i in 1:842]
+good_L1 = Float32[if i <= 784 0 else optimal_L1[i-784] end for i in 1:842]
 
-function opt_times(U, L, range)
+bad_U2 = Float32[if i <= 784 1 else 1000 end for i in 1:874]
+bad_L2 = Float32[if i <= 784 0 else -1000 end for i in 1:874]
+@time optimal_L2, optimal_U2 = solve_optimal_bounds(nn2, bad_U2, bad_L2)
+good_U2 = Float32[if i <= 784 1 else optimal_U2[i-784] end for i in 1:874]
+good_L2 = Float32[if i <= 784 0 else optimal_L2[i-784] end for i in 1:874]
+
+bad_U3 = Float32[if i <= 784 1 else 1000 end for i in 1:922]
+bad_L3 = Float32[if i <= 784 0 else -1000 end for i in 1:922]
+@time optimal_L3, optimal_U3 = solve_optimal_bounds(nn3, bad_U3, bad_L3)
+good_U3 = Float32[if i <= 784 1 else optimal_U3[i-784] end for i in 1:922]
+good_L3 = Float32[if i <= 784 0 else optimal_L3[i-784] end for i in 1:922]
+
+function opt_times(nn, U, L, range)
 	times = []
 	images = []
 	for i in range
 		println("Current index is $i")
-		mdl = create_JuMP_model(nn, U, L, "missclassified L2", i)
+		mdl = create_JuMP_model(nn, U, L, "missclassified L1", i)
 		time = @elapsed optimize!(mdl)
 		adversarial = Float32[]
 		for pixel in 1:784
@@ -309,10 +349,14 @@ function opt_times(U, L, range)
 	return times, images
 end
 
-bad_times, bad_imgs = opt_times(bad_U, bad_L, 1:20)
+bad_times1, bad_imgs1 = opt_times(nn1, bad_U1, bad_L1, 1:10)
+good_times1, good_imgs1 = opt_times(nn1, good_U1, good_L1, 1:10)
+difference1 = bad_times1 - good_times1
 
-good_times, good_imgs = opt_times(good_U, good_L, 1:20)
+bad_times2, bad_imgs2 = opt_times(nn2, bad_U2, bad_L2, 1:10)
+good_times2, good_imgs2 = opt_times(nn2, good_U2, good_L2, 1:10)
+difference2 = bad_times2 - good_times2
 
-difference = bad_times - good_times
-
-
+bad_times3, bad_imgs3 = opt_times(nn3, bad_U3, bad_L3, 1:10)
+good_times3, good_imgs3 = opt_times(nn3, good_U3, good_L3, 1:10)
+difference3 = bad_times3 - good_times3

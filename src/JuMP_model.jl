@@ -169,101 +169,108 @@ function solve_optimal_bounds(nn_model, bounds_U, bounds_L)
 	opt_U = []
 
 	outer_index = 1
-	for obj_function in 1:2 # 1 for Min, 2 for Max
-		for k in 1:K
-			for node in 1:node_count[k+1]
 
-				model = Model(Gurobi.Optimizer)
-				# NOTE! below constraints in every problem
+	model = Model(Gurobi.Optimizer)
 
-				# sets the variables x[k,j] and s[k,j], the relaxed z[k,j] and the big-M values U[k,j] and L[k,j]
-				@variable(model, x[k in 0:K, j in 1:node_count[k+1]] >= 0)
-				@variable(model, s[k in 1:K-1, j in 1:node_count[k+1]] >= 0)
-				@variable(model, 0 <= z[k in 1:K-1, j in 1:node_count[k+1]] <= 1)
-				@variable(model, U[k in 0:K, j in 1:node_count[k+1]])
-				@variable(model, L[k in 0:K, j in 1:node_count[k+1]])
+	# NOTE! below variables and constraints for all opt problems
+	@variable(model, x[k in 0:K, j in 1:node_count[k+1]] >= 0)
+	@variable(model, s[k in 1:K-1, j in 1:node_count[k+1]] >= 0)
+	@variable(model, 0 <= z[k in 1:K-1, j in 1:node_count[k+1]] <= 1)
+	@variable(model, U[k in 0:K, j in 1:node_count[k+1]])
+	@variable(model, L[k in 0:K, j in 1:node_count[k+1]])
 
-				# fix bounds to all U[k,j] and L[k,j] from bounds_U and bounds_L
-				index = 1
-				for k in 0:K
-					for j in 1:node_count[k+1] 
-						fix(U[k,j], curr_bounds_U[index], force = true)
-						fix(L[k,j], curr_bounds_L[index], force = true)
-						index += 1
-					end
-				end
+	# fix bounds to all U[k,j] and L[k,j] from bounds_U and bounds_L
+	index = 1
+	for k in 0:K
+		for j in 1:node_count[k+1] 
+			fix(U[k,j], curr_bounds_U[index], force = true)
+			fix(L[k,j], curr_bounds_L[index], force = true)
+			index += 1
+		end
+	end
 
-				for input_node in 1:node_count[1] # input constraints (4a)
-					delete_lower_bound(x[0, input_node])
-					@constraint(model, L[0, input_node] <= x[0, input_node])
-					@constraint(model, x[0, input_node] <= U[0, input_node])
-				end
+	for input_node in 1:node_count[1] # input constraints (4a)
+		delete_lower_bound(x[0, input_node])
+		@constraint(model, L[0, input_node] <= x[0, input_node])
+		@constraint(model, x[0, input_node] <= U[0, input_node])
+	end
 
-				for output_node in 1:node_count[K+1]
-					delete_lower_bound(x[K, output_node])
-					@constraint(model, L[K, output_node] <= x[K, output_node])
-					@constraint(model, x[K, output_node] <= U[K, output_node])
-				end
+	for output_node in 1:node_count[K+1]
+		delete_lower_bound(x[K, output_node])
+		@constraint(model, L[K, output_node] <= x[K, output_node])
+		@constraint(model, x[K, output_node] <= U[K, output_node])
+	end
 
-				# NOTE! below constraints depending on the layer
-				# we only want to build ALL of the constraints until the PREVIOUS layer, and then go node by node. Here we calculate ONLY the constraints until the PREVIOUS layer
-				for k_in in 0:k-1
-					for node_in in 1:node_count[k_in+1]
-						if k_in >= 1
-							temp_sum = sum(W[k_in][node_in,j] * x[k_in-1,j] for j in 1:node_count[k_in]) # NOTE! prev layer [k_in], not [k_in-1]
-							@constraint(model,  x[k_in,node_in] <= U[k_in,node_in] * z[k_in,node_in])
-							@constraint(model, s[k_in,node_in] <= -L[k_in,node_in] * (1 - z[k_in,node_in]))
 
-							if k_in <= K-1-1
-								@constraint(model, temp_sum + b[k_in][node_in] == x[k_in,node_in] - s[k_in,node_in])
-							else # k_in == K-1
-								@constraint(model, temp_sum + b[k_in][node_in] == x[k_in,node_in])
-							end
+	for k in 1:K
+		for node in 1:node_count[k+1]
+
+			# NOTE! below constraints depending on the layer
+			# we only want to build ALL of the constraints until the PREVIOUS layer, and then go node by node. Here we calculate ONLY the constraints until the PREVIOUS layer
+			for k_in in 0:k-1
+				for node_in in 1:node_count[k_in+1]
+					if k_in >= 1
+						temp_sum = sum(W[k_in][node_in,j] * x[k_in-1,j] for j in 1:node_count[k_in]) # NOTE! prev layer [k_in], not [k_in-1]
+						@constraint(model,  x[k_in,node_in] <= U[k_in,node_in] * z[k_in,node_in])
+						@constraint(model, s[k_in,node_in] <= -L[k_in,node_in] * (1 - z[k_in,node_in]))
+
+						if k_in <= K-1-1
+							@constraint(model, temp_sum + b[k_in][node_in] == x[k_in,node_in] - s[k_in,node_in])
+						else # k_in == K-1
+							@constraint(model, temp_sum + b[k_in][node_in] == x[k_in,node_in])
 						end
 					end
 				end
+			end
 
-				# NOTE! below constraints depending on the node
-				# Here we calculate the specific constraints depending on the NODE
-				temp_sum = sum(W[k][node,j] * x[k-1,j] for j in 1:node_count[k]) # NOTE! prev layer [k]
+			# NOTE! below constraints depending on the node
+			# Here we calculate the specific constraints depending on the NODE
+			temp_sum = sum(W[k][node,j] * x[k-1,j] for j in 1:node_count[k]) # NOTE! prev layer [k]
 
-				if k <= K-1
-					@constraint(model, temp_sum + b[k][node] == x[k,node] - s[k,node])
-					@constraint(model, x[k,node] <= U[k,node] * z[k,node])
-					@constraint(model, s[k,node] <= -L[k,node] * (1 - z[k,node]))
-					if obj_function == 1
-						@objective(model, Min, x[k,node] - s[k,node])
-					else
-						@objective(model, Max, x[k,node] - s[k,node])
-					end
-				elseif k == K
-					@constraint(model, temp_sum + b[k][node] == x[k,node])
-					@constraint(model, L[k, node] <= x[k, node]) # const (4f) in layer K
-					@constraint(model, x[k, node] <= U[k, node])
-					if obj_function == 1
-						@objective(model, Min, x[k,node])
-					else
-						@objective(model, Max, x[k,node])
-					end
+			if k <= K-1
+				@constraint(model, node_const, temp_sum + b[k][node] == x[k,node] - s[k,node])
+				@constraint(model, node_U, x[k,node] <= U[k,node] * z[k,node])
+				@constraint(model, node_L, s[k,node] <= -L[k,node] * (1 - z[k,node]))
+			elseif k == K # == last value of k
+				@constraint(model, node_const, temp_sum + b[k][node] == x[k,node])
+				@constraint(model, node_L, L[k, node] <= x[k, node]) # const (4f) in layer K
+				@constraint(model, node_U, x[k, node] <= U[k, node])
+			end
+
+			for obj_function in 1:2
+				if obj_function == 1 && k <= K-1 # Min, hidden layer
+					@objective(model, Min, x[k,node] - s[k,node])
+				elseif obj_function == 2 && k <= K-1 # Max, hidden layer
+					@objective(model, Max, x[k,node] - s[k,node])
+				elseif obj_function == 1 && k == K # Min, last layer
+					@objective(model, Min, x[k,node])
+				elseif obj_function == 2 && k == K # Max, last layer
+					@objective(model, Max, x[k,node])
 				end
 
-				# println(model)
 				optimize!(model)
+				@assert termination_status(model) == OPTIMAL "Problem in layer $k (1:$K) and node $node (1:${node_count[k+1]}) is infeasible."
+				optimal = objective_value(model)
 
-				optimal = 1e6
-				if has_values(model)
-					optimal = objective_value(model)
-				end
-				if obj_function == 1
+				if obj_function == 1 # Min
 					push!(opt_L, optimal)
 					curr_bounds_L[784 + outer_index] = optimal
-				else
+					fix(L[k,node], optimal)
+				elseif obj_function == 2 # Max
 					push!(opt_U, optimal)
 					curr_bounds_U[784 + outer_index] = optimal
+					fix(U[k,node], optimal)
 				end
-				outer_index += 1
 			end
-			outer_index = 1
+			outer_index += 1
+
+			# deleting and unregistering the constraints assigned to the current node
+			delete(model, node_const)
+			delete(model, node_L)
+			delete(model, node_U)
+			unregister(model, :node_const)
+			unregister(model, :node_L)
+			unregister(model, :node_U)
 		end
 	end
 
@@ -360,3 +367,5 @@ difference2 = bad_times2 - good_times2
 bad_times3, bad_imgs3 = opt_times(nn3, bad_U3, bad_L3, 1:10)
 good_times3, good_imgs3 = opt_times(nn3, good_U3, good_L3, 1:10)
 difference3 = bad_times3 - good_times3
+
+test_times1, test_imgs1 = opt_times(nn1, good_U1, good_L1, 1:10)

@@ -203,26 +203,23 @@ function solve_optimal_bounds(nn_model, bounds_U, bounds_L)
 
 
 	for k in 1:K
-		for node in 1:node_count[k+1]
+		# NOTE! below constraints depending on the layer
+		# we only want to build ALL of the constraints until the PREVIOUS layer, and then go node by node. Here we calculate ONLY the constraints until the PREVIOUS layer
+		for node_in in 1:node_count[k]
+			if k >= 2
+				temp_sum = sum(W[k-1][node_in,j] * x[k-1-1,j] for j in 1:node_count[k-1]) # NOTE! prev layer [k_in], not [k_in-1]
+				@constraint(model,  x[k-1,node_in] <= U[k-1,node_in] * z[k-1,node_in])
+				@constraint(model, s[k-1,node_in] <= -L[k-1,node_in] * (1 - z[k-1,node_in]))
 
-			# NOTE! below constraints depending on the layer
-			# we only want to build ALL of the constraints until the PREVIOUS layer, and then go node by node. Here we calculate ONLY the constraints until the PREVIOUS layer
-			for k_in in 0:k-1
-				for node_in in 1:node_count[k_in+1]
-					if k_in >= 1
-						temp_sum = sum(W[k_in][node_in,j] * x[k_in-1,j] for j in 1:node_count[k_in]) # NOTE! prev layer [k_in], not [k_in-1]
-						@constraint(model,  x[k_in,node_in] <= U[k_in,node_in] * z[k_in,node_in])
-						@constraint(model, s[k_in,node_in] <= -L[k_in,node_in] * (1 - z[k_in,node_in]))
-
-						if k_in <= K-1-1
-							@constraint(model, temp_sum + b[k_in][node_in] == x[k_in,node_in] - s[k_in,node_in])
-						else # k_in == K-1
-							@constraint(model, temp_sum + b[k_in][node_in] == x[k_in,node_in])
-						end
-					end
+				if k <= K-1
+					@constraint(model, temp_sum + b[k-1][node_in] == x[k-1,node_in] - s[k-1,node_in])
+				else # k == K
+					@constraint(model, temp_sum + b[k-1][node_in] == x[k-1,node_in])
 				end
 			end
-
+		end
+		
+		for node in 1:node_count[k+1]
 			# NOTE! below constraints depending on the node
 			# Here we calculate the specific constraints depending on the NODE
 			temp_sum = sum(W[k][node,j] * x[k-1,j] for j in 1:node_count[k]) # NOTE! prev layer [k]
@@ -249,7 +246,7 @@ function solve_optimal_bounds(nn_model, bounds_U, bounds_L)
 				end
 
 				optimize!(model)
-				@assert termination_status(model) == OPTIMAL "Problem in layer $k (1:$K) and node $node (1:${node_count[k+1]}) is infeasible."
+				@assert termination_status(model) == OPTIMAL "Problem in layer $k (1:$K) and node $node is infeasible."
 				optimal = objective_value(model)
 
 				if obj_function == 1 # Min

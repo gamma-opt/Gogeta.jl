@@ -161,8 +161,8 @@ function solve_optimal_bounds(nn_model, bounds_U, bounds_L)
 	node_count = [if k == 1 input_node_count else length(nn_parameters[2*(k-1)]) end for k in 1:K+1]
 
 	# store the current optimal bounds in the algorithm
-	curr_bounds_U = bounds_U
-	curr_bounds_L = bounds_L
+	curr_bounds_U = copy(bounds_U)
+	curr_bounds_L = copy(bounds_L)
 	
 	# these store the optimization models to determine the optimal U and L
 	opt_L = []
@@ -295,7 +295,7 @@ function test_nns(seed)
 		Dense(32, 16, relu),
 		Dense(16, 10)
 	)
-	nn2 = Chain( # 840 nodes
+	nn2 = Chain( # 874 nodes
 		Dense(784, 32, relu),
 		Dense(32, 32, relu),
 		Dense(32, 16, relu),
@@ -329,11 +329,12 @@ bad_L2 = Float32[if i <= 784 0 else -1000 end for i in 1:874]
 good_U2 = Float32[if i <= 784 1 else optimal_U2[i-784] end for i in 1:874]
 good_L2 = Float32[if i <= 784 0 else optimal_L2[i-784] end for i in 1:874]
 
-bad_U3 = Float32[if i <= 784 1 else 1000 end for i in 1:922]
-bad_L3 = Float32[if i <= 784 0 else -1000 end for i in 1:922]
+bad_U3 = Float32[if i <= 784 1 else 1000 end for i in 1:890]
+bad_L3 = Float32[if i <= 784 0 else -1000 end for i in 1:890]
 @time optimal_L3, optimal_U3 = solve_optimal_bounds(nn3, bad_U3, bad_L3)
-good_U3 = Float32[if i <= 784 1 else optimal_U3[i-784] end for i in 1:922]
-good_L3 = Float32[if i <= 784 0 else optimal_L3[i-784] end for i in 1:922]
+good_U3 = Float32[if i <= 784 1 else optimal_U3[i-784] end for i in 1:890]
+good_L3 = Float32[if i <= 784 0 else optimal_L3[i-784] end for i in 1:890]
+
 
 function opt_times(nn, U, L, range)
 	times = []

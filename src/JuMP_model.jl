@@ -207,8 +207,8 @@ function solve_optimal_bounds(nn_model, bounds_U, bounds_L)
 		# we only want to build ALL of the constraints until the PREVIOUS layer, and then go node by node. Here we calculate ONLY the constraints until the PREVIOUS layer
 		for node_in in 1:node_count[k]
 			if k >= 2
-				temp_sum = sum(W[k-1][node_in,j] * x[k-1-1,j] for j in 1:node_count[k-1]) # NOTE! prev layer [k_in], not [k_in-1]
-				@constraint(model,  x[k-1,node_in] <= U[k-1,node_in] * z[k-1,node_in])
+				temp_sum = sum(W[k-1][node_in,j] * x[k-1-1,j] for j in 1:node_count[k-1]) 
+				@constraint(model, x[k-1,node_in] <= U[k-1,node_in] * z[k-1,node_in])
 				@constraint(model, s[k-1,node_in] <= -L[k-1,node_in] * (1 - z[k-1,node_in]))
 
 				if k <= K-1
@@ -225,11 +225,11 @@ function solve_optimal_bounds(nn_model, bounds_U, bounds_L)
 			temp_sum = sum(W[k][node,j] * x[k-1,j] for j in 1:node_count[k]) # NOTE! prev layer [k]
 
 			if k <= K-1
-				@constraint(model, node_const, temp_sum + b[k][node] == x[k,node] - s[k,node])
+				@constraint(model, node_con, temp_sum + b[k][node] == x[k,node] - s[k,node])
 				@constraint(model, node_U, x[k,node] <= U[k,node] * z[k,node])
 				@constraint(model, node_L, s[k,node] <= -L[k,node] * (1 - z[k,node]))
 			elseif k == K # == last value of k
-				@constraint(model, node_const, temp_sum + b[k][node] == x[k,node])
+				@constraint(model, node_con, temp_sum + b[k][node] == x[k,node])
 				@constraint(model, node_L, L[k, node] <= x[k, node]) # const (4f) in layer K
 				@constraint(model, node_U, x[k, node] <= U[k, node])
 			end
@@ -262,10 +262,10 @@ function solve_optimal_bounds(nn_model, bounds_U, bounds_L)
 			outer_index += 1
 
 			# deleting and unregistering the constraints assigned to the current node
-			delete(model, node_const)
+			delete(model, node_con)
 			delete(model, node_L)
 			delete(model, node_U)
-			unregister(model, :node_const)
+			unregister(model, :node_con)
 			unregister(model, :node_L)
 			unregister(model, :node_U)
 		end

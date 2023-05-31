@@ -1,4 +1,3 @@
-
 # writes data (variable) to a file
 function write2file(file_name, data)
     file = open(file_name, "w")

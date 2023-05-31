@@ -9,7 +9,6 @@ using MLJBase # for conf matrix
 using Plots, Images
 using Statistics
 using Random
-using ImageBinarization
 using Serialization
 using Flux
 using Flux: params, train!, mse, flatten, onehotbatch
@@ -27,6 +26,7 @@ include("JuMP_model.jl")
 include("file_read_write.jl")
 include("MNIST.jl")
 include("neural_nets.jl")
+include("bound_tightening.jl")
 
 include.(filter(contains(r".jl$"), readdir(current_dir*"/decision_trees/"; join=true)))
 

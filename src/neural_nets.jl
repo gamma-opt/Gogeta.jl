@@ -1,4 +1,3 @@
-
 function create_sum_nn(train_len, test_len, summand_count, model) # a neural network that solves sum of m variables
 
 	x_train      = rand(train_len, summand_count) # pairs of random float32's in the range of [0,1]
@@ -59,49 +58,6 @@ function create_rosenbrock_nn(train_len, test_len, model) # solves rosenbrock(x,
 	println("\nPrediction of the data and the expected output:")
 	println(model(x_test'))
 	println(y_test')
-
-	return model
-end
-
-function create_MNIST_nn(model)
-	x_train, y_train = MNIST(split=:train)[:]
-	x_test, y_test = MNIST(split=:test)[:]
-
-	x_train = Float32.(x_train)
-	y_train = onehotbatch(y_train, 0:9)
-
-	loss(x, y) = Flux.Losses.logitcrossentropy(model(x), y)
-	parameters = params(model)
-
-	x_train_flatten = flatten(x_train)
-	x_test_flatten = flatten(x_test)
-	train_data = [(x_train_flatten, y_train)]
-	test_data = [(x_test_flatten, y_test)]
-
-	opt = ADAM(0.01) # learning rate of 0.01 gives by far the best results
-
-	println("Value of the loss function at even steps")
-
-	n = 50
-	loss_values = zeros(n)
-	for i in 1:n
-		train!(loss, parameters, train_data, opt)
-		loss_values[i] = loss(x_train_flatten, y_train)
-		if i % 10 == 0
-			println(loss_values[i])
-		end
-	end
-
-	accuracy = 0
-	len = length(y_test)
-	for i in 1:len
-		if findmax(model(test_data[1][1][:, i]))[2] - 1  == y_test[i] # -1 to get right index
-			accuracy += 1
-		end
-	end
-
-	accuracy = correct_guesses / test_len
-  println("Accuracy: ", accuracy)
 
 	return model
 end

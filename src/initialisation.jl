@@ -2,6 +2,7 @@ current_dir =  @__DIR__
 cd(current_dir)
 
 using Pkg
+Pkg.activate(".")
 Pkg.instantiate()
 
 using MLDatasets, CUDA, FileIO, ImageShow 

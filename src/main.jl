@@ -18,6 +18,5 @@ for f = 1:nfeats
     [ x_opt[i] = value.(model[:x])[f,i] for i = 1:n_splits[f]]
     first_index = findfirst(x -> x==1, x_opt)
     print("x_$f <= $(splits[f][3,first_index]) \n")
-
 end
 

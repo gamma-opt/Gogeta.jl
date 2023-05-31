@@ -2,7 +2,7 @@
 
 julia_version = "1.8.5"
 manifest_format = "2.0"
-project_hash = "e7f5765df6a533ee971fb1f04094f1b473c93cbd"
+project_hash = "3d8c4cb1c1ce1e8749a9eb47452f61be5a2c6566"
 
 [[deps.ARFFFiles]]
 deps = ["CategoricalArrays", "Dates", "Parsers", "Tables"]
@@ -749,12 +749,6 @@ git-tree-sha1 = "53aadc2a53ef3ecc4704549b4791dea67657a4bb"
 uuid = "8fd58aa0-07eb-5a78-9b36-339c94fd15ea"
 version = "1.5.1+0"
 
-[[deps.HistogramThresholding]]
-deps = ["ImageBase", "LinearAlgebra", "MappedArrays"]
-git-tree-sha1 = "7194dfbb2f8d945abdaf68fa9480a965d6661e69"
-uuid = "2c695a8d-9458-5d45-9878-1b8a99cf7853"
-version = "0.3.1"
-
 [[deps.HostCPUFeatures]]
 deps = ["BitTwiddlingConvenienceFunctions", "IfElse", "Libdl", "Static"]
 git-tree-sha1 = "734fd90dd2f920a2f1921d5388dcebe805b262dc"
@@ -789,12 +783,6 @@ deps = ["ImageCore", "Reexport"]
 git-tree-sha1 = "b51bb8cae22c66d0f6357e3bcb6363145ef20835"
 uuid = "c817782e-172a-44cc-b673-b171935fbb9e"
 version = "0.1.5"
-
-[[deps.ImageBinarization]]
-deps = ["ColorVectorSpace", "HistogramThresholding", "ImageCore", "LinearAlgebra", "Polynomials", "Reexport", "Statistics"]
-git-tree-sha1 = "81f515a2fceeb8ae44045fa075f481e9a0e64bca"
-uuid = "cbc4b850-ae4b-5111-9e64-df94c024a13d"
-version = "0.2.9"
 
 [[deps.ImageContrastAdjustment]]
 deps = ["ImageCore", "ImageTransformations", "Parameters"]
@@ -1278,12 +1266,6 @@ git-tree-sha1 = "42324d08725e200c23d4dfb549e0d5d89dede2d2"
 uuid = "1914dd2f-81c6-5fcd-8719-6d5c9610ff09"
 version = "0.5.10"
 
-[[deps.MakieCore]]
-deps = ["Observables"]
-git-tree-sha1 = "9926529455a331ed73c19ff06d16906737a876ed"
-uuid = "20f20a25-4f0e-4fdf-b5d1-57303727442b"
-version = "0.6.3"
-
 [[deps.ManualMemory]]
 git-tree-sha1 = "bcaef4fc7a0cfe2cba636d84cda54b5e4e4ca3cd"
 uuid = "d125e4d3-2237-4719-b19c-fa641b8a4667"
@@ -1414,11 +1396,6 @@ version = "0.4.5"
 [[deps.NetworkOptions]]
 uuid = "ca575930-c2e3-43a9-ace4-1e988b2c1908"
 version = "1.2.0"
-
-[[deps.Observables]]
-git-tree-sha1 = "6862738f9796b3edc1c09d0890afce4eca9e7e93"
-uuid = "510215fc-4207-5dde-b226-833fc4488ee2"
-version = "0.5.4"
 
 [[deps.OffsetArrays]]
 deps = ["Adapt"]
@@ -1587,12 +1564,6 @@ deps = ["BitTwiddlingConvenienceFunctions", "CPUSummary", "IfElse", "Static", "T
 git-tree-sha1 = "240d7170f5ffdb285f9427b92333c3463bf65bf6"
 uuid = "1d0040c9-8b98-4ee7-8388-3f51789ca0ad"
 version = "0.2.1"
-
-[[deps.Polynomials]]
-deps = ["ChainRulesCore", "LinearAlgebra", "MakieCore", "MutableArithmetics", "RecipesBase"]
-git-tree-sha1 = "66443538efd80fac4962b74523ec0b35c9464a21"
-uuid = "f27b6e38-b328-58d1-80ce-0feddd5e7a45"
-version = "3.2.9"
 
 [[deps.PooledArrays]]
 deps = ["DataAPI", "Future"]

@@ -1,4 +1,3 @@
-
 function create_sum_nn(train_len, test_len, summand_count, model) # a neural network that solves sum of m variables
 
 	x_train      = rand(train_len, summand_count) # pairs of random float32's in the range of [0,1]

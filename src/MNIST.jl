@@ -1,5 +1,3 @@
-
-
 # NOTE! This file inclused some functions for training a MNIST digit nn,
 # viewing the output nodes of the nn, viewing 28x28 grayscale images,
 # creating adversarial images and a confusion matrix for a train and test set

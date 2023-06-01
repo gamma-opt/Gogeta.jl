@@ -6,10 +6,10 @@ Takes a trained EvoTrees model and returns an optimization model with only lazy 
 - depth: initial split constraint generation depth from root node
 
 # Output
-- opt_model: optimization model with necessary constraints generated
+- opt_model: optimized model where only necessary constraints are generated
 
 """
-function trees_to_relaxed_MIP(tree_model, depth)
+function trees_to_relaxed_MIP(tree_model, constraint_depth, tree_depth)
     
     "Data extraction from tree model"
 
@@ -52,7 +52,7 @@ function trees_to_relaxed_MIP(tree_model, depth)
 
     end
 
-    "Optimization model and constraint creation"
+    "Optimization model and constraint generation"
 
     opt_model = Model(Gurobi.Optimizer)
 
@@ -69,17 +69,68 @@ function trees_to_relaxed_MIP(tree_model, depth)
     # Objective function (maximize / minimize forest prediction)
     @objective(opt_model, Max, sum(1/n_trees * evo_model.trees[tree + 1].pred[leaves[tree][leaf]] * y[tree, leaf] for tree = 1:n_trees, leaf = 1:n_leaves[tree]))
 
-    # Optimize model
-    @time optimize!(opt_model)
+    # Use lazy constraints to generate only needed split constraints
+    function split_constraint_callback(cb_data)
+        
+        x_val = callback_value.(Ref(cb_data), x)
+        y_val = callback_value.(Ref(cb_data), y)
 
-    # Print optimal solution
-    for feat = 1:n_feats 
-        x_opt = Array{Float64}(undef,  n_splits[feat])
-        [x_opt[j] = value.(opt_model[:x])[feat, j] for j = 1:n_splits[feat]]
-        first_index = findfirst(x -> x==1, x_opt)
-        print("x_$feat <= $(splitpoints[feat][3, first_index]) \n")
+        for tree in 1:n_trees
+
+            current_node = 1
+        
+            while current_node in leaves[1] == false
+                
+                if # left side chosen
+                    if sum(findall( leaf -> leaf in children(2*current_node, tree_depth), leaves[tree])) == 0 # not found from left
+                        
+                        # Add current node constraint
+                        split_cons = @build_constraint()
+                        MOI.submit(opt_model, MOI.LazyConstraint(cb_data), split_cons)
+
+                    else # found from left
+                        current_node *= 2 # check left children constraint
+                    end
+                else # right side chosen
+                    if sum(y_val[tree, children(2*current_node + 1, tree_depth)]) == 0 # not found from right
+                        
+                        # Add current node constraint
+                        split_cons = @build_constraint()
+                        MOI.submit(opt_model, MOI.LazyConstraint(cb_data), split_cons)
+
+                    else # found from right
+                        current_node = 2*current_node + 1 # check right children constraint
+                    end
+                end
+
+            end
+        end
+
     end
 
+    MOI.set(opt_model, MOI.LazyConstraintCallback(), split_constraint_callback)
+
+    # Optimize model
+    optimize!(opt_model);
+
     return opt_model
+
+end
+
+function children(id, depth)
+    
+    result = Vector{Int64}()
+
+    function inner(num)
+        if num < 2^depth - 1
+            push!(result, num)
+            inner(2*num)
+            inner(2*num + 1)
+        end
+    end
+
+    inner(id)
+
+    return result
 
 end

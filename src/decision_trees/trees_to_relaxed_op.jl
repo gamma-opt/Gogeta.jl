@@ -52,8 +52,6 @@ function trees_to_relaxed_MIP(tree_model, constraint_depth, tree_depth)
 
     end
 
-    splitpoints
-
     "Optimization model and constraint generation"
 
     opt_model = Model(Gurobi.Optimizer)
@@ -64,16 +62,16 @@ function trees_to_relaxed_MIP(tree_model, constraint_depth, tree_depth)
 
     # Constraints (2f) and (2b) (constaint (2e) concerns only categorical variables)
     @constraint(opt_model, [i = 1:n_feats, j = 1:n_splits[i]-1], x[i,j] <= x[i, j+1]) # constraints regarding order of split points (2f)
-    @constraint(opt_model, [t = 1:n_trees], sum(y[t,l] for l = 1:n_leaves[t]) == 1) # observation must fall on exactly one leaf (2b)
+    @constraint(opt_model, [tree = 1:n_trees], sum(y[tree,leaf] for leaf = 1:n_leaves[tree]) == 1) # observation must fall on exactly one leaf (2b)
 
     # Constraints (2c) and (2d)
 
     # Objective function (maximize / minimize forest prediction)
-    @objective(opt_model, Min, sum(1/n_trees * evo_model.trees[tree + 1].pred[leaves[tree][leaf]] * y[tree, leaf] for tree = 1:n_trees, leaf = 1:n_leaves[tree]))
-
-    added_constraints = 0
+    @objective(opt_model, Max, sum(1/n_trees * evo_model.trees[tree + 1].pred[leaves[tree][leaf]] * y[tree, leaf] for tree = 1:n_trees, leaf = 1:n_leaves[tree]))
 
     # Use lazy constraints to generate only needed split constraints
+    global added_constraints = 0
+
     function split_constraint_callback(cb_data)
         
         x_opt = callback_value.(Ref(cb_data), opt_model[:x])
@@ -83,44 +81,34 @@ function trees_to_relaxed_MIP(tree_model, constraint_depth, tree_depth)
 
             current_node = 1 # start investigating from root
         
-            while (current_node in leaves[tree]) == false
+            while (current_node in leaves[tree]) == false # traverse from root until hitting a leaf
                 
-                left_leaves = filter(leaf_id -> leaf_id in children(2*current_node, tree_depth), leaves[tree]) # indices of leaves to left of current node
-                right_leaves = filter(leaf_id -> leaf_id in children(2*current_node + 1, tree_depth), leaves[tree]) # indices of leaves to right of current node
+                # indices for leaves left/right from current node - indexing based on y vector convention
+                left_leaves = findall(leaf_id -> leaf_id in children(2*current_node, tree_depth), leaves[tree])
+                right_leaves = findall(leaf_id -> leaf_id in children(2*current_node + 1, tree_depth), leaves[tree])
 
-                current_feat, current_node_value = find_feature_and_value(splitpoints, tree, current_node)
+                # feature, split value and split point index associated with current node
+                current_feat, current_node_value, current_splitpoint_index = find_feature_value_and_index(splitpoints, tree, current_node)
 
-                # i = feature number
-                # j = split point index (from whole list)
-                # V(s) feature participating in split s
-                # C(s) index of split point value from splitpoints
+                if [x for x in x_opt[current_feat, :]][current_splitpoint_index] == 1 # left side chosen
+                    if sum(y_opt[tree, right_leaves]) > 0 # found from right
 
-                first_index = findfirst(val -> val!=0, [x for x in x_opt[current_feat, :]])
-                current_splitpoint_index = first_index === nothing ? length([x for x in x_opt[current_feat, :]]) : first_index; 
-
-                current_solution_value = splitpoints[current_feat][3, current_splitpoint_index]
-
-                if current_solution_value <= current_node_value # left side chosen
-                    if sum(y_opt[tree, left_leaves]) == 0 # not found from left
-                        
                         # Add constraint associated with current node (2d constraints)
                         split_cons = @build_constraint(sum(y[tree, right_leaves]) <= 1 - x[current_feat, current_splitpoint_index])
                         MOI.submit(opt_model, MOI.LazyConstraint(cb_data), split_cons)
                         added_constraints += 1
-
                         return
 
                     else # found from left
-                        current_node *= 2 # check left child
+                        current_node = 2*current_node # check left child
                     end
                 else # right side chosen
-                    if sum(y_opt[tree, right_leaves]) == 0 # not found from right
+                    if sum(y_opt[tree, left_leaves]) > 0 # not found from right
                         
-                        # Add constraint associated with current node
+                        # Add constraint associated with current node (2c constraints)
                         split_cons = @build_constraint(sum(y[tree, left_leaves]) <= x[current_feat, current_splitpoint_index])
                         MOI.submit(opt_model, MOI.LazyConstraint(cb_data), split_cons)
                         added_constraints += 1
-
                         return
 
                     else # found from right
@@ -130,9 +118,6 @@ function trees_to_relaxed_MIP(tree_model, constraint_depth, tree_depth)
 
             end
         end
-
-        return
-
     end
 
     MOI.set(opt_model, MOI.LazyConstraintCallback(), split_constraint_callback)
@@ -140,11 +125,24 @@ function trees_to_relaxed_MIP(tree_model, constraint_depth, tree_depth)
     # Optimize model
     optimize!(opt_model);
 
+    print_solution(n_feats, opt_model, n_splits, splitpoints)
+
     #return opt_model
-    return opt_model, added_constraints, splitpoints
+    return opt_model
 
 end
 
+"""
+Finds the ids of the children of any node in an indexed binary tree.
+
+# Parameters
+- id - number of the node
+- depth - depth of the binary tree
+
+# Output
+- result - vector containing the indices of the children
+
+"""
 function children(id, depth)
     
     result = Vector{Int64}()
@@ -163,12 +161,28 @@ function children(id, depth)
 
 end
 
-function find_feature_and_value(splitpoints, tree, node)
+"""
+Finds the feature (i) and split value associated with a node of a certain tree.
+
+# Parameters
+- splitpoints - array containing the split point data
+- tree - number of tree
+- node - id of the node
+
+# Output
+- feature number (i)
+- split value
+- split index
+
+"""
+function find_feature_value_and_index(splitpoints, tree, node)
 
     for feat in eachindex(splitpoints)
+        split_index = 0
         for col in eachcol(splitpoints[feat])
+            split_index += 1
             if col[1] == tree && col[2] == node
-                return feat, col[3]
+                return feat, col[3], split_index
             end   
         end
     end

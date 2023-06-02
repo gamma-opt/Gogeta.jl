@@ -10,7 +10,7 @@ evo_model = fit_evotree(config; x_train, y_train)
 preds = EvoTrees.predict(evo_model, x_train)
 plot(evo_model, 2)
 
-relaxed_model = trees_to_relaxed_MIP(evo_model, 2, 5)
+model, cons, split = trees_to_relaxed_MIP(evo_model, 2, 5);
 gbmodel = GBtrees_MIP(evo_model)
 optimize!(gbmodel)
 

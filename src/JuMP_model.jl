@@ -1,24 +1,37 @@
-# creates a JuMP model for arbitrary sized / shaped nn
-# type: what kind of model. adversial_index: index in train set to create new image
-function create_JuMP_model(nn_model, bounds_U, bounds_L, type, adversial_index=-1, opt_img_digit=0)
-    @assert type == "predict" ||
-            type == "missclassified L1" ||
-            type == "missclassified L2"
-    "Invalid type attribute \"$type\""
-    @assert 0 <= opt_img_digit <= 9 "Digit must be between 0 and 9."
+"""
+create_JuMP_model(DNN::Chain, bounds_U::Vector{Float32}, bounds_L::Vector{Float32}, bound_tightening::Bool=false)
 
-    K = length(nn_model) # NOTE! there are K+1 layers in the nn
-    nn_parameters = params(nn_model)
-    # println("nn_parameters: $nn_parameters")
+Converts a ReLU DNN to a 0-1 MILP formulatuion
 
-    W = [nn_parameters[2*i-1] for i in 1:K] # weights of the i:th layer are stored at the (2*i-1):th index
-    b = [nn_parameters[2*i] for i in 1:K] # biases  of the i:th layer are stored at the (2*i):th index
+# Arguments
+- `DNN::Chain`: A trained ReLU DNN.
+- `U_bounds::Vector{Float32}`: Upper bounds on the node values of the DNN.
+- `L_bounds::Vector{Float32}`: Lower bounds on the node values of the DNN.
+- `bound_tightening::Bool=false`: Optional bound tightening of the bounds
+
+# Examples
+```julia
+model = create_JuMP_model(DNN, U_bounds, L_bounds, true)
+```
+"""
+function create_JuMP_model(DNN::Chain, U_bounds::Vector{Float32}, L_bounds::Vector{Float32}, bound_tightening::Bool=false)
+
+    K = length(DNN) # NOTE! there are K+1 layers in the nn
+    for i in 1:K-1
+        @assert DNN[i].σ == relu "Hidden layers must use 'relu' as the activation function"
+    end
+    @assert DNN[K].σ == identity "Output layer must use the 'identity' activation function"
+
+    # store the DNN weights and biases
+    DNN_params = params(DNN)
+    W = [DNN_params[2*i-1] for i in 1:K]
+    b = [DNN_params[2*i] for i in 1:K]
 
     # stores the node count of layer k (starting at layer k=0) at index k+1
-    input_node_count = length(nn_parameters[1][1, :])
-    node_count = [if k == 1 input_node_count else length(nn_parameters[2*(k-1)]) end for k in 1:K+1]
+    input_node_count = length(DNN_params[1][1, :])
+    node_count = [if k == 1 input_node_count else length(DNN_params[2*(k-1)]) end for k in 1:K+1]
 
-    model = Model(Gurobi.Optimizer)
+    model = Model(optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => 1))
 
     # sets the variables x[k,j] and s[k,j], the binary variables z[k,j] and the big-M values U[k,j] and L[k,j]
     @variable(model, x[k in 0:K, j in 1:node_count[k+1]] >= 0)
@@ -31,116 +44,67 @@ function create_JuMP_model(nn_model, bounds_U, bounds_L, type, adversial_index=-
     index = 1
     for k in 0:K
         for j in 1:node_count[k+1]
-            fix(U[k, j], bounds_U[index])
-            fix(L[k, j], bounds_L[index])
+            fix(U[k, j], U_bounds[index])
+            fix(L[k, j], L_bounds[index])
             index += 1
         end
     end
 
-    # constraint (4a)
+    # fix bounds to the input nodes
     for input_node in 1:node_count[1]
         delete_lower_bound(x[0, input_node])
         @constraint(model, L[0, input_node] <= x[0, input_node])
         @constraint(model, x[0, input_node] <= U[0, input_node])
     end
 
-    # constraint (4b) and (4e) (cases k=1, ..., k=K)
+    # constraints corresponding to the activation functions
     for k in 1:K
-        for node in 1:node_count[k+1] # node count of the next layer of k, i.e., the layer k+1 
-            if k == 1 # constraint (4b), case k=1
-                temp_sum = sum(W[k][node, j] * x[k-1, j] for j in 1:node_count[k])
+        for node in 1:node_count[k+1] # node count of the next layer of k, i.e., the layer k+1
+            temp_sum = sum(W[k][node, j] * x[k-1, j] for j in 1:node_count[k])
+            if k < K # constraint (4b) (k=1, ..., k=K-1)
                 @constraint(model, temp_sum + b[k][node] == x[k, node] - s[k, node])
-            else
-                # [j in node_count[k]] is the number of nodes of the layer k-1 (although indexed k)
-                temp_sum = sum(W[k][node, j] * x[k-1, j] for j in 1:node_count[k])
-                if k < K # constraint (4b), case k=2, ..., k=K-1
-                    @constraint(model, temp_sum + b[k][node] == x[k, node] - s[k, node])
-                elseif k == K # constraint (4e) (k=K)
-                    @constraint(model, temp_sum + b[k][node] == x[k, node])
-                end
+            elseif k == K # constraint (4e) (k=K)
+                @constraint(model, temp_sum + b[k][node] == x[k, node])
             end
         end
     end
 
-    # constraint (4d)
+    # fix bounds to the hidden layer nodes
     @constraint(model, [k in 1:K, j in 1:node_count[k+1]], x[k, j] <= U[k, j] * z[k, j])
     @constraint(model, [k in 1:K, j in 1:node_count[k+1]], s[k, j] <= -L[k, j] * (1 - z[k, j]))
 
-    # constraint (4f)
+    # fix bounds to the output nodes
     for output_node in 1:node_count[K+1]
         delete_lower_bound(x[K, output_node])
         @constraint(model, L[K, output_node] <= x[K, output_node])
         @constraint(model, x[K, output_node] <= U[K, output_node])
     end
 
-    # NOTE! Below if clauses for testing, the type attribute will determine which objective
-    # function will be added to the model, as well as if other variables or constraints
-    # need to be added (e.g., (12) and (13) from the paper for type "missclassified")
-
-    x_train, y_train = MNIST(split=:train)[:] # easy access for testing
-    x_train_flatten = flatten(x_train)
-
-    if type == "predict"
-
-        @objective(model, Max, x[K, opt_img_digit+1]) # objective function for testing
-
-    elseif type == "missclassified L1"
-
-        @assert adversial_index >= 1 "adversial_index missing from input"
-        cur_digit = y_train[adversial_index]
-        cur_digit_img = x_train_flatten[:, adversial_index]
-
-        # variables for constraint (12) in the 2018 paper
-        @variable(model, d[k in [0], j in 1:node_count[1]] >= 0)
-
-        mult = 1.2
-        imposed_index = (cur_digit + 5) % 10 + 1 # digit is imposed as (d + 5 mod 10), +1 for indexing
-        for output_node in 1:node_count[K+1]
-            if output_node != imposed_index
-                @constraint(model, x[K, imposed_index] >= mult * x[K, output_node])
-            end
-        end
-        # (13) in the paper
-        for input_node in 1:node_count[1]
-            @constraint(model, -d[0, input_node] <= x[0, input_node] - cur_digit_img[input_node])
-            @constraint(model, x[0, input_node] - cur_digit_img[input_node] <= d[0, input_node])
-        end
-
-        # the obj function from the paper
-        @objective(model, Min, sum(d[0, input_node] for input_node in 1:node_count[1]))
-
-    elseif type == "missclassified L2"
-
-        @assert adversial_index >= 1 "adversial_index missing from input"
-        cur_digit = y_train[adversial_index]
-        cur_digit_img = x_train_flatten[:, adversial_index]
-
-        mult = 1.2
-        imposed_index = (cur_digit + 5) % 10 + 1 # digit is imposed as (d + 5 mod 10), +1 for indexing
-        for output_node in 1:node_count[K+1]
-            if output_node != imposed_index
-                @constraint(model, x[K, imposed_index] >= mult * x[K, output_node])
-            end
-        end
-
-        # the obj function from the paper
-        @objective(model, Min, sum((x[0, input_node] - cur_digit_img[input_node])^2 for input_node in 1:node_count[1]))
-    end
-
-    # println(model)
+    @objective(model, Max, x[K, 1]) # arbitrary objective function to have a complete JuMP model
 
     return model
 end
 
-# fixes the input values (layer k=0) for the JuMP model
-function evaluate(JuMP_model, input)
+"""
+evaluate!(JuMP_model::Model, input::Vector{Float32})
 
+Fixes the variables corresponding to the DNN input to a given input vector.
+
+# Arguments
+- `JuMP_model::Model`: A JuMP model representing a traied ReLU DNN (generated using the function create_JuMP_model).
+- `input::Vector{Float32}`: A given input to the trained DNN.
+
+# Examples
+```julia
+evaluate!(JuMP_model, input)
+```
+"""
+# fixes the input values (layer k=0) for the JuMP model
+function evaluate!(JuMP_model::Model, input::Vector{Float32})
     x = JuMP_model[:x] # stores the @variable with name x from the JuMP model
     input_len = length(input)
+    @assert input_len == length(x[0,:]) "'input' has wrong dimension"
     for input_node in 1:input_len
         fix(x[0, input_node], input[input_node], force=true) # fix value of input to x[0,j]
     end
-    # println(JuMP_model)
 end
-
-

@@ -1,20 +1,20 @@
 # solves the optimal BT bounds
 # nn_model is the trained nn, bound_U and bounds_L are the initial bounds as of the algorithm
-function solve_optimal_bounds(nn_model, init_bounds_U, init_bounds_L)
+function solve_optimal_bounds(DNN::Chain, init_U_bounds::Vector{Float32}, init_L_bounds::Vector{Float32})
 
-    K = length(nn_model) # NOTE! there are K+1 layers in the nn
-    nn_parameters = params(nn_model)
+    K = length(DNN) # NOTE! there are K+1 layers in the nn
+    DNN_params = params(DNN)
 
-    W = [nn_parameters[2*i-1] for i in 1:K] # weights of the i:th layer are stored at the (2*i-1):th index
-    b = [nn_parameters[2*i] for i in 1:K] # biases  of the i:th layer are stored at the (2*i):th index
+    W = [DNN_params[2*i-1] for i in 1:K] # weights of the i:th layer are stored at the (2*i-1):th index
+    b = [DNN_params[2*i] for i in 1:K] # biases  of the i:th layer are stored at the (2*i):th index
 
     # stores the node count of layer k (starting at layer k=0) at index k+1
-    input_node_count = length(nn_parameters[1][1, :])
-    node_count = [if k == 1 input_node_count else length(nn_parameters[2*(k-1)]) end for k in 1:K+1]
+    input_node_count = length(DNN_params[1][1, :])
+    node_count = [if k == 1 input_node_count else length(DNN_params[2*(k-1)]) end for k in 1:K+1]
 
     # store the current optimal bounds in the algorithm
-    curr_bounds_L = copy(init_bounds_L)
-    curr_bounds_U = copy(init_bounds_U)
+    curr_L_bounds = copy(init_L_bounds)
+    curr_U_bounds = copy(init_U_bounds)
 
 	# Threads.@threads for obj_function in 1:2
 
@@ -32,8 +32,8 @@ function solve_optimal_bounds(nn_model, init_bounds_U, init_bounds_L)
 		index = 1
 		for k in 0:K
 			for j in 1:node_count[k+1]
-				fix(U[k, j], curr_bounds_U[index], force=true)
-				fix(L[k, j], curr_bounds_L[index], force=true)
+				fix(U[k, j], curr_U_bounds[index], force=true)
+				fix(L[k, j], curr_L_bounds[index], force=true)
 				index += 1
 			end
 		end
@@ -100,11 +100,11 @@ function solve_optimal_bounds(nn_model, init_bounds_U, init_bounds_L)
 
 					if obj_function == 1 # Min
 						# push!(opt_L, optimal)
-						curr_bounds_L[input_node_count + outer_index] = optimal
+						curr_L_bounds[input_node_count + outer_index] = optimal
 						fix(L[k, node], optimal)
 					elseif obj_function == 2 # Max
 						# push!(opt_U, optimal)
-						curr_bounds_U[input_node_count + outer_index] = optimal
+						curr_U_bounds[input_node_count + outer_index] = optimal
 						fix(U[k, node], optimal)
 					end
 				end
@@ -121,7 +121,7 @@ function solve_optimal_bounds(nn_model, init_bounds_U, init_bounds_L)
 		end
 	# end
 
-    return curr_bounds_L, curr_bounds_U
+    return curr_L_bounds, curr_U_bounds
 end
 
 # sum_model2 = create_sum_nn(
@@ -180,34 +180,16 @@ bad_L3 = Float32[if i <= 784 0 else -1000 end for i in 1:890]
 @time optimal_L3, optimal_U3 = solve_optimal_bounds(nn3, bad_U3, bad_L3)
 
 
-function opt_times(nn, U, L, range)
-    times = []
-    images = []
-    for i in range
-        println("Current index is $i")
-        mdl = create_JuMP_model(nn, U, L, "missclassified L1", i)
-        time = @elapsed optimize!(mdl)
-        adversarial = Float32[]
-        for pixel in 1:784
-            pixel_value = value(mdl[:x][0, pixel]) # indexing
-            push!(adversarial, pixel_value)
-        end
-        push!(images, adversarial)
-        push!(times, time)
-    end
-    return times, images
-end
-
-bad_times1, bad_imgs1 = opt_times(nn1, bad_U1, bad_L1, 1:10)
-optimal_times1, optimal_imgs1 = opt_times(nn1, optimal_U1, optimal_L1, 1:10)
+bad_times1, bad_imgs1 = create_adversarials(nn1, bad_U1, bad_L1, 1, 10)
+optimal_times1, optimal_imgs1 = create_adversarials(nn1, optimal_U1, optimal_L1, 1, 10)
 difference1 = bad_times1 - optimal_times1
 
-bad_times2, bad_imgs2 = opt_times(nn2, bad_U2, bad_L2, 1:10)
-optimal_times2, optimal_imgs2 = opt_times(nn2, optimal_U2, optimal_L2, 1:10)
+bad_times2, bad_imgs2 = create_adversarials(nn2, bad_U2, bad_L2, 1, 10)
+optimal_times2, optimal_imgs2 = create_adversarials(nn2, optimal_U2, optimal_L2, 1, 10)
 difference2 = bad_times2 - optimal_times2
 
-bad_times3, bad_imgs3 = opt_times(nn3, bad_U3, bad_L3, 1:10)
-optimal_times3, optimal_imgs3 = opt_times(nn3, optimal_U3, optimal_L3, 1:10)
+bad_times3, bad_imgs3 = create_adversarials(nn3, bad_U3, bad_L3, 1, 10)
+optimal_times3, optimal_imgs3 = create_adversarials(nn3, optimal_U3, optimal_L3, 1, 10)
 difference3 = bad_times3 - optimal_times3
 
-test_times1, test_imgs1 = opt_times(nn1, optimal_U1, optimal_L1, 1:10)
+test_times1, test_imgs1 = create_adversarials(nn1, optimal_U1, optimal_L1, 1, 10)

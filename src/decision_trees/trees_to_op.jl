@@ -16,6 +16,7 @@ function GBtrees_MIP(evo_model)
 
     for t = 1:number_of_trees
         leaves[t] = findall(x->x!=0, vec(evo_model.trees[t+1].pred))
+        @show leaves[t]
         number_of_leaves[t] = length(leaves[t])
     end
 

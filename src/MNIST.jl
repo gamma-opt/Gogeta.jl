@@ -1,27 +1,27 @@
-
-
 # NOTE! This file inclused some functions for training a MNIST digit nn,
 # viewing the output nodes of the nn, viewing 28x28 grayscale images,
 # creating adversarial images and a confusion matrix for a train and test set
 
 # trains a mnist digit nn and returns it, (only) train and test data as input
-function train_mnist_nn(train_x, train_y, test_x, test_y, seed = abs(rand(Int)))
+function train_mnist_nn(mnist_nn, seed = abs(rand(Int)))
     Random.seed!(seed) # seed for reproducibility
 
-    mnist_model = Chain(
-        Dense(784, 32, relu),
-        Dense(32, 16, relu),
-        Dense(16, 10)
-    )
+    # mnist_nn = Chain(
+    #     Dense(784, 32, relu),
+    #     Dense(32, 16, relu),
+    #     Dense(16, 10)
+    # )
+    x_train, y_train = MNIST(split=:train)[:]
+    x_test, y_test = MNIST(split=:test)[:]
 
-    parameters = params(mnist_model)
-    train_x_flatten = flatten(train_x)
-    test_x_flatten = flatten(test_x)
-    train_y_oh = onehotbatch(train_y, 0:9)
-    train = [(train_x_flatten, train_y_oh)]
-    test = [(test_x_flatten, test_y)]
+    parameters = params(mnist_nn)
+    x_train_flatten = flatten(x_train)
+    x_test_flatten = flatten(x_test)
+    y_train_oh = onehotbatch(y_train, 0:9)
+    train = [(x_train_flatten, y_train_oh)]
+    test = [(x_test_flatten, y_test)]
 
-    loss(x, y) = Flux.Losses.logitcrossentropy(mnist_model(x), y)
+    loss(x, y) = Flux.Losses.logitcrossentropy(mnist_nn(x), y)
 
     opt = ADAM(0.01) # learning rate of 0.01 gives by far the best results
 
@@ -31,23 +31,23 @@ function train_mnist_nn(train_x, train_y, test_x, test_y, seed = abs(rand(Int)))
     loss_values = zeros(n)
     for i in 1:n
         train!(loss, parameters, train, opt)
-        loss_values[i] = loss(train_x_flatten, train_y_oh)
+        loss_values[i] = loss(x_train_flatten, y_train_oh)
         if i % 10 == 0
             println(loss_values[i])
         end
     end
 
     correct_guesses = 0
-    test_len = length(test_y)
+    test_len = length(y_test)
     for i in 1:test_len
-        if findmax(mnist_model(test[1][1][:, i]))[2] - 1  == test_y[i] # -1 to get right index
+        if findmax(mnist_nn(test[1][1][:, i]))[2] - 1  == y_test[i] # -1 to get right index
             correct_guesses += 1
         end
     end
     accuracy = correct_guesses / test_len
     println("Accuracy: ", accuracy)
 
-    return mnist_model, accuracy
+    return mnist_nn, accuracy
 end
 
 # finds an optimal input to maximize a given output node
@@ -82,14 +82,41 @@ function show_digit(img_flatten)
 end
 
 # creates adversarial images from th MNIST train data 
-function create_adversarials(model, start_idx, end_idx, l_norm = "L1")
+function create_adversarials(model::Chain, U::Vector{Float32}, L::Vector{Float32}, start_idx, end_idx, l_norm = "L1")
+    K = length(model)
+    x_train, y_train = MNIST(split=:train)[:]
+    x_train_flatten = flatten(x_train)
 
     @assert l_norm == "L1" || l_norm == "L2" "l_norm must be \"L1\" or \"L2\""
     adversarial_images = []
+    times = []
     for i in start_idx:end_idx
+        cur_digit = y_train[i]
+        cur_digit_img = x_train_flatten[:, i]
+
         println("L-norm: ", l_norm, ", Index: ", i)
-        false_class = create_JuMP_model(model, "missclassified $l_norm", i)
-        optimize!(false_class)
+        false_class = create_JuMP_model(model, U, L)
+        x = false_class[:x]
+        # variables for constraint (12) in the 2018 paper
+        @variable(false_class, d[k in [0], j in 1:784] >= 0)
+        mult = 1.2
+        imposed_index = (cur_digit + 5) % 10 + 1 # digit is imposed as (d + 5 mod 10), +1 for indexing
+        for output_node in 1:10
+            if output_node != imposed_index
+                @constraint(false_class, x[K, imposed_index] >= mult * x[K, output_node])
+            end
+        end
+        for input_node in 1:784
+            @constraint(false_class, -d[0, input_node] <= x[0, input_node] - cur_digit_img[input_node])
+            @constraint(false_class, x[0, input_node] - cur_digit_img[input_node] <= d[0, input_node])
+        end
+        if l_norm == "L1"
+            @objective(false_class, Min, sum(d[0, input_node] for input_node in 1:784))
+        else 
+            @objective(false_class, Min, sum(d[0, input_node]^2 for input_node in 1:784))
+        end
+
+        time = @elapsed optimize!(false_class)
 
         adversarial = Float32[]
         for pixel in 1:784
@@ -98,25 +125,10 @@ function create_adversarials(model, start_idx, end_idx, l_norm = "L1")
         end
 
         push!(adversarial_images, adversarial)
+        push!(times, time)
     end
 
-    return adversarial_images
-end
-
-# adversarial_L1 = create_adversarials(mnist_model,1,12000, "L1") # Note! very long runtime
-# adversarial_L2 = create_adversarials(mnist_model,1,12000, "L2")
-
-# creates a confusion matrix for MNIST digits
-function confusion_matrix(model, features, labels)
-    # ordering = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
-    features_flatten = flatten(features)
-    len = length(labels)
-    predictions = zeros(len)
-    for i in 1:len
-        cur_pred = findmax(model(features_flatten[:,i]))[2] - 1
-        predictions[i] = cur_pred
-    end
-    return ConfusionMatrix()(predictions, labels)
+    return times, adversarial_images
 end
 
 # adds a certain amount of adversarials
@@ -138,18 +150,4 @@ function add_adversarials(adversarials, count)
     new_y_train = cat(y_train, adversarial_labels; dims=1)
 
     return new_x_train, new_y_train
-end
-
-# function that creates a label to the digit image
-function create_labeled_digit(original_img, label)
-    img = load(original_img)
-    plot(img, framestyle=:none, title="Label is $label")
-    savefig("uncropped_$label.png")
-
-    img_label = load("uncropped_$label.png")
-    # img_size = size(img_label)
-    # cropping to 400x400 with even edges
-    cropped = img_label[:, 116:515] 
-    # img_smaller = imresize(cropped, (200, 200))
-    return cropped
 end

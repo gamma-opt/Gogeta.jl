@@ -1,9 +1,10 @@
 """
-Takes a trained EvoTrees model and returns an optimization model with only lazy generated split constraints.
+Takes a trained EvoTrees model and returns an optimized model with only lazy generated split constraints.
 
 # Parameters
 - tree_model: trained `EvoTrees` model to be optimized
-- depth: initial split constraint generation depth from root node
+- constraint_depth: initial split constraint generation depth from root node
+- tree_depth: `EvoTrees` model maximum tree depth - used for finding children to necessary depth
 
 # Output
 - opt_model: optimized model where only necessary constraints are generated
@@ -60,18 +61,36 @@ function trees_to_relaxed_MIP(tree_model, constraint_depth, tree_depth)
     @variable(opt_model, x[feat = 1:n_feats, 1:n_splits[feat]], Bin) # indicator variable x_ij for feature i <= j:th split point (2g)
     @variable(opt_model, y[tree = 1:n_trees, 1:n_leaves[tree]] >= 0) # indicator variable y_tl for observation falling on leaf l of tree (2h)
 
-    # Constraints (2f) and (2b) (constaint (2e) concerns only categorical variables)
+    # Constraints (2f) and (2b) (constraint (2e) concerns only categorical variables)
     @constraint(opt_model, [i = 1:n_feats, j = 1:n_splits[i]-1], x[i,j] <= x[i, j+1]) # constraints regarding order of split points (2f)
     @constraint(opt_model, [tree = 1:n_trees], sum(y[tree,leaf] for leaf = 1:n_leaves[tree]) == 1) # observation must fall on exactly one leaf (2b)
 
-    # Constraints (2c) and (2d)
+    # Constraints (2c) and (2d) - generate only to depth specified in constraint_depth
+    initial_constraints = 0
+
+    for tree in 1:n_trees
+        for current_node in findall(feat -> feat!=0, tree_model.trees[tree + 1].feat)
+            if current_node <= (2^constraint_depth - 1)
+
+                left_leaves = findall(leaf_id -> leaf_id in children(2*current_node, tree_depth), leaves[tree])
+                right_leaves = findall(leaf_id -> leaf_id in children(2*current_node + 1, tree_depth), leaves[tree])
+
+                current_feat, current_node_value, current_splitpoint_index = find_feature_value_and_index(splitpoints, tree, current_node)
+
+                @constraint(opt_model, sum(y[tree, right_leaves]) <= 1 - x[current_feat, current_splitpoint_index])
+                @constraint(opt_model, sum(y[tree, left_leaves]) <= x[current_feat, current_splitpoint_index])
+
+                initial_constraints += 2
+
+            end
+        end
+    end
 
     # Objective function (maximize / minimize forest prediction)
-    @objective(opt_model, Max, sum(1/n_trees * evo_model.trees[tree + 1].pred[leaves[tree][leaf]] * y[tree, leaf] for tree = 1:n_trees, leaf = 1:n_leaves[tree]))
+    @objective(opt_model, Min, sum(1/n_trees * evo_model.trees[tree + 1].pred[leaves[tree][leaf]] * y[tree, leaf] for tree = 1:n_trees, leaf = 1:n_leaves[tree]))
 
     # Use lazy constraints to generate only needed split constraints
-    global added_constraints = 0
-
+    generated_constraints = 0
     function split_constraint_callback(cb_data)
         
         x_opt = callback_value.(Ref(cb_data), opt_model[:x])
@@ -90,29 +109,29 @@ function trees_to_relaxed_MIP(tree_model, constraint_depth, tree_depth)
                 # feature, split value and split point index associated with current node
                 current_feat, current_node_value, current_splitpoint_index = find_feature_value_and_index(splitpoints, tree, current_node)
 
-                if [x for x in x_opt[current_feat, :]][current_splitpoint_index] == 1 # left side chosen
-                    if sum(y_opt[tree, right_leaves]) > 0 # found from right
+                if x_opt[current_feat, current_splitpoint_index] == 1 # node condition true - left side chosen...
+                    if sum(y_opt[tree, right_leaves]) > 0 # ...but found from right
 
-                        # Add constraint associated with current node (2d constraints)
+                        # Add constraint associated with current node (2d constraint)
                         split_cons = @build_constraint(sum(y[tree, right_leaves]) <= 1 - x[current_feat, current_splitpoint_index])
                         MOI.submit(opt_model, MOI.LazyConstraint(cb_data), split_cons)
-                        added_constraints += 1
+                        generated_constraints += 1
                         return
 
-                    else # found from left
-                        current_node = 2*current_node # check left child
+                    else # ...and found from left
+                        current_node = 2*current_node # check left child - continue search
                     end
-                else # right side chosen
-                    if sum(y_opt[tree, left_leaves]) > 0 # not found from right
+                else # right side chosen...
+                    if sum(y_opt[tree, left_leaves]) > 0 # ...but found from left
                         
-                        # Add constraint associated with current node (2c constraints)
+                        # Add constraint associated with current node (2c constraint)
                         split_cons = @build_constraint(sum(y[tree, left_leaves]) <= x[current_feat, current_splitpoint_index])
                         MOI.submit(opt_model, MOI.LazyConstraint(cb_data), split_cons)
-                        added_constraints += 1
+                        generated_constraints += 1
                         return
 
-                    else # found from right
-                        current_node = 2*current_node + 1 # check right child
+                    else # ...and found from right
+                        current_node = 2*current_node + 1 # check right child - continue search
                     end
                 end
 
@@ -120,29 +139,19 @@ function trees_to_relaxed_MIP(tree_model, constraint_depth, tree_depth)
         end
     end
 
+    # Set callback for lazy split constraint generation
     MOI.set(opt_model, MOI.LazyConstraintCallback(), split_constraint_callback)
+    optimize!(opt_model)
 
-    # Optimize model
-    optimize!(opt_model);
+    println("\nINITIAL CONSTRAINTS: $initial_constraints")
+    println("GENERATED CONSTRAINTS: $generated_constraints")
 
     print_solution(n_feats, opt_model, n_splits, splitpoints)
 
-    #return opt_model
     return opt_model
 
 end
 
-"""
-Finds the ids of the children of any node in an indexed binary tree.
-
-# Parameters
-- id - number of the node
-- depth - depth of the binary tree
-
-# Output
-- result - vector containing the indices of the children
-
-"""
 function children(id, depth)
     
     result = Vector{Int64}()
@@ -161,20 +170,6 @@ function children(id, depth)
 
 end
 
-"""
-Finds the feature (i) and split value associated with a node of a certain tree.
-
-# Parameters
-- splitpoints - array containing the split point data
-- tree - number of tree
-- node - id of the node
-
-# Output
-- feature number (i)
-- split value
-- split index
-
-"""
 function find_feature_value_and_index(splitpoints, tree, node)
 
     for feat in eachindex(splitpoints)

@@ -1,6 +1,6 @@
 include("initialisation.jl")
 
-config = EvoTreeRegressor(max_depth=5, nbins=32, nrounds=10)
+config = EvoTreeRegressor(max_depth=12, nbins=100, nrounds=10)
 nobs, nfeats = 1_000, 5
 x_train = randn(nobs, nfeats)
 y_train = Array{Float64}(undef, nobs)
@@ -8,14 +8,17 @@ y_train = Array{Float64}(undef, nobs)
 
 evo_model = fit_evotree(config; x_train, y_train)
 preds = EvoTrees.predict(evo_model, x_train)
-plot(evo_model, 2)
+plot(evo_model, 3)
 
-model = trees_to_relaxed_MIP(evo_model, 2, 5);
-gbmodel = GBtrees_MIP(evo_model)
-optimize!(gbmodel)
+@time new_model = trees_to_relaxed_MIP(evo_model, 12, 12);
+
+@time lazy_model = trees_to_relaxed_MIP(evo_model, 1, 12);
+
+@time old_model = GBtrees_MIP(evo_model);
 
 
 function print_solution(n_feats, model, n_splits, splitpoints)
+    println("\n=========================SOLUTION=========================")
     for f = 1:n_feats 
         x_opt = Array{Float64}(undef,  n_splits[f])
         [x_opt[i] = value.(model[:x])[f,i] for i = 1:n_splits[f]]
@@ -26,4 +29,5 @@ function print_solution(n_feats, model, n_splits, splitpoints)
             println("x_$f <= $(splitpoints[f][3,first_index])")
         end
     end
+    println("==========================================================\n")
 end

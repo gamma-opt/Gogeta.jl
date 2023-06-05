@@ -77,6 +77,10 @@ function GBtrees_MIP(evo_model)
 
     @objective(model, Min, sum(0.1 * evo_model.trees[t+1].pred[leaves[t][l]] * y[t,l] for t = 1:number_of_trees, l = 1:number_of_leaves[t]))
 
+    optimize!(model)
+
+    print_solution(nfeats, model, n_splits, splits)
+
     return model
 
 end

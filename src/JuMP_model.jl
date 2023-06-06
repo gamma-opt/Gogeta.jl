@@ -7,7 +7,7 @@ Converts a ReLU DNN to a 0-1 MILP formulatuion
 - `DNN::Chain`: A trained ReLU DNN.
 - `U_bounds::Vector{Float32}`: Upper bounds on the node values of the DNN.
 - `L_bounds::Vector{Float32}`: Lower bounds on the node values of the DNN.
-- `bound_tightening::Bool=false`: Optional bound tightening of the bounds
+- `bound_tightening::Bool=false`: Optional bound tightening of the constraint bounds
 
 # Examples
 ```julia
@@ -31,6 +31,14 @@ function create_JuMP_model(DNN::Chain, U_bounds::Vector{Float32}, L_bounds::Vect
     input_node_count = length(DNN_params[1][1, :])
     node_count = [if k == 1 input_node_count else length(DNN_params[2*(k-1)]) end for k in 1:K+1]
 
+    final_L_bounds = copy(L_bounds)
+    final_U_bounds = copy(U_bounds)
+
+    # optional: calculates optimal lower and upper bounds L and U 
+    if bound_tightening 
+        final_L_bounds, final_U_bounds = solve_optimal_bounds(DNN, U_bounds, L_bounds)
+    end
+
     model = Model(optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => 1))
 
     # sets the variables x[k,j] and s[k,j], the binary variables z[k,j] and the big-M values U[k,j] and L[k,j]
@@ -44,8 +52,8 @@ function create_JuMP_model(DNN::Chain, U_bounds::Vector{Float32}, L_bounds::Vect
     index = 1
     for k in 0:K
         for j in 1:node_count[k+1]
-            fix(U[k, j], U_bounds[index])
-            fix(L[k, j], L_bounds[index])
+            fix(U[k, j], final_U_bounds[index])
+            fix(L[k, j], final_L_bounds[index])
             index += 1
         end
     end

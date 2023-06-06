@@ -48,7 +48,7 @@ function create_JuMP_model(DNN::Chain, U_bounds::Vector{Float32}, L_bounds::Vect
     @variable(model, U[k in 0:K, j in 1:node_count[k+1]])
     @variable(model, L[k in 0:K, j in 1:node_count[k+1]])
 
-    # fix bounds to all U[k,j] and L[k,j] from bounds_U and bounds_L
+    # fix values to all U[k,j] and L[k,j] from U_bounds and L_bounds
     index = 1
     for k in 0:K
         for j in 1:node_count[k+1]
@@ -58,20 +58,20 @@ function create_JuMP_model(DNN::Chain, U_bounds::Vector{Float32}, L_bounds::Vect
         end
     end
 
-    # fix bounds to the input nodes
+    # fix bounds U and L to input nodes
     for input_node in 1:node_count[1]
         delete_lower_bound(x[0, input_node])
         @constraint(model, L[0, input_node] <= x[0, input_node])
         @constraint(model, x[0, input_node] <= U[0, input_node])
     end
 
-    # constraints corresponding to the activation functions
+    # constraints corresponding to the ReLU activation functions
     for k in 1:K
         for node in 1:node_count[k+1] # node count of the next layer of k, i.e., the layer k+1
             temp_sum = sum(W[k][node, j] * x[k-1, j] for j in 1:node_count[k])
-            if k < K # constraint (4b) (k=1, ..., k=K-1)
+            if k < K # hidden layers: k = 1, ..., K-1
                 @constraint(model, temp_sum + b[k][node] == x[k, node] - s[k, node])
-            elseif k == K # constraint (4e) (k=K)
+            else # output layer: k == K
                 @constraint(model, temp_sum + b[k][node] == x[k, node])
             end
         end
@@ -111,7 +111,7 @@ evaluate!(JuMP_model, input)
 function evaluate!(JuMP_model::Model, input::Vector{Float32})
     x = JuMP_model[:x] # stores the @variable with name x from the JuMP model
     input_len = length(input)
-    @assert input_len == length(x[0,:]) "'input' has wrong dimension"
+    @assert input_len == length(x[0, :]) "'input' has wrong dimension"
     for input_node in 1:input_len
         fix(x[0, input_node], input[input_node], force=true) # fix value of input to x[0,j]
     end

@@ -36,7 +36,9 @@ function solve_optimal_bounds(DNN::Chain, init_U_bounds::Vector{Float32}, init_L
 	# Threads.@threads for obj_function in 1:2
 
 		model = Model(optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => 1))
-		outer_index = 1
+
+        # keeps track of the current node index starting from layer 1 (out of 0:K)
+		outer_index = node_count[1] + 1
 
 		# NOTE! below variables and constraints for all opt problems
 		@variable(model, x[k in 0:K, j in 1:node_count[k+1]] >= 0)
@@ -45,7 +47,7 @@ function solve_optimal_bounds(DNN::Chain, init_U_bounds::Vector{Float32}, init_L
 		@variable(model, U[k in 0:K, j in 1:node_count[k+1]])
 		@variable(model, L[k in 0:K, j in 1:node_count[k+1]])
 
-		# fix bounds to all U[k,j] and L[k,j] from bounds_U and bounds_L
+		# fix values to all U[k,j] and L[k,j] from U_bounds and L_bounds
 		index = 1
 		for k in 0:K
 			for j in 1:node_count[k+1]
@@ -55,21 +57,22 @@ function solve_optimal_bounds(DNN::Chain, init_U_bounds::Vector{Float32}, init_L
 			end
 		end
 
-		for input_node in 1:node_count[1] # input constraints (4a)
+        # input layer (layer 0) node bounds are given beforehand
+		for input_node in 1:node_count[1]
 			delete_lower_bound(x[0, input_node])
 			@constraint(model, L[0, input_node] <= x[0, input_node])
 			@constraint(model, x[0, input_node] <= U[0, input_node])
 		end
 
+        # deleting lower bound for output nodes
 		for output_node in 1:node_count[K+1]
 			delete_lower_bound(x[K, output_node])
-			@constraint(model, L[K, output_node] <= x[K, output_node])
-			@constraint(model, x[K, output_node] <= U[K, output_node])
 		end
 
+        # NOTE! below constraints depending on the layer
 		for k in 1:K
-			# NOTE! below constraints depending on the layer
-			# we only want to build ALL of the constraints until the PREVIOUS layer, and then go node by node. Here we calculate ONLY the constraints until the PREVIOUS layer
+			# we only want to build ALL of the constraints until the PREVIOUS layer, and then go node by node
+            # here we calculate ONLY the constraints until the PREVIOUS layer
 			for node_in in 1:node_count[k]
 				if k >= 2
 					temp_sum = sum(W[k-1][node_in, j] * x[k-1-1, j] for j in 1:node_count[k-1])
@@ -83,9 +86,9 @@ function solve_optimal_bounds(DNN::Chain, init_U_bounds::Vector{Float32}, init_L
 				end
 			end
 
+            # NOTE! below constraints depending on the node
 			for node in 1:node_count[k+1]
-				# NOTE! below constraints depending on the node
-				# Here we calculate the specific constraints depending on the current node
+				# here we calculate the specific constraints depending on the current node
 				temp_sum = sum(W[k][node, j] * x[k-1, j] for j in 1:node_count[k]) # NOTE! prev layer [k]
 				if k <= K - 1
 					@constraint(model, node_con, temp_sum + b[k][node] == x[k, node] - s[k, node])
@@ -97,6 +100,7 @@ function solve_optimal_bounds(DNN::Chain, init_U_bounds::Vector{Float32}, init_L
 					@constraint(model, node_U, x[k, node] <= U[k, node])
 				end
 
+                # NOTE! below objective function and optimizing the model depending on obj_function and layer
 				for obj_function in 1:2
 					if obj_function == 1 && k <= K - 1 # Min, hidden layer
 						@objective(model, Min, x[k, node] - s[k, node])
@@ -107,16 +111,17 @@ function solve_optimal_bounds(DNN::Chain, init_U_bounds::Vector{Float32}, init_L
 					elseif obj_function == 2 && k == K # Max, last layer
 						@objective(model, Max, x[k, node])
 					end
-					println("Curr layer: ", k, " , curr node: ", node, " , curr obj: ", obj_function)
+					println("Curr layer: ", k, ", curr node: ", node, ", curr obj: ", obj_function, " (1 -> Min, 2 -> Max)")
 					optimize!(model)
-					@assert termination_status(model) == OPTIMAL "Problem in layer $k (1:$K) and node $node is infeasible."
+					@assert termination_status(model) == OPTIMAL "Problem in layer $k (from 1:$K) and node $node is infeasible."
 					optimal = objective_value(model)
 
+                    # fix the model variable L or U corresponding to the current node to be the optimal value
 					if obj_function == 1 # Min
-						curr_L_bounds[input_node_count + outer_index] = optimal
+						curr_L_bounds[outer_index] = optimal
 						fix(L[k, node], optimal)
 					elseif obj_function == 2 # Max
-						curr_U_bounds[input_node_count + outer_index] = optimal
+						curr_U_bounds[outer_index] = optimal
 						fix(U[k, node], optimal)
 					end
 				end

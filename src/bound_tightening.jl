@@ -9,14 +9,15 @@ NOTE! Currently single-threaded.
 - `DNN::Chain`: A trained ReLU DNN.
 - `init_U_bounds::Vector{Float32}`: Initial upper bounds on the node values of the DNN.
 - `init_L_bounds::Vector{Float32}`: Initial lower bounds on the node values of the DNN.
+- `verbose::Bool=false`: Controls Gurobi logs
 
 # Examples
 ```julia
-optimal_L, optimal_U = solve_optimal_bounds(DNN, init_U_bounds, init_L_bounds)
+optimal_L, optimal_U = solve_optimal_bounds(DNN, init_U_bounds, init_L_bounds, false)
 ```
 """
 
-function solve_optimal_bounds(DNN::Chain, init_U_bounds::Vector{Float32}, init_L_bounds::Vector{Float32})
+function solve_optimal_bounds(DNN::Chain, init_U_bounds::Vector{Float32}, init_L_bounds::Vector{Float32}, verbose::Bool=false)
 
     K = length(DNN) # NOTE! there are K+1 layers in the nn
 
@@ -35,7 +36,7 @@ function solve_optimal_bounds(DNN::Chain, init_U_bounds::Vector{Float32}, init_L
 
 	# Threads.@threads for obj_function in 1:2
 
-		model = Model(optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => 1))
+		model = Model(optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => (verbose ? 1 : 0)))
 
         # keeps track of the current node index starting from layer 1 (out of 0:K)
 		outer_index = node_count[1] + 1
@@ -111,9 +112,12 @@ function solve_optimal_bounds(DNN::Chain, init_U_bounds::Vector{Float32}, init_L
 					elseif obj_function == 2 && k == K # Max, last layer
 						@objective(model, Max, x[k, node])
 					end
-					println("Curr layer: ", k, ", curr node: ", node, ", curr obj: ", obj_function, " (1 -> Min, 2 -> Max)")
-					optimize!(model)
-					@assert termination_status(model) == OPTIMAL "Problem in layer $k (from 1:$K) and node $node is infeasible."
+
+					solve_time = @elapsed optimize!(model)
+                    solve_time = round(solve_time; sigdigits = 3)
+					@assert termination_status(model) == OPTIMAL 
+                        "Problem (layer $k (from 1:$K), node $node, $(obj_function == 1 ? "L" : "U")-bound) is infeasible."
+                    println("Solve time (layer $k, node $node, $(obj_function == 1 ? "L" : "U")-bound): $(solve_time)s")
 					optimal = objective_value(model)
 
                     # fix the model variable L or U corresponding to the current node to be the optimal value
@@ -137,6 +141,8 @@ function solve_optimal_bounds(DNN::Chain, init_U_bounds::Vector{Float32}, init_L
 			end
 		end
 	# end
+
+    println("Solving optimal constraint bounds complete")
 
     return curr_L_bounds, curr_U_bounds
 end

@@ -3,9 +3,11 @@ DNN1: 784 -> 32 -> 16 -> 10 (2 hidden layers)
 Single thread: solve for optimal bounds:
 28.378149 seconds (1.32 M allocations: 2.056 GiB, 0.40% gc time)
 
-creating 10 optimal images (s) (difference: old bounds - new bounds):
+Average time of creating 10 adversarial images:
+Old bounds: 9.56, optimal bounds: 2.64, difference 6.90
+
+creating 10 optimal images (s) (difference: old bounds - optimal bounds):
 3.31, 3.86, 0.53, 32.78, 0.65, 0.014, 4.94, 0.012, 21.29, 1.63
-average time: 6.90
 
 
 DNN2: 784 -> 32 -> 24 -> 16 -> 10 (3 hidden layers)
@@ -13,9 +15,11 @@ DNN2: 784 -> 32 -> 24 -> 16 -> 10 (3 hidden layers)
 Single thread: solve for optimal bounds:
 231.630025 seconds (2.40 M allocations: 2.093 GiB, 0.07% gc time)
 
+Average time of creating 10 adversarial images:
+Old bounds: 57.87, optimal bounds: 29.09, difference 28.78
+
 creating 10 optimal images (s) (difference: old bounds - new bounds):
 -0.77, -20.19, 15.66, -2.03, -27.27, 5.96, 0.36, 6.17, 87.16, 222.77
-average time: 28.78
 
 
 DNN3: 784 -> 40 -> 30 -> 20 -> 10 -> 10 (4 hidden layers)
@@ -23,6 +27,8 @@ DNN3: 784 -> 40 -> 30 -> 20 -> 10 -> 10 (4 hidden layers)
 Single thread: solve for optimal bounds:
 3813.756949 seconds (18.10 M allocations: 3.072 GiB, 0.01% gc time)
 
+Average time of creating 10 adversarial images:
+Old bounds: 2927, optimal bounds: 240, difference 2687
+
 creating 10 optimal images (s) (difference: old bounds - new bounds):
 2365, 1136, 1287, 10089, 117, -576, 3317, -176, -22, 9329
-average: 2687

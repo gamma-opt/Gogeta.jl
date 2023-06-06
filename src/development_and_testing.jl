@@ -59,3 +59,31 @@ difference3 = bad_times3 - optimal_times3
 @time test = create_JuMP_model(nn1, bad_U1, bad_L1, true)
 
 test_time, test_img = create_adversarials(nn1, bad_U1, bad_L1, 1, 1, "L1", true)
+
+
+
+using Distributed
+using SharedArrays
+
+n_threads = Threads.nthreads()
+addprocs(n_threads)
+nprocs()
+workers()
+worker = workers()
+
+
+@everywhere begin
+    import Pkg
+    Pkg.activate(".")
+    include("initialisation.jl")
+end
+
+@everywhere printsquare(i) = println("working on i=$i: its square it $(i^2)")
+@sync @distributed for i in 1:9
+    printsquare(i)
+    sleep(2)
+end
+
+bad_U1 = Float32[if i <= 784 1 else 1000 end for i in 1:842]
+bad_L1 = Float32[if i <= 784 0 else -1000 end for i in 1:842]
+@time optimal_L1_multi, optimal_U1_multi = solve_optimal_bounds_multi(nn1, bad_U1, bad_L1)

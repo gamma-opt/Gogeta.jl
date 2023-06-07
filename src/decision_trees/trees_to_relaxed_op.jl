@@ -13,82 +13,51 @@ Takes a trained EvoTrees model and returns an optimized model with only lazy gen
 function trees_to_relaxed_MIP(tree_model, constraint_depth, tree_depth)
     
     "Data extraction from tree model"
-
-    n_trees = length(tree_model.trees) - 1 # number of trees in the model
-    n_feats = length(evo_model.info[:fnames]) # number of features (variables) in the model
-
-    n_leaves = Array{Int64}(undef, n_trees) # array for the number of leaves on each tree
-    leaves = Array{Array}(undef, n_trees) # array for the ids of the leaves for each tree
-
-    # Get number of leaves and ids of the leaves on each tree
-    for tree in 1:n_trees
-        leaves[tree] = findall(x -> x!=0, vec(evo_model.trees[tree + 1].pred))
-        n_leaves[tree] = length(leaves[tree])
-    end
-
-    n_splits = Array{Int64}(undef, n_feats) # number of splits for each variable
-    splitpoints = Array{Any}(undef, n_feats) # ordered list of matrices of unique split points for each feature [tree, node_id, split_value]
-
-    # Get number of splits and unique split points for each feature (variable)
-    for feat in 1:n_feats
-        
-        split_tree = Vector{Int64}() # array for trees the split happens in
-        split_id = Vector{Int64}() # array for nodes the split happens in
-        split_value = Vector{Float64}() # array for split values
-
-        for tree in 1:n_trees
-
-            split_ids = findall(id -> id == feat, tree_model.trees[tree + 1].feat) # nodes with split on feat
-            
-            # Add node data to splitspoints
-            append!(split_id, split_ids)
-            append!(split_value, evo_model.trees[tree + 1].cond_float[split_ids])
-            append!(split_tree, tree .* ones(length(split_ids)))
-
-        end
-
-        splitpoints[feat] = [split_tree'; split_id'; split_value'] # save split point data in a matrix
-        splitpoints[feat] = splitpoints[feat][:,sortperm(splitpoints[feat][3,:])] # sort the matix columns based on the 3rd column (splits values)
-        n_splits[feat] = size(splitpoints[feat], 2) # store the number of splits in the whole forest associated with feat 
-
-    end
+ 
+    @time n_trees, n_feats, n_leaves, leaves, n_splits, splits = extract_tree_model_info(tree_model, tree_depth)
+    println("DATA EXTRACTION FROM EVOTREES MODEL TIME")
 
     "Optimization model and constraint generation"
 
-    opt_model = Model(Gurobi.Optimizer)
+    @time begin
 
-    # Variable definitions as well as constraints (2g) and (2h)
-    @variable(opt_model, x[feat = 1:n_feats, 1:n_splits[feat]], Bin) # indicator variable x_ij for feature i <= j:th split point (2g)
-    @variable(opt_model, y[tree = 1:n_trees, 1:n_leaves[tree]] >= 0) # indicator variable y_tl for observation falling on leaf l of tree (2h)
+        opt_model = Model(Gurobi.Optimizer)
 
-    # Constraints (2f) and (2b) (constraint (2e) concerns only categorical variables)
-    @constraint(opt_model, [i = 1:n_feats, j = 1:n_splits[i]-1], x[i,j] <= x[i, j+1]) # constraints regarding order of split points (2f)
-    @constraint(opt_model, [tree = 1:n_trees], sum(y[tree,leaf] for leaf = 1:n_leaves[tree]) == 1) # observation must fall on exactly one leaf (2b)
+        # Variable definitions as well as constraints (2g) and (2h)
+        @variable(opt_model, x[feat = 1:n_feats, 1:n_splits[feat]], Bin) # indicator variable x_ij for feature i <= j:th split point (2g)
+        @variable(opt_model, y[tree = 1:n_trees, 1:n_leaves[tree]] >= 0) # indicator variable y_tl for observation falling on leaf l of tree (2h)
 
-    # Constraints (2c) and (2d) - generate only to depth specified in constraint_depth
-    initial_constraints = 0
+        # Constraints (2f) and (2b) (constraint (2e) concerns only categorical variables)
+        @constraint(opt_model, [i = 1:n_feats, j = 1:n_splits[i]-1], x[i,j] <= x[i, j+1]) # constraints regarding order of split points (2f)
+        @constraint(opt_model, [tree = 1:n_trees], sum(y[tree,leaf] for leaf = 1:n_leaves[tree]) == 1) # observation must fall on exactly one leaf (2b)
 
-    for tree in 1:n_trees
-        for current_node in findall(feat -> feat!=0, tree_model.trees[tree + 1].feat)
-            if current_node <= (2^constraint_depth - 1)
+        # Constraints (2c) and (2d) - generate only to depth specified in constraint_depth
+        initial_constraints = 0
+        
+        for tree in 1:n_trees
+            for current_node in findall(feat -> feat!=0, tree_model.trees[tree + 1].feat)
+                if current_node <= (2^constraint_depth - 1)
 
-                left_leaves = findall(leaf_id -> leaf_id in children(2*current_node, tree_depth), leaves[tree])
-                right_leaves = findall(leaf_id -> leaf_id in children(2*current_node + 1, tree_depth), leaves[tree])
+                    right_leaves = children(2*current_node + 1, leaves[tree])
+                    left_leaves = children(2*current_node, leaves[tree])
 
-                current_feat, current_node_value, current_splitpoint_index = find_feature_value_and_index(splitpoints, tree, current_node)
+                    current_feat, current_node_value, current_splitpoint_index = splits[tree, current_node]
 
-                @constraint(opt_model, sum(y[tree, right_leaves]) <= 1 - x[current_feat, current_splitpoint_index])
-                @constraint(opt_model, sum(y[tree, left_leaves]) <= x[current_feat, current_splitpoint_index])
+                    @constraint(opt_model, sum(y[tree, right_leaves]) <= 1 - x[current_feat, current_splitpoint_index])
+                    @constraint(opt_model, sum(y[tree, left_leaves]) <= x[current_feat, current_splitpoint_index])
+                    
+                    initial_constraints += 2
 
-                initial_constraints += 2
-
+                end
             end
         end
+        
+        # Objective function (maximize / minimize forest prediction)
+        @objective(opt_model, Min, sum(1/n_trees * evo_model.trees[tree + 1].pred[leaves[tree][leaf]] * y[tree, leaf] for tree = 1:n_trees, leaf = 1:n_leaves[tree]))
+
     end
-
-    # Objective function (maximize / minimize forest prediction)
-    @objective(opt_model, Min, sum(1/n_trees * evo_model.trees[tree + 1].pred[leaves[tree][leaf]] * y[tree, leaf] for tree = 1:n_trees, leaf = 1:n_leaves[tree]))
-
+    println("OPTIMIZATION MODEL CREATION AND CONSTRAINT GENERATION TIME")
+    
     # Use lazy constraints to generate only needed split constraints
     generated_constraints = 0
     function split_constraint_callback(cb_data)
@@ -103,11 +72,12 @@ function trees_to_relaxed_MIP(tree_model, constraint_depth, tree_depth)
             while (current_node in leaves[tree]) == false # traverse from root until hitting a leaf
                 
                 # indices for leaves left/right from current node - indexing based on y vector convention
-                left_leaves = findall(leaf_id -> leaf_id in children(2*current_node, tree_depth), leaves[tree])
-                right_leaves = findall(leaf_id -> leaf_id in children(2*current_node + 1, tree_depth), leaves[tree])
+                right_leaves = children(2*current_node + 1, leaves[tree])
+                left_leaves = children(2*current_node, leaves[tree])
 
                 # feature, split value and split point index associated with current node
-                current_feat, current_node_value, current_splitpoint_index = find_feature_value_and_index(splitpoints, tree, current_node)
+                #current_feat, current_node_value, current_splitpoint_index = find_feature_value_and_index(splitpoints, tree, current_node)
+                current_feat, current_node_value, current_splitpoint_index = splits[tree, current_node]
 
                 if x_opt[current_feat, current_splitpoint_index] == 1 # node condition true - left side chosen...
                     if sum(y_opt[tree, right_leaves]) > 0 # ...but found from right
@@ -139,26 +109,85 @@ function trees_to_relaxed_MIP(tree_model, constraint_depth, tree_depth)
         end
     end
 
-    # Set callback for lazy split constraint generation
-    MOI.set(opt_model, MOI.LazyConstraintCallback(), split_constraint_callback)
-    optimize!(opt_model)
+    @time begin
+        # Set callback for lazy split constraint generation
+        MOI.set(opt_model, MOI.LazyConstraintCallback(), split_constraint_callback)
+        optimize!(opt_model)
+    end
+    println("OPTIMIZATION WITH LAZY CONSTRAINT CALLBACK TIME")
 
     println("\nINITIAL CONSTRAINTS: $initial_constraints")
     println("GENERATED CONSTRAINTS: $generated_constraints")
 
-    print_solution(n_feats, opt_model, n_splits, splitpoints)
+    #print_solution(n_feats, opt_model, n_splits, splitpoints)
 
     return opt_model
 
 end
 
-function children(id, depth)
+function extract_tree_model_info(tree_model, tree_depth)
+
+    n_trees = length(tree_model.trees) - 1 # number of trees in the model
+    n_feats = length(evo_model.info[:fnames]) # number of features (variables) in the model
+
+    n_leaves = Array{Int64}(undef, n_trees) # array for the number of leaves on each tree
+    leaves = Array{Array}(undef, n_trees) # array for the ids of the leaves for each tree
+
+    # Get number of leaves and ids of the leaves on each tree
+    for tree in 1:n_trees
+        leaves[tree] = findall(x -> x!=0, vec(evo_model.trees[tree + 1].pred))
+        n_leaves[tree] = length(leaves[tree])
+    end
+
+    n_splits = zeros(Int64, n_feats) # number of splits for each variable
+    splits = Matrix{Any}(undef, n_trees, 2^(tree_depth - 1)) # array of (feature, node value, splitpoint number) indexed by [tree, node]
+
+    # Get number of splits and unique split points for each feature (variable)
+    for feat in 1:n_feats
+        
+        split_tree = Vector{Int64}() # array for trees the split happens in
+        split_id = Vector{Int64}() # array for nodes the split happens in
+        split_value = Vector{Float64}() # array for split values
+
+        for tree in 1:n_trees
+
+            split_ids = findall(id -> id == feat, tree_model.trees[tree + 1].feat) # nodes with split on feat
+            n_splits[feat] += length(split_ids)
+            
+            # Add node data to splitspoints
+            append!(split_id, split_ids)
+            append!(split_value, evo_model.trees[tree + 1].cond_float[split_ids])
+            append!(split_tree, tree .* ones(length(split_ids)))
+
+        end
+
+        splitpoints = hcat(split_tree, split_id, split_value) # save split point data in a matrix
+        splitpoints = splitpoints[sortperm(splitpoints[:, 3]), :] # sort the matrix columns based on the 3rd column (splits values)
+
+        row_num = 0
+        for point in eachrow(splitpoints)
+            row_num += 1
+            splits[round.(Int, point[1]), round.(Int, point[2])] = feat, point[3], row_num
+        end
+
+    end
+
+    return n_trees, n_feats, n_leaves, leaves, n_splits, splits
+
+end
+
+function children(id, leaves)
     
     result = Vector{Int64}()
+    max = last(leaves)
 
     function inner(num)
-        if num < 2^depth - 1
-            push!(result, num)
+        if num < max
+            for leaf_index in eachindex(leaves)
+                if num == leaves[leaf_index]
+                    push!(result, leaf_index)
+                end
+            end
             inner(2*num)
             inner(2*num + 1)
         end
@@ -167,19 +196,5 @@ function children(id, depth)
     inner(id)
 
     return result
-
-end
-
-function find_feature_value_and_index(splitpoints, tree, node)
-
-    for feat in eachindex(splitpoints)
-        split_index = 0
-        for col in eachcol(splitpoints[feat])
-            split_index += 1
-            if col[1] == tree && col[2] == node
-                return feat, col[3], split_index
-            end   
-        end
-    end
 
 end

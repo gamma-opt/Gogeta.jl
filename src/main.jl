@@ -12,7 +12,7 @@ plot(evo_model, 3)
 
 @time new_model = trees_to_relaxed_MIP(evo_model, 12, 12);
 
-@time lazy_model = trees_to_relaxed_MIP(evo_model, 1, 12);
+@time lazy_model = trees_to_relaxed_MIP(evo_model, 0, 12);
 
 @time old_model = GBtrees_MIP(evo_model);
 

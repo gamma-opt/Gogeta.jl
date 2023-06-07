@@ -22,6 +22,7 @@ using CSV
 using DataFrames
 using StatsBase
 using MLJ
+using Profile
 
 include("JuMP_model.jl")
 include("file_read_write.jl")

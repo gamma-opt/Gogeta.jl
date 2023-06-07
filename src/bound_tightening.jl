@@ -169,7 +169,7 @@ end
 
     for k in 1:K
 
-        @sync @distributed for node in 1:node_count[k+1]
+        @sync @distributed for node in 1:(2*node_count[k+1]) # loop over both obj functions
 
             ### below variables and constraints in all problems
 
@@ -180,7 +180,14 @@ end
             for prev_layer in 0:k-1
                 prev_layers_node_sum += node_count[prev_layer+1]
             end
-            curr_node_index = prev_layers_node_sum + node
+            
+            curr_node = node
+            obj_function = 1
+            if node > node_count[k+1]
+                curr_node = node - node_count[k+1]
+                obj_function = 2
+            end
+            curr_node_index = prev_layers_node_sum + curr_node
 
             # NOTE! below variables and constraints for all opt problems
             @variable(model, x[k in 0:K, j in 1:node_count[k+1]] >= 0)
@@ -228,45 +235,45 @@ end
             end
 
             ### below constraints depending on the node
-            temp_sum = sum(W[k][node, j] * x[k-1, j] for j in 1:node_count[k]) # NOTE! prev layer [k]
+            temp_sum = sum(W[k][curr_node, j] * x[k-1, j] for j in 1:node_count[k]) # NOTE! prev layer [k]
             if k <= K - 1
-                @constraint(model, node_con, temp_sum + b[k][node] == x[k, node] - s[k, node])
-                @constraint(model, node_U, x[k, node] <= U[k, node] * z[k, node])
-                @constraint(model, node_L, s[k, node] <= -L[k, node] * (1 - z[k, node]))
+                @constraint(model, node_con, temp_sum + b[k][curr_node] == x[k, curr_node] - s[k, curr_node])
+                @constraint(model, node_U, x[k, curr_node] <= U[k, curr_node] * z[k, curr_node])
+                @constraint(model, node_L, s[k, curr_node] <= -L[k, curr_node] * (1 - z[k, curr_node]))
             elseif k == K # == last value of k
-                @constraint(model, node_con, temp_sum + b[k][node] == x[k, node])
-                @constraint(model, node_L, L[k, node] <= x[k, node])
-                @constraint(model, node_U, x[k, node] <= U[k, node])
+                @constraint(model, node_con, temp_sum + b[k][curr_node] == x[k, curr_node])
+                @constraint(model, node_L, L[k, curr_node] <= x[k, curr_node])
+                @constraint(model, node_U, x[k, curr_node] <= U[k, curr_node])
             end
 
-            for obj_function in 1:2
+            # for obj_function in 1:2
                 if obj_function == 1 && k <= K - 1 # Min, hidden layer
-                    @objective(model, Min, x[k, node] - s[k, node])
+                    @objective(model, Min, x[k, curr_node] - s[k, curr_node])
                 elseif obj_function == 2 && k <= K - 1 # Max, hidden layer
-                    @objective(model, Max, x[k, node] - s[k, node])
+                    @objective(model, Max, x[k, curr_node] - s[k, curr_node])
                 elseif obj_function == 1 && k == K # Min, last layer
-                    @objective(model, Min, x[k, node])
+                    @objective(model, Min, x[k, curr_node])
                 elseif obj_function == 2 && k == K # Max, last layer
-                    @objective(model, Max, x[k, node])
+                    @objective(model, Max, x[k, curr_node])
                 end
 
                 solve_time = @elapsed optimize!(model)
                 solve_time = round(solve_time; sigdigits = 3)
                 @assert termination_status(model) == OPTIMAL 
-                    "Problem (layer $k (from 1:$K), node $node, $(obj_function == 1 ? "L" : "U")-bound) is infeasible."
-                println("Solve time (layer $k, node $node, $(obj_function == 1 ? "L" : "U")-bound): $(solve_time)s")
+                    "Problem (layer $k (from 1:$K), node $curr_node, $(obj_function == 1 ? "L" : "U")-bound) is infeasible."
+                println("Solve time (layer $k, node $curr_node, $(obj_function == 1 ? "L" : "U")-bound): $(solve_time)s")
                 optimal = objective_value(model)
-                println("thread: ", myid(), ", node: ", node, ", optimal value: ", optimal)
+                println("thread: ", myid(), ", node: ", curr_node, ", optimal value: ", optimal)
 
                 # fix the model variable L or U corresponding to the current node to be the optimal value
                 if obj_function == 1 # Min
                     shared_L_bounds[curr_node_index] = optimal
-                    fix(L[k, node], optimal)
+                    fix(L[k, curr_node], optimal)
                 elseif obj_function == 2 # Max
                     shared_U_bounds[curr_node_index] = optimal
-                    fix(U[k, node], optimal)
+                    fix(U[k, curr_node], optimal)
                 end
-            end
+            # end
             
         end
 

@@ -87,3 +87,11 @@ end
 bad_U1 = Float32[if i <= 784 1 else 1000 end for i in 1:842]
 bad_L1 = Float32[if i <= 784 0 else -1000 end for i in 1:842]
 @time optimal_L1_multi, optimal_U1_multi = solve_optimal_bounds_multi(nn1, bad_U1, bad_L1)
+
+bad_U2 = Float32[if i <= 784 1 else 1000 end for i in 1:866]
+bad_L2 = Float32[if i <= 784 0 else -1000 end for i in 1:866]
+@time optimal_L2_multi, optimal_U2_multi = solve_optimal_bounds_multi(nn2, bad_U2, bad_L2)
+
+bad_U3 = Float32[if i <= 784 1 else 1000 end for i in 1:894]
+bad_L3 = Float32[if i <= 784 0 else -1000 end for i in 1:894]
+@time optimal_L3_multi, optimal_U3_multi = solve_optimal_bounds_multi(nn3, bad_U3, bad_L3)

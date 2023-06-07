@@ -3,11 +3,18 @@ DNN1: 784 -> 32 -> 16 -> 10 (2 hidden layers)
 Single thread: solve for optimal bounds:
 28.378149 seconds (1.32 M allocations: 2.056 GiB, 0.40% gc time)
 
+Multi thread (Gurobi Thread => 1)
+27.699889 seconds (26.91 k allocations: 1010.383 KiB)
+
+Multi thread (Gurobi Thread => 8) (default)
+35.626017 seconds (23.92 k allocations: 909.102 KiB)
+
 Average time of creating 10 adversarial images:
 Old bounds: 9.56, optimal bounds: 2.64, difference 6.90
 
 creating 10 optimal images (s) (difference: old bounds - optimal bounds):
 3.31, 3.86, 0.53, 32.78, 0.65, 0.014, 4.94, 0.012, 21.29, 1.63
+
 
 
 DNN2: 784 -> 32 -> 24 -> 16 -> 10 (3 hidden layers)
@@ -32,3 +39,24 @@ Old bounds: 2927, optimal bounds: 240, difference 2687
 
 creating 10 optimal images (s) (difference: old bounds - new bounds):
 2365, 1136, 1287, 10089, 117, -576, 3317, -176, -22, 9329
+
+single thread and Threads => 1
+DNN1: 57.738674 seconds (1.35 M allocations: 2.057 GiB, 0.54% gc time)
+DNN2: 613.022826 seconds (3.38 M allocations: 2.129 GiB, 0.06% gc time, 0.06% compilation time)
+DNN3: 
+
+
+
+236.373317 seconds (30.96 k allocations: 1.217 MiB)
+
+everything
+248.725950 seconds (36.81 k allocations: 1.414 MiB)
+
+everything and without threads => 1
+190.936342 seconds (33.02 k allocations: 1.289 MiB)
+
+DNN3 multi 8 thread gurobi
+3681.714591 seconds (148.66 k allocations: 7.449 MiB, 0.00% compilation time)
+
+DNN3 multi 1 thread gurobi
+4212.450986 seconds (650.31 k allocations: 35.550 MiB, 0.01% compilation time)

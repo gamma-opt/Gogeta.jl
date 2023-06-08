@@ -31,8 +31,8 @@ function solve_optimal_bounds(DNN::Chain, init_U_bounds::Vector{Float32}, init_L
     node_count = [if k == 1 input_node_count else length(DNN_params[2*(k-1)]) end for k in 1:K+1]
 
     # store the current optimal bounds in the algorithm
-    curr_L_bounds = copy(init_L_bounds)
     curr_U_bounds = copy(init_U_bounds)
+    curr_L_bounds = copy(init_L_bounds)
 
     model = Model(optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => (verbose ? 1 : 0)))
 
@@ -141,7 +141,7 @@ function solve_optimal_bounds(DNN::Chain, init_U_bounds::Vector{Float32}, init_L
 
     println("Solving optimal constraint bounds complete")
 
-    return curr_L_bounds, curr_U_bounds
+    return curr_U_bounds, curr_L_bounds
 end
 
 # Same function as above but using multi-threading
@@ -160,13 +160,13 @@ end
     node_count = [if k == 1 input_node_count else length(DNN_params[2*(k-1)]) end for k in 1:K+1]
 
     # store the current optimal bounds in the algorithm
-    curr_L_bounds = copy(init_L_bounds)
     curr_U_bounds = copy(init_U_bounds)
+    curr_L_bounds = copy(init_L_bounds)
 
     # copy bounds to shared array
-    shared_L_bounds = SharedArray(curr_L_bounds)
     shared_U_bounds = SharedArray(curr_U_bounds)
-
+    shared_L_bounds = SharedArray(curr_L_bounds)
+    
     for k in 1:K
 
         @sync @distributed for node in 1:(2*node_count[k+1]) # loop over both obj functions
@@ -181,6 +181,7 @@ end
                 prev_layers_node_sum += node_count[prev_layer+1]
             end
             
+            # loops nodes twice: 1st time with obj function Min, 2nd time with Max
             curr_node = node
             obj_function = 1
             if node > node_count[k+1]
@@ -283,9 +284,9 @@ end
 
     len = length(curr_L_bounds)
     for i in 1:len
-        curr_L_bounds[i] = shared_L_bounds[i]
         curr_U_bounds[i] = shared_U_bounds[i]
+        curr_L_bounds[i] = shared_L_bounds[i]
     end
 
-    return curr_L_bounds, curr_U_bounds
+    return curr_U_bounds, curr_L_bounds
 end

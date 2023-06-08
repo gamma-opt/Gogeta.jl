@@ -33,15 +33,15 @@ nn3, acc3 = train_mnist_nn(raw_nn3)
 
 bad_U1 = Float32[if i <= 784 1 else 1000 end for i in 1:842]
 bad_L1 = Float32[if i <= 784 0 else -1000 end for i in 1:842]
-@time optimal_L1, optimal_U1 = solve_optimal_bounds(nn1, bad_U1, bad_L1)
+@time optimal_U1, optimal_L1 = solve_optimal_bounds(nn1, bad_U1, bad_L1)
 
 bad_U2 = Float32[if i <= 784 1 else 1000 end for i in 1:866]
 bad_L2 = Float32[if i <= 784 0 else -1000 end for i in 1:866]
-@time optimal_L2, optimal_U2 = solve_optimal_bounds(nn2, bad_U2, bad_L2)
+@time optimal_U2, optimal_L2 = solve_optimal_bounds(nn2, bad_U2, bad_L2)
 
 bad_U3 = Float32[if i <= 784 1 else 1000 end for i in 1:894]
 bad_L3 = Float32[if i <= 784 0 else -1000 end for i in 1:894]
-@time optimal_L3, optimal_U3 = solve_optimal_bounds(nn3, bad_U3, bad_L3)
+@time optimal_U3, optimal_L3 = solve_optimal_bounds(nn3, bad_U3, bad_L3)
 
 
 bad_times1, bad_imgs1 = create_adversarials(nn1, bad_U1, bad_L1, 1, 10)
@@ -75,8 +75,11 @@ worker = workers()
 @everywhere begin
     import Pkg
     Pkg.activate(".")
-    include("initialisation.jl")
+    Pkg.instantiate()
+    # include("initialisation.jl")
 end
+
+@everywhere include("initialisation.jl")
 
 @everywhere printsquare(i) = println("working on i=$i: its square it $(i^2)")
 @sync @distributed for i in 1:9
@@ -86,12 +89,25 @@ end
 
 bad_U1 = Float32[if i <= 784 1 else 1000 end for i in 1:842]
 bad_L1 = Float32[if i <= 784 0 else -1000 end for i in 1:842]
-@time optimal_L1_multi, optimal_U1_multi = solve_optimal_bounds_multi(nn1, bad_U1, bad_L1)
+@time optimal_U1_multi, optimal_L1_multi = solve_optimal_bounds_multi(nn1, bad_U1, bad_L1)
 
 bad_U2 = Float32[if i <= 784 1 else 1000 end for i in 1:866]
 bad_L2 = Float32[if i <= 784 0 else -1000 end for i in 1:866]
-@time optimal_L2_multi, optimal_U2_multi = solve_optimal_bounds_multi(nn2, bad_U2, bad_L2)
+@time optimal_U2_multi, optimal_L2_multi = solve_optimal_bounds_multi(nn2, bad_U2, bad_L2)
 
 bad_U3 = Float32[if i <= 784 1 else 1000 end for i in 1:894]
 bad_L3 = Float32[if i <= 784 0 else -1000 end for i in 1:894]
-@time optimal_L3_multi, optimal_U3_multi = solve_optimal_bounds_multi(nn3, bad_U3, bad_L3)
+@time optimal_U3_multi, optimal_L3_multi = solve_optimal_bounds_multi(nn3, bad_U3, bad_L3)
+
+
+
+using JLD
+
+x_train, y_train = MNIST(split=:train)[:]
+x_test, y_test = MNIST(split=:test)[:]
+
+save("mnist_data.jld", "x_train", x_train, "y_train", y_train, "x_test", x_test, "y_test", y_test)
+
+mnist_data = JLD.load("../test/data/mnist_data.jld")
+
+x_train_test = mnist_data["x_train"]

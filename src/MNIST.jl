@@ -6,11 +6,6 @@
 function train_mnist_nn(mnist_nn, seed = abs(rand(Int)))
     Random.seed!(seed) # seed for reproducibility
 
-    # mnist_nn = Chain(
-    #     Dense(784, 32, relu),
-    #     Dense(32, 16, relu),
-    #     Dense(16, 10)
-    # )
     x_train, y_train = MNIST(split=:train)[:]
     x_test, y_test = MNIST(split=:test)[:]
 
@@ -62,16 +57,6 @@ function create_optimal_input(model, digit)
     end
 
     return optimal_img_flatten
-end
-
-# prints last layer acivations for a flattened image (784 pixel array)
-function digit_activations(model, img_flatten)
-    guess_digit = create_JuMP_model(model, "predict")
-    evaluate(guess_digit, img_flatten)
-    optimize!(guess_digit)
-    nn_activations = model(img_flatten)
-    
-    return nn_activations
 end
 
 # shows a flattened gray scale image 

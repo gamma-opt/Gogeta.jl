@@ -14,8 +14,8 @@ function trees_to_relaxed_MIP(tree_model, constraint_depth, tree_depth)
     
     "Data extraction from tree model"
  
-    @time n_trees, n_feats, n_leaves, leaves, n_splits, splits = extract_tree_model_info(tree_model, tree_depth)
-    println("DATA EXTRACTION FROM EVOTREES MODEL TIME")
+    @time n_trees, n_feats, n_leaves, leaves, n_splits, splits, ordered_splits = extract_tree_model_info(tree_model, tree_depth)
+    println("TIME USED FOR DATA EXTRACTION FROM EVOTREES MODEL\n\n")
 
     "Optimization model and constraint generation"
 
@@ -56,7 +56,7 @@ function trees_to_relaxed_MIP(tree_model, constraint_depth, tree_depth)
         @objective(opt_model, Min, sum(1/n_trees * evo_model.trees[tree + 1].pred[leaves[tree][leaf]] * y[tree, leaf] for tree = 1:n_trees, leaf = 1:n_leaves[tree]))
 
     end
-    println("OPTIMIZATION MODEL CREATION AND CONSTRAINT GENERATION TIME")
+    println("TIME USED FOR OPTIMIZATION MODEL CREATION AND CONSTRAINT GENERATION\n\n")
     
     # Use lazy constraints to generate only needed split constraints
     generated_constraints = 0
@@ -114,12 +114,12 @@ function trees_to_relaxed_MIP(tree_model, constraint_depth, tree_depth)
         MOI.set(opt_model, MOI.LazyConstraintCallback(), split_constraint_callback)
         optimize!(opt_model)
     end
-    println("OPTIMIZATION WITH LAZY CONSTRAINT CALLBACK TIME")
+    println("TIME USED FOR OPTIMIZATION\n\n")
 
     println("\nINITIAL CONSTRAINTS: $initial_constraints")
     println("GENERATED CONSTRAINTS: $generated_constraints")
 
-    #print_solution(n_feats, opt_model, n_splits, splitpoints)
+    print_solution(n_feats, opt_model, n_splits, ordered_splits)
 
     return opt_model
 
@@ -141,6 +141,7 @@ function extract_tree_model_info(tree_model, tree_depth)
 
     n_splits = zeros(Int64, n_feats) # number of splits for each variable
     splits = Matrix{Any}(undef, n_trees, 2^(tree_depth - 1)) # array of (feature, node value, splitpoint number) indexed by [tree, node]
+    ordered_splits = Array{Any}(undef, n_feats)
 
     # Get number of splits and unique split points for each feature (variable)
     for feat in 1:n_feats
@@ -161,18 +162,18 @@ function extract_tree_model_info(tree_model, tree_depth)
 
         end
 
-        splitpoints = hcat(split_tree, split_id, split_value) # save split point data in a matrix
-        splitpoints = splitpoints[sortperm(splitpoints[:, 3]), :] # sort the matrix columns based on the 3rd column (splits values)
+        ordered_splits[feat] = hcat(split_tree, split_id, split_value) # save split point data in a matrix
+        ordered_splits[feat] = ordered_splits[feat][sortperm(ordered_splits[feat][:, 3]), :] # sort the matrix columns based on the 3rd column (splits values)
 
         row_num = 0
-        for point in eachrow(splitpoints)
+        for point in eachrow(ordered_splits[feat])
             row_num += 1
             splits[round.(Int, point[1]), round.(Int, point[2])] = feat, point[3], row_num
         end
 
     end
 
-    return n_trees, n_feats, n_leaves, leaves, n_splits, splits
+    return n_trees, n_feats, n_leaves, leaves, n_splits, splits, ordered_splits
 
 end
 

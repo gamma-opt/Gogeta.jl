@@ -93,7 +93,7 @@ function GBtrees_MIP(evo_model)
     end
     println("OPTIMIZATION TIME")
 
-    #print_solution(nfeats, model, n_splits, splits)
+    print_solution(nfeats, model, n_splits, transpose(splits))
 
     return model
 

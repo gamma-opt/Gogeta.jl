@@ -14,50 +14,42 @@ function trees_to_relaxed_MIP(tree_model, constraint_depth, tree_depth)
     
     "Data extraction from tree model"
  
-    @time n_trees, n_feats, n_leaves, leaves, n_splits, splits, ordered_splits = extract_tree_model_info(tree_model, tree_depth)
-    println("TIME USED FOR DATA EXTRACTION FROM EVOTREES MODEL\n\n")
+    n_trees, n_feats, n_leaves, leaves, n_splits, splits, ordered_splits = extract_tree_model_info(tree_model, tree_depth)
+    
+    opt_model = Model(Gurobi.Optimizer)
 
-    "Optimization model and constraint generation"
+    # Variable definitions as well as constraints (2g) and (2h)
+    @variable(opt_model, x[feat = 1:n_feats, 1:n_splits[feat]], Bin) # indicator variable x_ij for feature i <= j:th split point (2g)
+    @variable(opt_model, y[tree = 1:n_trees, 1:n_leaves[tree]] >= 0) # indicator variable y_tl for observation falling on leaf l of tree (2h)
 
-    @time begin
+    # Constraints (2f) and (2b) (constraint (2e) concerns only categorical variables)
+    @constraint(opt_model, [i = 1:n_feats, j = 1:n_splits[i]-1], x[i,j] <= x[i, j+1]) # constraints regarding order of split points (2f)
+    @constraint(opt_model, [tree = 1:n_trees], sum(y[tree,leaf] for leaf = 1:n_leaves[tree]) == 1) # observation must fall on exactly one leaf (2b)
 
-        opt_model = Model(Gurobi.Optimizer)
+    # Constraints (2c) and (2d) - generate only to depth specified in constraint_depth
+    initial_constraints = 0
+    
+    for tree in 1:n_trees
+        for current_node in findall(feat -> feat!=0, tree_model.trees[tree + 1].feat)
+            if current_node <= (2^constraint_depth - 1)
 
-        # Variable definitions as well as constraints (2g) and (2h)
-        @variable(opt_model, x[feat = 1:n_feats, 1:n_splits[feat]], Bin) # indicator variable x_ij for feature i <= j:th split point (2g)
-        @variable(opt_model, y[tree = 1:n_trees, 1:n_leaves[tree]] >= 0) # indicator variable y_tl for observation falling on leaf l of tree (2h)
+                right_leaves = children(2*current_node + 1, leaves[tree])
+                left_leaves = children(2*current_node, leaves[tree])
 
-        # Constraints (2f) and (2b) (constraint (2e) concerns only categorical variables)
-        @constraint(opt_model, [i = 1:n_feats, j = 1:n_splits[i]-1], x[i,j] <= x[i, j+1]) # constraints regarding order of split points (2f)
-        @constraint(opt_model, [tree = 1:n_trees], sum(y[tree,leaf] for leaf = 1:n_leaves[tree]) == 1) # observation must fall on exactly one leaf (2b)
+                current_feat, current_node_value, current_splitpoint_index = splits[tree, current_node]
 
-        # Constraints (2c) and (2d) - generate only to depth specified in constraint_depth
-        initial_constraints = 0
-        
-        for tree in 1:n_trees
-            for current_node in findall(feat -> feat!=0, tree_model.trees[tree + 1].feat)
-                if current_node <= (2^constraint_depth - 1)
+                @constraint(opt_model, sum(y[tree, right_leaves]) <= 1 - x[current_feat, current_splitpoint_index])
+                @constraint(opt_model, sum(y[tree, left_leaves]) <= x[current_feat, current_splitpoint_index])
+                
+                initial_constraints += 2
 
-                    right_leaves = children(2*current_node + 1, leaves[tree])
-                    left_leaves = children(2*current_node, leaves[tree])
-
-                    current_feat, current_node_value, current_splitpoint_index = splits[tree, current_node]
-
-                    @constraint(opt_model, sum(y[tree, right_leaves]) <= 1 - x[current_feat, current_splitpoint_index])
-                    @constraint(opt_model, sum(y[tree, left_leaves]) <= x[current_feat, current_splitpoint_index])
-                    
-                    initial_constraints += 2
-
-                end
             end
         end
-        
-        # Objective function (maximize / minimize forest prediction)
-        @objective(opt_model, Min, sum(1/n_trees * evo_model.trees[tree + 1].pred[leaves[tree][leaf]] * y[tree, leaf] for tree = 1:n_trees, leaf = 1:n_leaves[tree]))
-
     end
-    println("TIME USED FOR OPTIMIZATION MODEL CREATION AND CONSTRAINT GENERATION\n\n")
     
+    # Objective function (maximize / minimize forest prediction)
+    @objective(opt_model, Min, tree_model.trees[1].pred[1] + sum(evo_model.trees[tree + 1].pred[leaves[tree][leaf]] * y[tree, leaf] for tree = 1:n_trees, leaf = 1:n_leaves[tree]))
+
     # Use lazy constraints to generate only needed split constraints
     generated_constraints = 0
     function split_constraint_callback(cb_data)
@@ -109,19 +101,14 @@ function trees_to_relaxed_MIP(tree_model, constraint_depth, tree_depth)
         end
     end
 
-    @time begin
-        # Set callback for lazy split constraint generation
-        MOI.set(opt_model, MOI.LazyConstraintCallback(), split_constraint_callback)
-        optimize!(opt_model)
-    end
-    println("TIME USED FOR OPTIMIZATION\n\n")
+    # Set callback for lazy split constraint generation
+    MOI.set(opt_model, MOI.LazyConstraintCallback(), split_constraint_callback)
+    optimize!(opt_model)
 
     println("\nINITIAL CONSTRAINTS: $initial_constraints")
     println("GENERATED CONSTRAINTS: $generated_constraints")
 
-    print_solution(n_feats, opt_model, n_splits, ordered_splits)
-
-    return opt_model
+    return get_solution(n_feats, opt_model, n_splits, ordered_splits)
 
 end
 
@@ -198,4 +185,25 @@ function children(id, leaves)
 
     return result
 
+end
+
+function get_solution(n_feats, model, n_splits, splitpoints)
+
+    [smallest_splitpoint[feat] = n_splits[feat] + 1 for feat in 1:n_feats]
+    for ele in eachindex(model[:x])
+        if value(model[:x][ele]) == 1 && ele[2] < smallest_splitpoint[ele[1]]
+            smallest_splitpoint[ele[1]] = ele[2]
+        end
+    end
+
+    solution = Array{Float32}(undef, n_feats)
+    for feat in 1:n_feats
+        if smallest_splitpoint[feat] <= n_splits[feat]
+            solution[feat] = splitpoints[feat][smallest_splitpoint[feat], 3]
+        else
+            solution[feat] = Inf32
+        end
+    end
+
+    return solution
 end

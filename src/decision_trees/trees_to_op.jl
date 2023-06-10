@@ -78,7 +78,7 @@ function GBtrees_MIP(evo_model)
 
     optimize!(model)
 
-    return get_solution(nfeats, model, n_splits, transpose(splits))
+    return get_solution(nfeats, model, n_splits, transpose(splits)), objective_value(model)
 
 end
 

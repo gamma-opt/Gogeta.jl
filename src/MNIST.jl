@@ -82,7 +82,7 @@ function show_digit(img_flatten)
 end
 
 # creates adversarial images from th MNIST train data 
-function create_adversarials(model::Chain, U::Vector{Float32}, L::Vector{Float32}, start_idx, end_idx, l_norm = "L1")
+function create_adversarials(model::Chain, U::Vector{Float32}, L::Vector{Float32}, start_idx, end_idx, l_norm = "L1", BT::Bool=false)
     K = length(model)
     x_train, y_train = MNIST(split=:train)[:]
     x_train_flatten = flatten(x_train)
@@ -95,7 +95,7 @@ function create_adversarials(model::Chain, U::Vector{Float32}, L::Vector{Float32
         cur_digit_img = x_train_flatten[:, i]
 
         println("L-norm: ", l_norm, ", Index: ", i)
-        false_class = create_JuMP_model(model, U, L)
+        false_class = create_JuMP_model(model, U, L, BT)
         x = false_class[:x]
         # variables for constraint (12) in the 2018 paper
         @variable(false_class, d[k in [0], j in 1:784] >= 0)

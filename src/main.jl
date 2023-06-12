@@ -1,7 +1,7 @@
 include("initialisation.jl")
 
 tree_depth = 5
-forest_size = 500
+forest_size = 1000
 Random.seed!(3)
 
 nobs, nfeats = 1_000, 3
@@ -22,18 +22,15 @@ plot(y_test, [preds, y_test], markershape=[:circle :none], seriestype=[:scatter 
 
 @time x_new, sol_new, m_new = trees_to_relaxed_MIP(evo_model, true, tree_depth)
 @time x_alg, sol_alg, m_algo = trees_to_relaxed_MIP(evo_model, false, tree_depth)
-@time x_old, sol_old, m_old = GBtrees_MIP(evo_model)
 
-EvoTrees.predict(evo_model, reshape(x_new, 1, nfeats))[1]
-EvoTrees.predict(evo_model, reshape(x_alg, 1, nfeats))[1]
-EvoTrees.predict(evo_model, reshape(x_old, 1, nfeats))[1]
+EvoTrees.predict(evo_model, reshape([mean(x_new[n]) for n in 1:nfeats], 1, nfeats))[1]
+EvoTrees.predict(evo_model, reshape([mean(x_alg[n]) for n in 1:nfeats], 1, nfeats))[1]
 EvoTrees.predict(evo_model, reshape(zeros(nfeats), 1, nfeats))[1]
 minimum(preds)
 sum(minimum(evo_model.trees[tree].pred) for tree in eachindex(evo_model.trees))
 
 sol_new
 sol_alg
-sol_old
 
 # FLOATING POINT ERRORS ?
 # INCORRECT DATA EXTRACTION FROM EVOTREES ?

@@ -32,9 +32,9 @@ function trees_to_relaxed_MIP(tree_model, create_initial_constraints, tree_depth
     if create_initial_constraints
         for tree in 1:n_trees
             for current_node in 1:(2^(tree_depth - 1))
-                if tree_model.trees[tree + 1].feat[current_node] != 0
-                    right_leaves = children(2*current_node + 1, leaves[tree])
-                    left_leaves = children(2*current_node, leaves[tree])
+                if tree_model.trees[tree + 1].split[current_node] == true
+                    right_leaves = children(current_node << 1 + 1, leaves[tree])
+                    left_leaves = children(current_node << 1, leaves[tree])
 
                     current_feat, current_splitpoint_index = splits[tree, current_node]
 
@@ -64,8 +64,8 @@ function trees_to_relaxed_MIP(tree_model, create_initial_constraints, tree_depth
             while (current_node in leaves[tree]) == false # traverse from root until hitting a leaf
                 
                 # indices for leaves left/right from current node - indexing based on y vector convention
-                right_leaves = children(2*current_node + 1, leaves[tree])
-                left_leaves = children(2*current_node, leaves[tree])
+                right_leaves = children(current_node << 1 + 1, leaves[tree])
+                left_leaves = children(current_node << 1, leaves[tree])
 
                 # feature and split point index associated with current node
                 current_feat, current_splitpoint_index = splits[tree, current_node]
@@ -127,41 +127,36 @@ function extract_tree_model_info(tree_model, tree_depth)
         n_leaves[tree] = length(leaves[tree])
     end
 
-    n_splits = zeros(Int64, n_feats) # number of splits for each variable
-    splits = Matrix{Any}(undef, n_trees, 2^(tree_depth - 1)) # array of (feature, splitpoint number) indexed by [tree, node]
-    ordered_splits = Array{Any}(undef, n_feats)
+    splits = Matrix{Any}(undef, n_trees, 2^(tree_depth - 1))
+    splits_ordered = Array{Vector}(undef, n_feats)
+    n_splits = zeros(Int64, n_feats)
+    [splits_ordered[feat] = [] for feat in 1:n_feats]
 
-    # Get number of splits and unique split points for each feature (variable)
-    for feat in 1:n_feats
-        
-        split_tree = Vector{Int64}() # array for trees the split happens in
-        split_id = Vector{Int64}() # array for nodes the split happens in
-        split_value = Vector{Float64}() # array for split values
-
-        for tree in 1:n_trees
-
-            split_ids = findall(id -> id == feat, tree_model.trees[tree + 1].feat) # nodes with split on feat
-            n_splits[feat] += length(split_ids)
-            
-            # Add node data to splitspoints
-            append!(split_id, split_ids)
-            append!(split_value, tree_model.trees[tree + 1].cond_float[split_ids])
-            append!(split_tree, tree .* ones(length(split_ids)))
-
+    for tree in 1:n_trees
+        for node in 1:2^(tree_depth - 1)
+            if tree_model.trees[tree + 1].split[node] == true
+                splits[tree, node] = [tree_model.trees[tree + 1].feat[node], tree_model.trees[tree + 1].cond_float[node]]
+                push!(splits_ordered[tree_model.trees[tree + 1].feat[node]], tree_model.trees[tree + 1].cond_float[node]) 
+            end
         end
+    end
+    [unique!(sort!(splits_ordered[feat])) for feat in 1:n_feats]
+    [n_splits[feat] = length(splits_ordered[feat]) for feat in 1:n_feats]
 
-        ordered_splits[feat] = hcat(split_tree, split_id, split_value) # save split point data in a matrix
-        ordered_splits[feat] = ordered_splits[feat][sortperm(ordered_splits[feat][:, 3]), :] # sort the matrix columns based on the 3rd column (splits values)
+    for tree in 1:n_trees
+        for node in 1:2^(tree_depth - 1)
+            if tree_model.trees[tree + 1].split[node] == true
+                
+                feature::Int = splits[tree, node][1]
+                value = splits[tree, node][2]
 
-        row_num = 0
-        for point in eachrow(ordered_splits[feat])
-            row_num += 1
-            splits[round.(Int, point[1]), round.(Int, point[2])] = feat, row_num
+                splits[tree, node][2] = searchsortedfirst(splits_ordered[feature], value)
+
+            end
         end
-
     end
 
-    return n_trees, n_feats, n_leaves, leaves, n_splits, splits, ordered_splits
+    return n_trees, n_feats, n_leaves, leaves, n_splits, splits, splits_ordered
 
 end
 
@@ -177,8 +172,8 @@ function children(id, leaves)
                     push!(result, leaf_index)
                 end
             end
-            inner(2*num)
-            inner(2*num + 1)
+            inner(num << 1)
+            inner(num << 1 + 1)
         end
     end
 
@@ -199,12 +194,17 @@ function get_solution(n_feats, model, n_splits, splitpoints)
         end
     end
 
-    solution = Array{Float64}(undef, n_feats)
+    solution = Array{Vector}(undef, n_feats)
     for feat in 1:n_feats
+
+        solution[feat] = [-Inf64; Inf64]
+
         if smallest_splitpoint[feat] <= n_splits[feat]
-            solution[feat] = splitpoints[feat][smallest_splitpoint[feat], 3]
-        else
-            solution[feat] = Inf64
+            solution[feat][2] = splitpoints[feat][smallest_splitpoint[feat]]
+        end
+
+        if smallest_splitpoint[feat] > 1
+            solution[feat][1] = splitpoints[feat][smallest_splitpoint[feat] - 1]
         end
     end
 

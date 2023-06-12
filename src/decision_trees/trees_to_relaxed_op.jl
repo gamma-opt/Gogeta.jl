@@ -31,16 +31,18 @@ function trees_to_relaxed_MIP(tree_model, create_initial_constraints, tree_depth
 
     if create_initial_constraints
         for tree in 1:n_trees
-            for current_node in findall(split->split==true, tree_model.trees[tree + 1].split)
-                right_leaves = children(2*current_node + 1, leaves[tree])
-                left_leaves = children(2*current_node, leaves[tree])
+            for current_node in 1:(2^(tree_depth - 1))
+                if tree_model.trees[tree + 1].feat[current_node] != 0
+                    right_leaves = children(2*current_node + 1, leaves[tree])
+                    left_leaves = children(2*current_node, leaves[tree])
 
-                current_feat, current_splitpoint_index = splits[tree, current_node]
+                    current_feat, current_splitpoint_index = splits[tree, current_node]
 
-                @constraint(opt_model, sum(y[tree, right_leaves]) <= 1 - x[current_feat, current_splitpoint_index])
-                @constraint(opt_model, sum(y[tree, left_leaves]) <= x[current_feat, current_splitpoint_index])
-                
-                initial_constraints += 2
+                    @constraint(opt_model, sum(y[tree, leaf] for leaf in right_leaves) <= 1 - x[current_feat, current_splitpoint_index])
+                    @constraint(opt_model, sum(y[tree, leaf] for leaf in left_leaves) <= x[current_feat, current_splitpoint_index])
+                    
+                    initial_constraints += 2
+                end
             end
         end
     end
@@ -100,20 +102,20 @@ function trees_to_relaxed_MIP(tree_model, create_initial_constraints, tree_depth
 
     # Set callback for lazy split constraint generation
     if create_initial_constraints == false
-        MOI.set(opt_model, MOI.LazyConstraintCallback(), split_constraint_callback)
+        set_attribute(opt_model, MOI.LazyConstraintCallback(), split_constraint_callback)
     end
     optimize!(opt_model)
 
     println("\nINITIAL CONSTRAINTS: $initial_constraints")
     println("GENERATED CONSTRAINTS: $generated_constraints")
 
-    return get_solution(n_feats, opt_model, n_splits, ordered_splits), objective_value(opt_model)
+    return get_solution(n_feats, opt_model, n_splits, ordered_splits), objective_value(opt_model), opt_model
 
 end
 
 function extract_tree_model_info(tree_model, tree_depth)
 
-    n_trees = length(tree_model.trees) - 1 # number of trees in the model
+    n_trees = length(tree_model.trees) - 1 # number of trees in the model (excluding the bias tree)
     n_feats = length(tree_model.info[:fnames]) # number of features (variables) in the model
 
     n_leaves = Array{Int64}(undef, n_trees) # array for the number of leaves on each tree
@@ -121,7 +123,7 @@ function extract_tree_model_info(tree_model, tree_depth)
 
     # Get number of leaves and ids of the leaves on each tree
     for tree in 1:n_trees
-        leaves[tree] = findall(x -> x == false, vec(tree_model.trees[tree + 1].split))
+        leaves[tree] = findall(x -> x != 0, vec(tree_model.trees[tree + 1].pred))
         n_leaves[tree] = length(leaves[tree])
     end
 
@@ -189,7 +191,6 @@ end
 function get_solution(n_feats, model, n_splits, splitpoints)
 
     smallest_splitpoint = Array{Int64}(undef, n_feats)
-    solution = Array{Float64}(undef, n_feats)
 
     [smallest_splitpoint[feat] = n_splits[feat] + 1 for feat in 1:n_feats]
     for ele in eachindex(model[:x])
@@ -198,12 +199,12 @@ function get_solution(n_feats, model, n_splits, splitpoints)
         end
     end
 
-    solution = Array{Float32}(undef, n_feats)
+    solution = Array{Float64}(undef, n_feats)
     for feat in 1:n_feats
         if smallest_splitpoint[feat] <= n_splits[feat]
             solution[feat] = splitpoints[feat][smallest_splitpoint[feat], 3]
         else
-            solution[feat] = Inf32
+            solution[feat] = Inf64
         end
     end
 

@@ -15,9 +15,8 @@ end
 
 function random_data()
     
-    Random.seed!(3)
+    Random.seed!(1)
 
-    nobs, nfeats = 1_000, 5
     x_train = randn(nobs, nfeats)
     y_train = Array{Float64}(undef, nobs)
     [y_train[i] = sum(x_train[i,:].^2) for i = 1:nobs]
@@ -45,7 +44,7 @@ function plot_model_quality(x, y, plot_title, label_x, label_y, data_func)
 
     z = Matrix{Float64}(undef, length(x), length(y))
     for xi in eachindex(x), yi in eachindex(y)
-        evo_model, preds, avg_error = build_forest(y[yi], x[xi], data_func)
+        avg_error = build_forest(y[yi], x[xi], data_func)[3]
         z[xi, yi] = avg_error
     end
     

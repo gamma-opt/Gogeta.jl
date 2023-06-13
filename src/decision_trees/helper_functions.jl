@@ -32,6 +32,7 @@ end
 
 function build_forest(depth, n_trees, data_func)
     x_train, y_train, x_test, y_test = data_func()
+
     config = EvoTreeRegressor(max_depth=depth, nbins=32, nrounds=n_trees, loss=:linear, T=Float64)
     evo_model = fit_evotree(config; x_train, y_train)
     preds = EvoTrees.predict(evo_model, x_test)

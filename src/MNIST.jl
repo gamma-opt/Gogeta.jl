@@ -6,11 +6,6 @@
 function train_mnist_nn(mnist_nn, seed = abs(rand(Int)))
     Random.seed!(seed) # seed for reproducibility
 
-    # mnist_nn = Chain(
-    #     Dense(784, 32, relu),
-    #     Dense(32, 16, relu),
-    #     Dense(16, 10)
-    # )
     x_train, y_train = MNIST(split=:train)[:]
     x_test, y_test = MNIST(split=:test)[:]
 
@@ -64,16 +59,6 @@ function create_optimal_input(model, digit)
     return optimal_img_flatten
 end
 
-# prints last layer acivations for a flattened image (784 pixel array)
-function digit_activations(model, img_flatten)
-    guess_digit = create_JuMP_model(model, "predict")
-    evaluate(guess_digit, img_flatten)
-    optimize!(guess_digit)
-    nn_activations = model(img_flatten)
-    
-    return nn_activations
-end
-
 # shows a flattened gray scale image 
 function show_digit(img_flatten)
     img = reshape(img_flatten, 28, 28)
@@ -82,7 +67,7 @@ function show_digit(img_flatten)
 end
 
 # creates adversarial images from th MNIST train data 
-function create_adversarials(model::Chain, U::Vector{Float32}, L::Vector{Float32}, start_idx, end_idx, l_norm = "L1")
+function create_adversarials(model::Chain, U::Vector{Float32}, L::Vector{Float32}, start_idx, end_idx, l_norm = "L1", BT::Bool=false)
     K = length(model)
     x_train, y_train = MNIST(split=:train)[:]
     x_train_flatten = flatten(x_train)
@@ -95,7 +80,7 @@ function create_adversarials(model::Chain, U::Vector{Float32}, L::Vector{Float32
         cur_digit_img = x_train_flatten[:, i]
 
         println("L-norm: ", l_norm, ", Index: ", i)
-        false_class = create_JuMP_model(model, U, L)
+        false_class = create_JuMP_model(model, U, L, BT)
         x = false_class[:x]
         # variables for constraint (12) in the 2018 paper
         @variable(false_class, d[k in [0], j in 1:784] >= 0)

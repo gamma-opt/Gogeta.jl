@@ -1,24 +1,11 @@
 include("initialisation.jl")
 
-tree_depth = 5
-forest_size = 1000
-Random.seed!(3)
+"TREE TRAINING"
 
-nobs, nfeats = 1_000, 3
-x_train = randn(nobs, nfeats)
-y_train = Array{Float64}(undef, nobs)
-[y_train[i] = sum(x_train[i,:].^2) for i = 1:nobs]
-
-x_test = randn(nobs, nfeats)
-y_test = Array{Float64}(undef, nobs)
-[y_test[i] = sum(x_test[i,:].^2) for i = 1:nobs]
-
-config = EvoTreeRegressor(max_depth=tree_depth, nbins=32, nrounds=forest_size, loss=:linear, T=Float64)
-evo_model = fit_evotree(config; x_train, y_train)
-preds = EvoTrees.predict(evo_model, x_test)
-avg_error = rms(preds, y_test) / mean(y_test)
-
+evo_model, preds, avg_error = build_forest(5, 1000, random_data);
 plot(y_test, [preds, y_test], markershape=[:circle :none], seriestype=[:scatter :line], lw=3)
+
+"OPTIMIZATION"
 
 @time x_new, sol_new, m_new = trees_to_relaxed_MIP(evo_model, true, tree_depth)
 @time x_alg, sol_alg, m_algo = trees_to_relaxed_MIP(evo_model, false, tree_depth)
@@ -32,5 +19,10 @@ sum(minimum(evo_model.trees[tree].pred) for tree in eachindex(evo_model.trees))
 sol_new
 sol_alg
 
-# FLOATING POINT ERRORS ?
-# INCORRECT DATA EXTRACTION FROM EVOTREES ?
+"PLOTTING"
+
+trees = [1, 5, 10, 20, 100, 200]
+depths = [3, 5, 7, 9]
+
+plot_model_quality(trees, depths, "Tree model RMSE for concrete data set", "Forest size", "Tree depth", concrete_data)
+plot_model_quality(trees, depths, "Tree model RMSE for L2-norm data", "Forest size", "Tree depth", random_data)

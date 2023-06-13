@@ -70,7 +70,7 @@ function trees_to_relaxed_MIP(tree_model, create_initial_constraints, tree_depth
                 # feature and split point index associated with current node
                 current_feat, current_splitpoint_index = splits[tree, current_node]
 
-                if x_opt[current_feat, current_splitpoint_index] == 1 # node condition true - left side chosen...
+                if x_opt[current_feat, current_splitpoint_index] ≈ 1 # node condition true - left side chosen...
                     if sum(y_opt[tree, right_leaves]) != 0 # ...but found from right
 
                         # Add constraint associated with current node (2d constraint)
@@ -80,7 +80,7 @@ function trees_to_relaxed_MIP(tree_model, create_initial_constraints, tree_depth
                         return
 
                     else # ...and found from left
-                        current_node = 2*current_node # check left child - continue search
+                        current_node = current_node << 1 # check left child - continue search
                     end
                 else # right side chosen...
                     if sum(y_opt[tree, left_leaves]) != 0 # ...but found from left
@@ -92,7 +92,7 @@ function trees_to_relaxed_MIP(tree_model, create_initial_constraints, tree_depth
                         return
 
                     else # ...and found from right
-                        current_node = 2*current_node + 1 # check right child - continue search
+                        current_node = current_node << 1 + 1 # check right child - continue search
                     end
                 end
 

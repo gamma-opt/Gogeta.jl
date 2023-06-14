@@ -1,33 +1,43 @@
 include("initialisation.jl")
 
-config = EvoTreeRegressor(max_depth=12, nbins=100, nrounds=10)
+"GLOBAL PARAMETERS"
+
+# random data
 nobs, nfeats = 1_000, 5
-x_train = randn(nobs, nfeats)
-y_train = Array{Float64}(undef, nobs)
-[y_train[i] = sum(x_train[i,:].^2) for i = 1:nobs]
 
-evo_model = fit_evotree(config; x_train, y_train)
-preds = EvoTrees.predict(evo_model, x_train)
-plot(evo_model, 3)
+# Evotrees configuration
+forest_size = 500
+tree_depth = 5
 
-@time new_model = trees_to_relaxed_MIP(evo_model, 12, 12);
+"TREE TRAINING"
 
-@time lazy_model = trees_to_relaxed_MIP(evo_model, 0, 12);
+# CONCRETE DATA
+evo_model, preds, avg_error = build_forest(tree_depth, forest_size, concrete_data);
+x_train, y_train, x_test, y_test = concrete_data();
+plot(y_test, [preds, y_test], title="Concrete data", label=["Prediction" "Data"], markershape=[:circle :none], seriestype=[:scatter :line], lw=3)
 
-@time old_model = GBtrees_MIP(evo_model);
+# L2-NORM (SQUARED) DATA
+evo_model, preds, avg_error = build_forest(tree_depth, forest_size, random_data);
+x_train, y_train, x_test, y_test = random_data();
+plot(y_test, [preds, y_test], title="L2-norm (squared) data", label=["Prediction" "Data"], markershape=[:circle :none], seriestype=[:scatter :line], lw=3)
 
+"OPTIMIZATION"
 
-function print_solution(n_feats, model, n_splits, splitpoints)
-    println("\n=========================SOLUTION=========================")
-    for f = 1:n_feats 
-        x_opt = Array{Float64}(undef,  n_splits[f])
-        [x_opt[i] = value.(model[:x])[f,i] for i = 1:n_splits[f]]
-        first_index = findfirst(x -> x==1, x_opt)
-        if first_index === nothing
-            println("x_$f is unbound")
-        else
-            println("x_$f <= $(splitpoints[f][3,first_index])")
-        end
-    end
-    println("==========================================================\n")
-end
+@time x_new, sol_new, m_new = trees_to_relaxed_MIP(evo_model, true, tree_depth)
+@time x_alg, sol_alg, m_algo = trees_to_relaxed_MIP(evo_model, false, tree_depth)
+
+EvoTrees.predict(evo_model, reshape([mean(x_new[n]) for n in 1:nfeats], 1, nfeats))[1]
+EvoTrees.predict(evo_model, reshape([mean(x_alg[n]) for n in 1:nfeats], 1, nfeats))[1]
+EvoTrees.predict(evo_model, reshape(zeros(nfeats), 1, nfeats))[1]
+minimum(preds)
+
+sol_new
+sol_alg
+
+"PLOTTING"
+
+trees = [1, 5, 10, 20, 100, 200]
+depths = [3, 5, 7, 9]
+
+plot_model_quality(trees, depths, "Tree model NRMSE for concrete data set", "Forest size", "Tree depth", concrete_data)
+plot_model_quality(trees, depths, "Tree model NRMSE for L2-norm (squared) data set", "Forest size", "Tree depth", random_data)

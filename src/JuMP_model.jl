@@ -1,13 +1,13 @@
 """
 create_JuMP_model(DNN::Chain, bounds_U::Vector{Float32}, bounds_L::Vector{Float32}, bound_tightening::Bool=false)
 
-Converts a ReLU DNN to a 0-1 MILP formulatuion
+Converts a ReLU DNN to a 0-1 MILP JuMP model. The activation function must be "relu" in all hidden layers and "identity" in the output layer.
 
 # Arguments
 - `DNN::Chain`: A trained ReLU DNN.
 - `U_bounds::Vector{Float32}`: Upper bounds on the node values of the DNN.
 - `L_bounds::Vector{Float32}`: Lower bounds on the node values of the DNN.
-- `bound_tightening::Bool=false`: Optional bound tightening of the bounds
+- `bound_tightening::Bool=false`: Optional bound tightening of the constraint bounds.
 
 # Examples
 ```julia
@@ -31,6 +31,14 @@ function create_JuMP_model(DNN::Chain, U_bounds::Vector{Float32}, L_bounds::Vect
     input_node_count = length(DNN_params[1][1, :])
     node_count = [if k == 1 input_node_count else length(DNN_params[2*(k-1)]) end for k in 1:K+1]
 
+    final_U_bounds = copy(U_bounds)
+    final_L_bounds = copy(L_bounds)
+
+    # optional: calculates optimal lower and upper bounds L and U 
+    if bound_tightening 
+        final_L_bounds, final_U_bounds = solve_optimal_bounds(DNN, U_bounds, L_bounds)
+    end
+
     model = Model(optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => 1))
 
     # sets the variables x[k,j] and s[k,j], the binary variables z[k,j] and the big-M values U[k,j] and L[k,j]
@@ -40,30 +48,30 @@ function create_JuMP_model(DNN::Chain, U_bounds::Vector{Float32}, L_bounds::Vect
     @variable(model, U[k in 0:K, j in 1:node_count[k+1]])
     @variable(model, L[k in 0:K, j in 1:node_count[k+1]])
 
-    # fix bounds to all U[k,j] and L[k,j] from bounds_U and bounds_L
+    # fix values to all U[k,j] and L[k,j] from U_bounds and L_bounds
     index = 1
     for k in 0:K
         for j in 1:node_count[k+1]
-            fix(U[k, j], U_bounds[index])
-            fix(L[k, j], L_bounds[index])
+            fix(U[k, j], final_U_bounds[index])
+            fix(L[k, j], final_L_bounds[index])
             index += 1
         end
     end
 
-    # fix bounds to the input nodes
+    # fix bounds U and L to input nodes
     for input_node in 1:node_count[1]
         delete_lower_bound(x[0, input_node])
         @constraint(model, L[0, input_node] <= x[0, input_node])
         @constraint(model, x[0, input_node] <= U[0, input_node])
     end
 
-    # constraints corresponding to the activation functions
+    # constraints corresponding to the ReLU activation functions
     for k in 1:K
         for node in 1:node_count[k+1] # node count of the next layer of k, i.e., the layer k+1
             temp_sum = sum(W[k][node, j] * x[k-1, j] for j in 1:node_count[k])
-            if k < K # constraint (4b) (k=1, ..., k=K-1)
+            if k < K # hidden layers: k = 1, ..., K-1
                 @constraint(model, temp_sum + b[k][node] == x[k, node] - s[k, node])
-            elseif k == K # constraint (4e) (k=K)
+            else # output layer: k == K
                 @constraint(model, temp_sum + b[k][node] == x[k, node])
             end
         end
@@ -99,11 +107,11 @@ Fixes the variables corresponding to the DNN input to a given input vector.
 evaluate!(JuMP_model, input)
 ```
 """
-# fixes the input values (layer k=0) for the JuMP model
+
 function evaluate!(JuMP_model::Model, input::Vector{Float32})
-    x = JuMP_model[:x] # stores the @variable with name x from the JuMP model
+    x = JuMP_model[:x] # stores the @variable with name x from the JuMP_model
     input_len = length(input)
-    @assert input_len == length(x[0,:]) "'input' has wrong dimension"
+    @assert input_len == length(x[0, :]) "'input' has wrong dimension"
     for input_node in 1:input_len
         fix(x[0, input_node], input[input_node], force=true) # fix value of input to x[0,j]
     end

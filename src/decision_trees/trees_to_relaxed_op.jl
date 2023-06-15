@@ -10,7 +10,7 @@ Takes a trained EvoTrees model and returns an optimized model with only lazy gen
 - opt_model: optimized model where only necessary constraints are generated
 
 """
-function trees_to_relaxed_MIP(tree_model, create_initial_constraints, tree_depth)
+function trees_to_relaxed_MIP(tree_model, constraints, tree_depth, objective)
     
     "Data extraction from tree model"
  
@@ -29,7 +29,7 @@ function trees_to_relaxed_MIP(tree_model, create_initial_constraints, tree_depth
     # Constraints (2c) and (2d) - generate only if create_initial_constraints == true
     initial_constraints = 0
 
-    if create_initial_constraints
+    if constraints == :createinitial
         for tree in 1:n_trees
             for current_node in 1:(2^(tree_depth - 1))
                 if tree_model.trees[tree + 1].split[current_node] == true
@@ -49,6 +49,9 @@ function trees_to_relaxed_MIP(tree_model, create_initial_constraints, tree_depth
     
     # Objective function (maximize / minimize forest prediction)
     @objective(opt_model, Min, tree_model.trees[1].pred[1] + sum(tree_model.trees[tree + 1].pred[leaves[tree][leaf]] * y[tree, leaf] for tree = 1:n_trees, leaf = 1:n_leaves[tree]))
+    if objective == :max
+        @objective(opt_model, Max, objective_function(opt_model))
+    end
 
     # Use lazy constraints to generate only needed split constraints
     generated_constraints = 0
@@ -101,7 +104,7 @@ function trees_to_relaxed_MIP(tree_model, create_initial_constraints, tree_depth
     end
 
     # Set callback for lazy split constraint generation
-    if create_initial_constraints == false
+    if constraints != :createinitial
         set_attribute(opt_model, MOI.LazyConstraintCallback(), split_constraint_callback)
     end
     optimize!(opt_model)

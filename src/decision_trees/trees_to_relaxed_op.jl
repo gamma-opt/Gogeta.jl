@@ -16,7 +16,7 @@ function trees_to_relaxed_MIP(tree_model, constraints, tree_depth, objective)
  
     n_trees, n_feats, n_leaves, leaves, n_splits, splits, ordered_splits = extract_tree_model_info(tree_model, tree_depth)
     
-    opt_model = Model(Gurobi.Optimizer)
+    opt_model = direct_model(Gurobi.Optimizer())
 
     # Variable definitions as well as constraints (2g) and (2h)
     @variable(opt_model, x[feat = 1:n_feats, 1:n_splits[feat]], Bin) # indicator variable x_ij for feature i <= j:th split point (2g)
@@ -55,12 +55,31 @@ function trees_to_relaxed_MIP(tree_model, constraints, tree_depth, objective)
 
     # Use lazy constraints to generate only needed split constraints
     generated_constraints = 0
-    function split_constraint_callback(cb_data)
+    added_constraint = false
+    tree_counter = 0
+    function split_constraint_callback(cb_data, cb_where::Cint)
+
+        if cb_where != GRB_CB_MIPSOL && cb_where != GRB_CB_MIPNODE
+            return
+        end
+
+        if cb_where == GRB_CB_MIPNODE
+            resultP = Ref{Cint}()
+            GRBcbget(cb_data, cb_where, GRB_CB_MIPNODE_STATUS, resultP)
+            if resultP[] != GRB_OPTIMAL
+                return  # Solution is something other than optimal.
+            end
+        end
         
-        x_opt = callback_value.(Ref(cb_data), opt_model[:x])
-        y_opt = callback_value.(Ref(cb_data), opt_model[:y])
+        Gurobi.load_callback_variable_primal(cb_data, cb_where)
+        x_opt = callback_value.(cb_data, x)
+        y_opt = callback_value.(cb_data, y)
+
+        added_constraint = false
 
         for tree in 1:n_trees
+
+            tree_counter = tree
 
             current_node = 1 # start investigating from root
         
@@ -80,6 +99,7 @@ function trees_to_relaxed_MIP(tree_model, constraints, tree_depth, objective)
                         split_cons = @build_constraint(sum(y[tree, right_leaves]) <= 1 - x[current_feat, current_splitpoint_index])
                         MOI.submit(opt_model, MOI.LazyConstraint(cb_data), split_cons)
                         generated_constraints += 1
+                        added_constraint = true
                         return
 
                     else # ...and found from left
@@ -92,6 +112,7 @@ function trees_to_relaxed_MIP(tree_model, constraints, tree_depth, objective)
                         split_cons = @build_constraint(sum(y[tree, left_leaves]) <= x[current_feat, current_splitpoint_index])
                         MOI.submit(opt_model, MOI.LazyConstraint(cb_data), split_cons)
                         generated_constraints += 1
+                        added_constraint = true
                         return
 
                     else # ...and found from right
@@ -105,9 +126,13 @@ function trees_to_relaxed_MIP(tree_model, constraints, tree_depth, objective)
 
     # Set callback for lazy split constraint generation
     if constraints != :createinitial
-        set_attribute(opt_model, MOI.LazyConstraintCallback(), split_constraint_callback)
+        #set_attribute(opt_model, MOI.LazyConstraintCallback(), split_constraint_callback)
+        MOI.set(opt_model, MOI.RawOptimizerAttribute("LazyConstraints"), 1)
+        MOI.set(opt_model, Gurobi.CallbackFunction(), split_constraint_callback)
     end
     optimize!(opt_model)
+
+    println("LAST TREE: $tree_counter, CONSTRAINT ADDED: $added_constraint")
 
     println("\nINITIAL CONSTRAINTS: $initial_constraints")
     println("GENERATED CONSTRAINTS: $generated_constraints")

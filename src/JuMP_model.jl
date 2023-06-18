@@ -1,5 +1,5 @@
 """
-create_JuMP_model(DNN::Chain, bounds_U::Vector{Float32}, bounds_L::Vector{Float32}, bound_tightening::Bool=false)
+create_JuMP_model(DNN::Chain, bounds_U::Vector{Float32}, bounds_L::Vector{Float32}, bound_tightening::String="none", verbose::Bool=false)
 
 Converts a ReLU DNN to a 0-1 MILP JuMP model. The activation function must be "relu" in all hidden layers and "identity" in the output layer.
 
@@ -7,14 +7,15 @@ Converts a ReLU DNN to a 0-1 MILP JuMP model. The activation function must be "r
 - `DNN::Chain`: A trained ReLU DNN.
 - `U_bounds::Vector{Float32}`: Upper bounds on the node values of the DNN.
 - `L_bounds::Vector{Float32}`: Lower bounds on the node values of the DNN.
-- `bound_tightening::Bool=false`: Optional bound tightening of the constraint bounds.
+- `bt::String="none"`: Optional bound tightening of the constraint bounds. Can be set to "none" (default), "singlethread", "threads" or "workers".
+- `verbose::Bool=false`: Controls Gurobi logs.
 
 # Examples
 ```julia
-model = create_JuMP_model(DNN, U_bounds, L_bounds, true)
+model = create_JuMP_model(DNN, U_bounds, L_bounds, "singlethread", false)
 ```
 """
-function create_JuMP_model(DNN::Chain, U_bounds::Vector{Float32}, L_bounds::Vector{Float32}, bound_tightening::Bool=false)
+function create_JuMP_model(DNN::Chain, U_bounds::Vector{Float32}, L_bounds::Vector{Float32}, bt::String="none", verbose::Bool=false)
 
     K = length(DNN) # NOTE! there are K+1 layers in the nn
     for i in 1:K-1
@@ -34,12 +35,18 @@ function create_JuMP_model(DNN::Chain, U_bounds::Vector{Float32}, L_bounds::Vect
     final_U_bounds = copy(U_bounds)
     final_L_bounds = copy(L_bounds)
 
-    # optional: calculates optimal lower and upper bounds L and U 
-    if bound_tightening 
-        final_L_bounds, final_U_bounds = solve_optimal_bounds(DNN, U_bounds, L_bounds)
+    # optional: calculates optimal lower and upper bounds L and U
+    @assert bt == "none" || bt == "singlethread" || bt == "threads" || bt == "workers"
+        "bound_tightening has to be set to \"none\", \"singlethread\", \"threads\", or \"workers\"."
+    if bt == "singlethread"
+        final_L_bounds, final_U_bounds = bound_tightening(DNN, U_bounds, L_bounds, verbose)
+    elseif bt == "threads"
+        final_L_bounds, final_U_bounds = bound_tightening_threads(DNN, U_bounds, L_bounds, verbose)
+    elseif bt == "workers"
+        final_L_bounds, final_U_bounds = bound_tightening_workers(DNN, U_bounds, L_bounds, verbose)
     end
 
-    model = Model(optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => 1))
+    model = Model(optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => (verbose ? 1 : 0)))
 
     # sets the variables x[k,j] and s[k,j], the binary variables z[k,j] and the big-M values U[k,j] and L[k,j]
     @variable(model, x[k in 0:K, j in 1:node_count[k+1]] >= 0)

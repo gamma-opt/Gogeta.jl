@@ -380,8 +380,7 @@ bound_calculating(
     )
 
 An inner function to bound_tightening_workers that handles solving bounds in available
-workers. @everywhere defines the function in all available workers. This function is used 
-with Distributed.pmap() to get all bounds in one list.
+workers. This function is used with Distributed.pmap() to get all bounds in one list.
 
 # Arguments
 - `K::Int64`: same as length(DNN). There are K+1 layers in the DNN.
@@ -400,7 +399,7 @@ L_U_bounds = Distributed.pmap(node -> bound_calculating(K, k, node, W, b, node_c
 ```
 """
 
-@everywhere function bound_calculating(
+function bound_calculating(
     K::Int64, 
     k::Int64, 
     node::Int64, 

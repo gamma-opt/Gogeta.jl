@@ -1,7 +1,11 @@
+using JuMP, Flux, Gurobi
+using Flux: params
+
 """
 create_JuMP_model(DNN::Chain, bounds_U::Vector{Float32}, bounds_L::Vector{Float32}, bound_tightening::String="none", verbose::Bool=false)
 
-Converts a ReLU DNN to a 0-1 MILP JuMP model. The activation function must be "relu" in all hidden layers and "identity" in the output layer.
+Converts a ReLU DNN to a 0-1 MILP JuMP model. The ReLU DNN is assumed to be a Flux.Chain.
+The activation function must be "relu" in all hidden layers and "identity" in the output layer.
 
 # Arguments
 - `DNN::Chain`: A trained ReLU DNN.
@@ -24,7 +28,7 @@ function create_JuMP_model(DNN::Chain, U_bounds::Vector{Float32}, L_bounds::Vect
     @assert DNN[K].σ == identity "Output layer must use the 'identity' activation function"
 
     # store the DNN weights and biases
-    DNN_params = params(DNN)
+    DNN_params = Flux.params(DNN)
     W = [DNN_params[2*i-1] for i in 1:K]
     b = [DNN_params[2*i] for i in 1:K]
 

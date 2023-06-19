@@ -1,3 +1,8 @@
+using JuMP, Flux, Gurobi
+using Flux: params
+using Distributed
+using SharedArrays
+
 """
 bound_tightening(DNN::Chain, init_U_bounds::Vector{Float32}, init_L_bounds::Vector{Float32}, verbose::Bool=false)
 

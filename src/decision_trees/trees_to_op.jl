@@ -5,7 +5,7 @@
         model: a correspodning MIP 
 =#
 function GBtrees_MIP(evo_model)
-    
+
     number_of_trees = length(evo_model.trees)-1 # number of tree in the model (the first element is not a tree)
     nfeats = length(evo_model.info[:fnames]) # number of features used
 
@@ -16,7 +16,6 @@ function GBtrees_MIP(evo_model)
 
     for t = 1:number_of_trees
         leaves[t] = findall(x->x!=0, vec(evo_model.trees[t+1].pred))
-        @show leaves[t]
         number_of_leaves[t] = length(leaves[t])
     end
 
@@ -38,7 +37,6 @@ function GBtrees_MIP(evo_model)
         n_splits[f] = size(splits[f], 2) # store the number of splits in the whole forest associated with each feature 
     end
 
- 
     model = Model(Gurobi.Optimizer)  # create an empty model
     @variable(model, x[f = 1:nfeats, 1:n_splits[f]], Bin ) 
     @variable(model, y[t = 1:number_of_trees, 1:number_of_leaves[t]]>=0) 
@@ -76,13 +74,11 @@ function GBtrees_MIP(evo_model)
         end
     end
 
-    @objective(model, Min, sum(0.1 * evo_model.trees[t+1].pred[leaves[t][l]] * y[t,l] for t = 1:number_of_trees, l = 1:number_of_leaves[t]))
+    @objective(model, Min, evo_model.trees[1].pred[1] + sum(evo_model.trees[t+1].pred[leaves[t][l]] * y[t,l] for t = 1:number_of_trees, l = 1:number_of_leaves[t]))
 
     optimize!(model)
 
-    print_solution(nfeats, model, n_splits, splits)
-
-    return model
+    return get_solution(nfeats, model, n_splits, transpose(splits)), objective_value(model), model
 
 end
 

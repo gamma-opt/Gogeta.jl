@@ -20,6 +20,11 @@ using CSV
 using DataFrames
 using StatsBase
 using MLJ
+using JLD
+using Profile
+using Interpolations
+using XLSX
+
 
 include("JuMP_model.jl")
 include("MNIST.jl")

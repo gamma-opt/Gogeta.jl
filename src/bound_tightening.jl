@@ -504,7 +504,7 @@ function bound_calculating(
     @assert termination_status(model) == OPTIMAL || termination_status(model) == TIME_LIMIT
         "Problem (layer $k (from 1:$K), node $curr_node, $(obj_function == 1 ? "L" : "U")-bound) is infeasible."
     optimal = objective_value(model)
-    println("Thread: $(myid()), layer $k, node $curr_node, $(obj_function == 1 ? "L" : "U")-bound: solve time $(solve_time)s, optimal value $(optimal)")
+    println("Worker: $(myid()), layer $k, node $curr_node, $(obj_function == 1 ? "L" : "U")-bound: solve time $(solve_time)s, optimal value $(optimal)")
 
     return optimal
 end

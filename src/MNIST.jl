@@ -3,22 +3,22 @@
 # creating adversarial images and a confusion matrix for a train and test set
 
 # trains a mnist digit nn and returns it, (only) train and test data as input
-function train_mnist_nn(mnist_nn, seed = abs(rand(Int)))
+function train_mnist_nn(mnist_DNN::Chain, seed::Int64=abs(rand(Int)))
     Random.seed!(seed) # seed for reproducibility
 
     x_train, y_train = MNIST(split=:train)[:]
     x_test, y_test = MNIST(split=:test)[:]
 
-    parameters = params(mnist_nn)
+    parameters = params(mnist_DNN)
     x_train_flatten = flatten(x_train)
     x_test_flatten = flatten(x_test)
     y_train_oh = onehotbatch(y_train, 0:9)
     train = [(x_train_flatten, y_train_oh)]
     test = [(x_test_flatten, y_test)]
 
-    loss(x, y) = Flux.Losses.logitcrossentropy(mnist_nn(x), y)
+    loss(x, y) = Flux.Losses.logitcrossentropy(mnist_DNN(x), y)
 
-    opt = ADAM(0.01) # learning rate of 0.01 gives by far the best results
+    opt = Adam(0.01) # learning rate of 0.01 gives by far the best results
 
     println("Value of the loss function at even steps")
 
@@ -35,14 +35,14 @@ function train_mnist_nn(mnist_nn, seed = abs(rand(Int)))
     correct_guesses = 0
     test_len = length(y_test)
     for i in 1:test_len
-        if findmax(mnist_nn(test[1][1][:, i]))[2] - 1  == y_test[i] # -1 to get right index
+        if findmax(mnist_DNN(test[1][1][:, i]))[2] - 1  == y_test[i] # -1 to get right index
             correct_guesses += 1
         end
     end
     accuracy = correct_guesses / test_len
     println("Accuracy: ", accuracy)
 
-    return mnist_nn, accuracy
+    return mnist_DNN, accuracy
 end
 
 # finds an optimal input to maximize a given output node

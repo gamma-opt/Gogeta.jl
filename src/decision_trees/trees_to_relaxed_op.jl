@@ -1,15 +1,3 @@
-"""
-Takes a trained EvoTrees model and returns an optimized model with only lazy generated split constraints.
-
-# Parameters
-- tree_model: trained `EvoTrees` model to be optimized
-- constraint_depth: initial split constraint generation depth from root node
-- tree_depth: `EvoTrees` model maximum tree depth - used for finding children to necessary depth
-
-# Output
-- opt_model: optimized model where only necessary constraints are generated
-
-"""
 function trees_to_relaxed_MIP(tree_model, constraints, tree_depth, objective)
     
     "Data extraction from tree model"

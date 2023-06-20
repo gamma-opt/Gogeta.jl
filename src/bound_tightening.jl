@@ -508,3 +508,156 @@ function bound_calculating(
 
     return optimal
 end
+
+
+
+
+
+# this implementation uses 2 workers, first solving for all L bounds and 2nd for all U bounds
+# in a layer. This procedure is repeated layer by layer until we reach the output layer.
+
+function solve_optimal_bounds_2workers(DNN::Chain, init_U_bounds::Vector{Float32}, init_L_bounds::Vector{Float32}, verbose::Bool=false)
+
+    K = length(DNN) # NOTE! there are K+1 layers in the nn
+
+    # store the DNN weights and biases
+    DNN_params = params(DNN)
+    W = [DNN_params[2*i-1] for i in 1:K]
+    b = [DNN_params[2*i] for i in 1:K]
+
+    # stores the node count of layer k (starting at layer k=0) at index k+1
+    input_node_count = length(DNN_params[1][1, :])
+    node_count = [if k == 1 input_node_count else length(DNN_params[2*(k-1)]) end for k in 1:K+1]
+
+    # store the current optimal bounds in the algorithm
+    curr_U_bounds = copy(init_U_bounds)
+    curr_L_bounds = copy(init_L_bounds)
+
+    # copy bounds to shared array
+    shared_U_bounds = SharedArray(curr_U_bounds)
+    shared_L_bounds = SharedArray(curr_L_bounds)
+    
+    for k in 1:K
+
+        @sync @distributed for obj_function in 1:2 # 2 workers at each layer with an in-place model each
+
+            # @sync @distributed for node in 1:(2*node_count[k+1]) # loop over both obj functions
+
+                ### below variables and constraints in all problems
+
+                model = Model(optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => (verbose ? 1 : 0), "Threads" => 4))
+
+                # NOTE! below variables and constraints for all opt problems
+                @variable(model, x[k in 0:K, j in 1:node_count[k+1]] >= 0)
+                @variable(model, s[k in 1:K-1, j in 1:node_count[k+1]] >= 0)
+                @variable(model, z[k in 1:K-1, j in 1:node_count[k+1]], Bin)
+                @variable(model, U[k in 0:K, j in 1:node_count[k+1]])
+                @variable(model, L[k in 0:K, j in 1:node_count[k+1]])
+
+                # fix values to all U[k,j] and L[k,j] from U_bounds and L_bounds
+                index = 1
+                for k in 0:K
+                    for j in 1:node_count[k+1]
+                        fix(U[k, j], shared_U_bounds[index], force=true)
+                        fix(L[k, j], shared_L_bounds[index], force=true)
+                        index += 1
+                    end
+                end
+
+                # input layer (layer 0) node bounds are given beforehand
+                for input_node in 1:node_count[1]
+                    delete_lower_bound(x[0, input_node])
+                    @constraint(model, L[0, input_node] <= x[0, input_node])
+                    @constraint(model, x[0, input_node] <= U[0, input_node])
+                end
+
+                # deleting lower bound for output nodes
+                for output_node in 1:node_count[K+1]
+                    delete_lower_bound(x[K, output_node])
+                end
+
+                ### below constraints depending on the layer (every constraint up to the previous layer)
+                for k_in in 1:k
+                    for node_in in 1:node_count[k_in]
+                        if k_in >= 2
+                            temp_sum = sum(W[k_in-1][node_in, j] * x[k_in-1-1, j] for j in 1:node_count[k_in-1])
+                            @constraint(model, x[k_in-1, node_in] <= U[k_in-1, node_in] * z[k_in-1, node_in])
+                            @constraint(model, s[k_in-1, node_in] <= -L[k_in-1, node_in] * (1 - z[k_in-1, node_in]))
+                            if k_in <= K - 1
+                                @constraint(model, temp_sum + b[k_in-1][node_in] == x[k_in-1, node_in] - s[k_in-1, node_in])
+                            else # k_in == K
+                                @constraint(model, temp_sum + b[k_in-1][node_in] == x[k_in-1, node_in])
+                            end
+                        end
+                    end
+                end
+
+                for node in 1:node_count[k+1]
+
+                    prev_layers_node_sum = 0
+                    for prev_layer in 0:k-1
+                        prev_layers_node_sum += node_count[prev_layer+1]
+                    end
+                    curr_node_index = prev_layers_node_sum + node
+
+                    ### below constraints depending on the node
+                    temp_sum = sum(W[k][node, j] * x[k-1, j] for j in 1:node_count[k]) # NOTE! prev layer [k]
+                    if k <= K - 1
+                        @constraint(model, node_con, temp_sum + b[k][node] == x[k, node] - s[k, node])
+                        @constraint(model, node_U, x[k, node] <= U[k, node] * z[k, node])
+                        @constraint(model, node_L, s[k, node] <= -L[k, node] * (1 - z[k, node]))
+                    elseif k == K # == last value of k
+                        @constraint(model, node_con, temp_sum + b[k][node] == x[k, node])
+                        @constraint(model, node_L, L[k, node] <= x[k, node])
+                        @constraint(model, node_U, x[k, node] <= U[k, node])
+                    end
+
+                    if obj_function == 1 && k <= K - 1 # Min, hidden layer
+                        @objective(model, Min, x[k, node] - s[k, node])
+                    elseif obj_function == 2 && k <= K - 1 # Max, hidden layer
+                        @objective(model, Max, x[k, node] - s[k, node])
+                    elseif obj_function == 1 && k == K # Min, last layer
+                        @objective(model, Min, x[k, node])
+                    elseif obj_function == 2 && k == K # Max, last layer
+                        @objective(model, Max, x[k, node])
+                    end
+
+                    solve_time = @elapsed optimize!(model)
+                    solve_time = round(solve_time; sigdigits = 3)
+                    @assert termination_status(model) == OPTIMAL || termination_status(model) == TIME_LIMIT
+                        "Problem (layer $k (from 1:$K), node $node, $(obj_function == 1 ? "L" : "U")-bound) is infeasible."
+                    println("Solve time (layer $k, node $node, $(obj_function == 1 ? "L" : "U")-bound): $(solve_time)s")
+                    optimal = objective_value(model)
+                    println("thread: ", myid(), ", node: ", node, ", optimal value: ", optimal)
+
+                    # fix the model variable L or U corresponding to the current node to be the optimal value
+                    if obj_function == 1 # Min
+                        shared_L_bounds[curr_node_index] = optimal
+                        # fix(L[k, curr_node], optimal)
+                    elseif obj_function == 2 # Max
+                        shared_U_bounds[curr_node_index] = optimal
+                        # fix(U[k, curr_node], optimal)
+                    end
+
+                    delete(model, node_con)
+                    delete(model, node_L)
+                    delete(model, node_U)
+                    unregister(model, :node_con)
+                    unregister(model, :node_L)
+                    unregister(model, :node_U)
+
+                end
+                
+            # end
+        end
+
+
+    end
+
+    println("Solving optimal constraint bounds complete")
+
+    curr_U_bounds = collect(shared_U_bounds)
+    curr_L_bounds = collect(shared_L_bounds)
+
+    return curr_U_bounds, curr_L_bounds
+end

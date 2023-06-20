@@ -16,6 +16,7 @@ function trees_to_relaxed_MIP(tree_model, constraints, tree_depth, objective)
  
     n_trees, n_feats, n_leaves, leaves, n_splits, splits, ordered_splits = extract_tree_model_info(tree_model, tree_depth)
     
+    "TO-DO: Set up Gurobi environment "
     opt_model = direct_model(Gurobi.Optimizer())
 
     # Variable definitions as well as constraints (2g) and (2h)
@@ -48,6 +49,7 @@ function trees_to_relaxed_MIP(tree_model, constraints, tree_depth, objective)
     end
     
     # Objective function (maximize / minimize forest prediction)
+    "TO-DO: print the sum with small number of trees"
     @objective(opt_model, Min, tree_model.trees[1].pred[1] + sum(tree_model.trees[tree + 1].pred[leaves[tree][leaf]] * y[tree, leaf] for tree = 1:n_trees, leaf = 1:n_leaves[tree]))
     if objective == :max
         @objective(opt_model, Max, objective_function(opt_model))
@@ -190,11 +192,11 @@ end
 
 function children(id, leaves)
     
-    result = Vector{Int64}()
+    result::Vector{Int64} = []
     max = last(leaves)
 
     function inner(num)
-        if num < max
+        if num <= max
             for leaf_index in eachindex(leaves)
                 if num == leaves[leaf_index]
                     push!(result, leaf_index)

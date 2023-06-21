@@ -30,7 +30,7 @@ y_test = Array{Float64}(undef, length(x_test[:, 1]));
 
 "TREE MODEL CONFIGURATION AND TRAINING"
 
-tree_depth, forest_size = 10, 100
+tree_depth, forest_size = 12, 100
 
 config = EvoTreeRegressor(nrounds=forest_size, max_depth=tree_depth, T=Float64, loss=:linear);
 model = fit_evotree(config; x_train, y_train);
@@ -40,8 +40,8 @@ pred_test = EvoTrees.predict(model, x_test)
 
 "OPTIMIZATION"
 
-@time x_new, sol_new, m_new = trees_to_relaxed_MIP(model, :createinitial, tree_depth, :min);
-@time x_alg, sol_alg, m_alg = trees_to_relaxed_MIP(model, :noconstraints, tree_depth, :min);
+@time x_new, sol_new, m_new = trees_to_relaxed_MIP(model, tree_depth; constraints="initial", objective="min");
+@time x_alg, sol_alg, m_alg = trees_to_relaxed_MIP(model, tree_depth; constraints="generate", objective="min");
 @time x_man, sol_man, m_man = manual_const_gen(model, tree_depth);
 
 "CHECKING OF SOLUTION"

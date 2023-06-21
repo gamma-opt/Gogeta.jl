@@ -5,8 +5,9 @@ function manual_const_gen(tree_model, tree_depth)
     n_trees, n_feats, n_leaves, leaves, n_splits, splits, ordered_splits = extract_tree_model_info(tree_model, tree_depth)
     
     opt_model = direct_model(Gurobi.Optimizer(ENV))
-    set_attribute(opt_model, "Presolve", 0)
     set_attribute(opt_model, "OutputFlag", 0)
+    set_attribute(opt_model, "Presolve", 0)
+    set_attribute(opt_model, "LazyConstraints", 1)
 
     # Variable definitions as well as constraints (2g) and (2h)
     @variable(opt_model, x[feat = 1:n_feats, 1:n_splits[feat]], Bin) # indicator variable x_ij for feature i <= j:th split point (2g)
@@ -21,13 +22,10 @@ function manual_const_gen(tree_model, tree_depth)
 
     generated_constraints = 0
     added_constraint = true
-    tree_counter = 0
 
     function check_violated(x_opt, y_opt)
 
         for tree in 1:n_trees
-
-            tree_counter = tree
 
             current_node = 1 # start investigating from root
         
@@ -82,9 +80,8 @@ function manual_const_gen(tree_model, tree_depth)
         check_violated(x_opt, y_opt)
     end
 
-    println("LAST TREE: $tree_counter, CONSTRAINT ADDED: $added_constraint")
-
-    println("GENERATED CONSTRAINTS: $generated_constraints")
+    println("\nGENERATED CONSTRAINTS: $generated_constraints")
+    println("OPTIMAL OBJECTIVE: $(objective_value(opt_model))")
 
     return get_solution(n_feats, opt_model, n_splits, ordered_splits), objective_value(opt_model), opt_model
 

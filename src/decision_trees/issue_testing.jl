@@ -7,7 +7,7 @@ using JuMP
 using Gurobi
 include("trees_to_relaxed_op.jl")
 include("manual_const_gen.jl")
-include("hybrid_const_gen.jl")
+include("util.jl")
 
 const ENV = Gurobi.Env()
 
@@ -30,7 +30,9 @@ y_test = Array{Float64}(undef, length(x_test[:, 1]));
 
 "TREE MODEL CONFIGURATION AND TRAINING"
 
-config = EvoTreeRegressor(nrounds=200, max_depth=5, T=Float64, loss=:linear);
+tree_depth, forest_size = 10, 100
+
+config = EvoTreeRegressor(nrounds=forest_size, max_depth=tree_depth, T=Float64, loss=:linear);
 model = fit_evotree(config; x_train, y_train);
 
 pred_train = EvoTrees.predict(model, x_train)
@@ -38,20 +40,14 @@ pred_test = EvoTrees.predict(model, x_test)
 
 "OPTIMIZATION"
 
-@time x_new, sol_new, m_new = trees_to_relaxed_MIP(model, :createinitial, 5, :min);
-@time x_alg, sol_alg, m_alg = trees_to_relaxed_MIP(model, :noconstraints, 5, :min);
-
-@time x_manual, sol_manual, m_manual = manual_const_gen(model, 5);
-#@time x_hybrid, sol_hybrid, m_hybrid = hybrid_const_gen(model, 5);
+@time x_new, sol_new, m_new = trees_to_relaxed_MIP(model, :createinitial, tree_depth, :min);
+@time x_alg, sol_alg, m_alg = trees_to_relaxed_MIP(model, :noconstraints, tree_depth, :min);
+@time x_man, sol_man, m_man = manual_const_gen(model, tree_depth);
 
 "CHECKING OF SOLUTION"
 
-EvoTrees.predict(model, reshape([mean(x_new[n]) for n in 1:n_feats], 1, n_feats))[1]
-EvoTrees.predict(model, reshape([mean(x_alg[n]) for n in 1:n_feats], 1, n_feats))[1]
-EvoTrees.predict(model, reshape([mean(x_manual[n]) for n in 1:n_feats], 1, n_feats))[1]
-EvoTrees.predict(model, reshape([mean(x_hybrid[n]) for n in 1:n_feats], 1, n_feats))[1]
+sol_new ≈ EvoTrees.predict(model, reshape([mean(x_new[n]) for n in 1:n_feats], 1, n_feats))[1]
+sol_alg ≈ EvoTrees.predict(model, reshape([mean(x_alg[n]) for n in 1:n_feats], 1, n_feats))[1]
+sol_man ≈ EvoTrees.predict(model, reshape([mean(x_man[n]) for n in 1:n_feats], 1, n_feats))[1]
 
-sol_new
-sol_alg
-sol_manual
-sol_hybrid
+x_new ≈ x_alg ≈ x_man

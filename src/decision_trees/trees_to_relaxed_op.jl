@@ -7,7 +7,6 @@ function trees_to_relaxed_MIP(tree_model, tree_depth; objective, constraints)
     opt_model = direct_model(Gurobi.Optimizer(ENV))
     set_attribute(opt_model, "OutputFlag", 0)
     set_attribute(opt_model, "Presolve", 0)
-    set_attribute(opt_model, "LazyConstraints", 1)
 
     # Variable definitions as well as constraints (2g) and (2h)
     @variable(opt_model, x[feat = 1:n_feats, 1:n_splits[feat]], Bin) # indicator variable x_ij for feature i <= j:th split point (2g)
@@ -102,6 +101,7 @@ function trees_to_relaxed_MIP(tree_model, tree_depth; objective, constraints)
 
     # Set callback for lazy split constraint generation
     if constraints == "generate"
+        set_attribute(opt_model, "LazyConstraints", 1)
         set_attribute(opt_model, Gurobi.CallbackFunction(), split_constraint_callback)
     end
     optimize!(opt_model)

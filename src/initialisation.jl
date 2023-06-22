@@ -26,8 +26,7 @@ using Interpolations
 using XLSX
 
 
-include("JuMP_model.jl")
-include("MNIST.jl")
-include("bound_tightening.jl")
+include("nn/JuMP_model.jl")
+include("nn/bound_tightening.jl")
 
 include.(filter(contains(r".jl$"), readdir(current_dir*"/decision_trees/"; join=true)))

@@ -20,8 +20,8 @@ using Interpolations
 using XLSX
 using Distributed, SharedArrays
 
-include("JuMP_model.jl")
-include("bound_tightening.jl")
+include("nn/JuMP_model.jl")
+include("nn/bound_tightening.jl")
 
 export create_JuMP_model,
     evaluate!

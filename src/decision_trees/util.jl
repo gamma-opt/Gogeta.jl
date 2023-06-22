@@ -45,17 +45,15 @@ function extract_tree_model_info(tree_model, tree_depth)
 
 end
 
-function children(id, leaves)
-    
+function children(id, leaf_dict, max)
+
     result::Vector{Int64} = []
-    max = last(leaves)
 
     function inner(num)
         if num <= max
-            for leaf_index in eachindex(leaves)
-                if num == leaves[leaf_index]
-                    push!(result, leaf_index)
-                end
+            leaf_index = get(leaf_dict, num, 0)
+            if leaf_index != 0
+                push!(result, leaf_index)
             end
             inner(num << 1)
             inner(num << 1 + 1)
@@ -74,7 +72,7 @@ function get_solution(n_feats, model, n_splits, splitpoints)
 
     [smallest_splitpoint[feat] = n_splits[feat] + 1 for feat in 1:n_feats]
     for ele in eachindex(model[:x])
-        if value(model[:x][ele]) == 1 && ele[2] < smallest_splitpoint[ele[1]]
+        if round(value(model[:x][ele])) == 1 && ele[2] < smallest_splitpoint[ele[1]]
             smallest_splitpoint[ele[1]] = ele[2]
         end
     end

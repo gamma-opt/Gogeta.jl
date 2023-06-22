@@ -50,7 +50,7 @@ n_feats = 8
 
 "TREE MODEL CONFIGURATION AND TRAINING"
 
-tree_depth, forest_size = 5, 500
+tree_depth, forest_size = 15, 50
 
 config = EvoTreeRegressor(nrounds=forest_size, max_depth=tree_depth, T=Float64, loss=:linear);
 model = fit_evotree(config; x_train, y_train);
@@ -65,5 +65,14 @@ pred_test = EvoTrees.predict(model, x_test);
 
 "CHECKING OF SOLUTION"
 
+sol_new
 EvoTrees.predict(model, reshape([mean(x_new[n]) for n in 1:n_feats], 1, n_feats))[1]
+
+sol_alg
 EvoTrees.predict(model, reshape([mean(x_alg[n]) for n in 1:n_feats], 1, n_feats))[1]
+
+"METRICS"
+
+println("N_levels: $(length(eachindex(m_new[:x])))")
+println("N_leaves: $(length(eachindex(m_new[:y])))")
+println("Maxium possible number of leaves: $(2^(tree_depth-1)*forest_size)")

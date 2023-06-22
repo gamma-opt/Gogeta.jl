@@ -2,8 +2,11 @@ function trees_to_relaxed_MIP(tree_model, tree_depth; objective, constraints)
     
     "Data extraction from tree model"
  
-    n_trees, n_feats, n_leaves, leaves, n_splits, splits, ordered_splits = extract_tree_model_info(tree_model, tree_depth)
+    global n_trees, n_feats, n_leaves, leaves, n_splits, splits, ordered_splits = extract_tree_model_info(tree_model, tree_depth)
     
+    leaf_dict = Array{Any}(undef, n_trees)
+    [leaf_dict[tree] = Dict([(leaves[tree][leaf], leaf) for leaf in eachindex(leaves[tree])]) for tree in 1:n_trees]
+
     opt_model = direct_model(Gurobi.Optimizer(ENV))
     set_attribute(opt_model, "OutputFlag", 0)
     set_attribute(opt_model, "Presolve", 0)
@@ -18,21 +21,25 @@ function trees_to_relaxed_MIP(tree_model, tree_depth; objective, constraints)
 
     # Constraints (2c) and (2d)
     initial_constraints = 0
+    child_call_time = 0
+    child_calls = 0
 
     if constraints == "initial"
         for tree in 1:n_trees
-            for current_node in 1:(2^(tree_depth - 1))
-                if tree_model.trees[tree + 1].split[current_node] == true
-                    right_leaves = children(current_node << 1 + 1, leaves[tree])
-                    left_leaves = children(current_node << 1, leaves[tree])
-
-                    current_feat, current_splitpoint_index = splits[tree, current_node]
-
-                    @constraint(opt_model, sum(y[tree, leaf] for leaf in right_leaves) <= 1 - x[current_feat, current_splitpoint_index])
-                    @constraint(opt_model, sum(y[tree, leaf] for leaf in left_leaves) <= x[current_feat, current_splitpoint_index])
-                    
-                    initial_constraints += 2
+            for current_node in findall(s -> s==true, tree_model.trees[tree + 1].split)
+                
+                child_call_time += @elapsed begin
+                right_leaves = children(current_node << 1 + 1, leaf_dict[tree], last(leaves[tree]))
+                left_leaves = children(current_node << 1, leaf_dict[tree], last(leaves[tree]))
+                child_calls += 2
                 end
+
+                current_feat, current_splitpoint_index = splits[tree, current_node]
+
+                @constraint(opt_model, sum(y[tree, leaf] for leaf in right_leaves) <= 1 - x[current_feat, current_splitpoint_index])
+                @constraint(opt_model, sum(y[tree, leaf] for leaf in left_leaves) <= x[current_feat, current_splitpoint_index])
+                
+                initial_constraints += 2
             end
         end
     end
@@ -60,16 +67,18 @@ function trees_to_relaxed_MIP(tree_model, tree_depth; objective, constraints)
 
             current_node = 1 # start investigating from root
         
-            while (current_node in leaves[tree]) == false # traverse from root until hitting a leaf
+            while tree_model.trees[tree + 1].split[current_node] == true # traverse from root until hitting a leaf
                 
+                child_call_time += @elapsed begin
                 # indices for leaves left/right from current node - indexing based on y vector convention
-                right_leaves = children(current_node << 1 + 1, leaves[tree])
-                left_leaves = children(current_node << 1, leaves[tree])
-
+                right_leaves = children(current_node << 1 + 1, leaf_dict[tree], last(leaves[tree]))
+                left_leaves = children(current_node << 1, leaf_dict[tree], last(leaves[tree]))
+                child_calls += 2
+                end
                 # feature and split point index associated with current node
                 current_feat, current_splitpoint_index = splits[tree, current_node]
 
-                if x_opt[current_feat, current_splitpoint_index] ≈ 1 # node condition true - left side chosen...
+                if round(x_opt[current_feat, current_splitpoint_index]) == 1 # node condition true - left side chosen...
                     if sum(round(y_opt[tree, leaf]) for leaf in right_leaves) > 0 # ...but found from right
 
                         # Add constraint associated with current node (2d constraint)
@@ -108,6 +117,8 @@ function trees_to_relaxed_MIP(tree_model, tree_depth; objective, constraints)
 
     println("\nINITIAL CONSTRAINTS: $initial_constraints")
     println("GENERATED CONSTRAINTS: $generated_constraints")
+    println("CHILD CALLS: $child_calls")
+    println("CHILD CALL TIME: $(round(child_call_time; digits = 2)) s")
     println("OPTIMAL OBJECTIVE: $(objective_value(opt_model))")
 
     return get_solution(n_feats, opt_model, n_splits, ordered_splits), objective_value(opt_model), opt_model

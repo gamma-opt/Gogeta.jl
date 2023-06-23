@@ -50,7 +50,7 @@ n_feats = 8
 
 "TREE MODEL CONFIGURATION AND TRAINING"
 
-tree_depth, forest_size = 15, 50
+tree_depth, forest_size = 15, 100
 
 config = EvoTreeRegressor(nrounds=forest_size, max_depth=tree_depth, T=Float64, loss=:linear);
 model = fit_evotree(config; x_train, y_train);
@@ -60,15 +60,15 @@ pred_test = EvoTrees.predict(model, x_test);
 
 "OPTIMIZATION"
 
-@time x_new, sol_new, m_new = trees_to_relaxed_MIP(model, tree_depth; constraints="initial", objective="max");
-@time x_alg, sol_alg, m_alg = trees_to_relaxed_MIP(model, tree_depth; constraints="generate", objective="max");
+@time x_new, m_new = trees_to_relaxed_MIP(model, tree_depth; constraints="initial", objective="max");
+@time x_alg, m_alg = trees_to_relaxed_MIP(model, tree_depth; constraints="generate", objective="max");
 
 "CHECKING OF SOLUTION"
 
-sol_new
+objective_value(m_new)
 EvoTrees.predict(model, reshape([mean(x_new[n]) for n in 1:n_feats], 1, n_feats))[1]
 
-sol_alg
+objective_value(m_alg)
 EvoTrees.predict(model, reshape([mean(x_alg[n]) for n in 1:n_feats], 1, n_feats))[1]
 
 "METRICS"

@@ -2,14 +2,28 @@ function trees_to_relaxed_MIP(tree_model, tree_depth; objective, constraints)
     
     "Data extraction from tree model"
  
-    global n_trees, n_feats, n_leaves, leaves, n_splits, splits, ordered_splits = extract_tree_model_info(tree_model, tree_depth)
+    n_trees, n_feats, n_leaves, leaves, n_splits, splits, ordered_splits = extract_tree_model_info(tree_model, tree_depth)
     
+    # set up dictionary for leaves when finding child nodes
     leaf_dict = Array{Any}(undef, n_trees)
     [leaf_dict[tree] = Dict([(leaves[tree][leaf], leaf) for leaf in eachindex(leaves[tree])]) for tree in 1:n_trees]
 
+    # pre-compute all children for all nodes of all trees
+    child_leaves = Array{Any}(undef, n_trees)
+    for tree in 1:n_trees
+        
+        child_leaves[tree] = Array{Any}(undef, length(tree_model.trees[tree + 1].split))
+
+        for node in eachindex(child_leaves[tree])
+            child_leaves[tree][node] = children(node, leaf_dict[tree], last(leaves[tree]))[1]
+        end
+    end
+
+    # Set up model
     opt_model = direct_model(Gurobi.Optimizer(ENV))
     set_attribute(opt_model, "OutputFlag", 0)
     set_attribute(opt_model, "Presolve", 0)
+    set_attribute(opt_model, "TimeLimit", 60.0)
 
     # Variable definitions as well as constraints (2g) and (2h)
     @variable(opt_model, x[feat = 1:n_feats, 1:n_splits[feat]], Bin) # indicator variable x_ij for feature i <= j:th split point (2g)
@@ -21,18 +35,13 @@ function trees_to_relaxed_MIP(tree_model, tree_depth; objective, constraints)
 
     # Constraints (2c) and (2d)
     initial_constraints = 0
-    child_call_time = 0
-    child_calls = 0
 
     if constraints == "initial"
         for tree in 1:n_trees
             for current_node in findall(s -> s==true, tree_model.trees[tree + 1].split)
-                
-                child_call_time += @elapsed begin
-                right_leaves = children(current_node << 1 + 1, leaf_dict[tree], last(leaves[tree]))
-                left_leaves = children(current_node << 1, leaf_dict[tree], last(leaves[tree]))
-                child_calls += 2
-                end
+
+                right_leaves = child_leaves[tree][current_node << 1 + 1]
+                left_leaves = child_leaves[tree][current_node << 1]
 
                 current_feat, current_splitpoint_index = splits[tree, current_node]
 
@@ -69,12 +78,9 @@ function trees_to_relaxed_MIP(tree_model, tree_depth; objective, constraints)
         
             while tree_model.trees[tree + 1].split[current_node] == true # traverse from root until hitting a leaf
                 
-                child_call_time += @elapsed begin
-                # indices for leaves left/right from current node - indexing based on y vector convention
-                right_leaves = children(current_node << 1 + 1, leaf_dict[tree], last(leaves[tree]))
-                left_leaves = children(current_node << 1, leaf_dict[tree], last(leaves[tree]))
-                child_calls += 2
-                end
+                right_leaves = child_leaves[tree][current_node << 1 + 1]
+                left_leaves = child_leaves[tree][current_node << 1]
+
                 # feature and split point index associated with current node
                 current_feat, current_splitpoint_index = splits[tree, current_node]
 
@@ -117,10 +123,13 @@ function trees_to_relaxed_MIP(tree_model, tree_depth; objective, constraints)
 
     println("\nINITIAL CONSTRAINTS: $initial_constraints")
     println("GENERATED CONSTRAINTS: $generated_constraints")
-    println("CHILD CALLS: $child_calls")
-    println("CHILD CALL TIME: $(round(child_call_time; digits = 2)) s")
-    println("OPTIMAL OBJECTIVE: $(objective_value(opt_model))")
 
-    return get_solution(n_feats, opt_model, n_splits, ordered_splits), objective_value(opt_model), opt_model
+    if termination_status(opt_model) == MOI.OPTIMAL
+        println("SOLVED TO OPTIMALITY: $(objective_value(opt_model))")
+        return get_solution(n_feats, opt_model, n_splits, ordered_splits), opt_model
+    else
+        println("SOLVE FAILED, TIME LIMIT 60s REACHED")
+        return nothing, opt_model
+    end
 
 end

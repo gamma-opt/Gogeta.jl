@@ -48,10 +48,8 @@ end
 function children(id, leaf_dict, max)
 
     result::Vector{Int64} = []
-    inner_calls = 0
 
     function inner(num)
-        inner_calls += 1
         if num <= max
             leaf_index = get(leaf_dict, num, 0)
             if leaf_index != 0
@@ -64,7 +62,7 @@ function children(id, leaf_dict, max)
 
     inner(id)
 
-    return result, inner_calls
+    return result
 
 end
 

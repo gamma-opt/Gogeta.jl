@@ -22,9 +22,9 @@ function trees_to_relaxed_MIP(tree_model, tree_depth; objective, constraints)
 
     # Set up model
     opt_model = direct_model(Gurobi.Optimizer(ENV))
-    #set_attribute(opt_model, "OutputFlag", 0)
+    set_attribute(opt_model, "OutputFlag", 0)
     set_attribute(opt_model, "Presolve", 0)
-    set_attribute(opt_model, "TimeLimit", 500.0)
+    set_attribute(opt_model, "TimeLimit", 100.0)
 
     # Variable definitions as well as constraints (2g) and (2h)
     @variable(opt_model, x[feat = 1:n_feats, 1:n_splits[feat]], Bin) # indicator variable x_ij for feature i <= j:th split point (2g)

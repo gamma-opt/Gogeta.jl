@@ -1,5 +1,6 @@
 function trees_to_relaxed_MIP(tree_model, tree_depth; objective, constraints)
     
+    creation_time = @elapsed begin
     "Data extraction from tree model"
  
     n_trees, n_feats, n_leaves, leaves, n_splits, splits, ordered_splits = extract_tree_model_info(tree_model, tree_depth)
@@ -21,9 +22,9 @@ function trees_to_relaxed_MIP(tree_model, tree_depth; objective, constraints)
 
     # Set up model
     opt_model = direct_model(Gurobi.Optimizer(ENV))
-    set_attribute(opt_model, "OutputFlag", 0)
+    #set_attribute(opt_model, "OutputFlag", 0)
     set_attribute(opt_model, "Presolve", 0)
-    set_attribute(opt_model, "TimeLimit", 60.0)
+    set_attribute(opt_model, "TimeLimit", 500.0)
 
     # Variable definitions as well as constraints (2g) and (2h)
     @variable(opt_model, x[feat = 1:n_feats, 1:n_splits[feat]], Bin) # indicator variable x_ij for feature i <= j:th split point (2g)
@@ -58,6 +59,9 @@ function trees_to_relaxed_MIP(tree_model, tree_depth; objective, constraints)
     if objective == "max"
         @objective(opt_model, Max, objective_function(opt_model))
     end
+    end
+    println("\nTIME SPENT CREATING MODEL: $(round(creation_time, digits=2)) seconds")
+    println("\nINITIAL CONSTRAINTS: $initial_constraints")
 
     # Use lazy constraints to generate only needed split constraints
     generated_constraints = 0
@@ -69,8 +73,6 @@ function trees_to_relaxed_MIP(tree_model, tree_depth; objective, constraints)
         end
 
         Gurobi.load_callback_variable_primal(cb_data, cb_where)
-        x_opt = callback_value.(cb_data, x)
-        y_opt = callback_value.(cb_data, y)
 
         for tree in 1:n_trees
 
@@ -82,10 +84,10 @@ function trees_to_relaxed_MIP(tree_model, tree_depth; objective, constraints)
                 left_leaves = child_leaves[tree][current_node << 1]
 
                 # feature and split point index associated with current node
-                current_feat, current_splitpoint_index = splits[tree, current_node]
+                current_feat::Int64, current_splitpoint_index::Int64 = round.(splits[tree, current_node])
 
-                if round(x_opt[current_feat, current_splitpoint_index]) == 1 # node condition true - left side chosen...
-                    if sum(round(y_opt[tree, leaf]) for leaf in right_leaves) > 0 # ...but found from right
+                if round(callback_value(cb_data, x[current_feat, current_splitpoint_index])) == 1 # node condition true - left side chosen...
+                    if sum(round(callback_value(cb_data, y[tree, leaf])) for leaf in right_leaves) > 0 # ...but found from right
 
                         # Add constraint associated with current node (2d constraint)
                         split_cons = @build_constraint(sum(y[tree, leaf] for leaf in right_leaves) <= 1 - x[current_feat, current_splitpoint_index])
@@ -97,7 +99,7 @@ function trees_to_relaxed_MIP(tree_model, tree_depth; objective, constraints)
                         current_node = current_node << 1 # check left child - continue search
                     end
                 else # right side chosen...
-                    if sum(round(y_opt[tree, leaf]) for leaf in left_leaves) > 0 # ...but found from left
+                    if sum(round(callback_value(cb_data, y[tree, leaf])) for leaf in left_leaves) > 0 #...but found from left
                         
                         # Add constraint associated with current node (2c constraint)
                         split_cons = @build_constraint(sum(y[tree, leaf] for leaf in left_leaves) <= x[current_feat, current_splitpoint_index])
@@ -109,7 +111,6 @@ function trees_to_relaxed_MIP(tree_model, tree_depth; objective, constraints)
                         current_node = current_node << 1 + 1 # check right child - continue search
                     end
                 end
-
             end
         end
     end
@@ -119,16 +120,17 @@ function trees_to_relaxed_MIP(tree_model, tree_depth; objective, constraints)
         set_attribute(opt_model, "LazyConstraints", 1)
         set_attribute(opt_model, Gurobi.CallbackFunction(), split_constraint_callback)
     end
-    optimize!(opt_model)
+    opt_time = @elapsed optimize!(opt_model)
 
-    println("\nINITIAL CONSTRAINTS: $initial_constraints")
     println("GENERATED CONSTRAINTS: $generated_constraints")
+
+    println("\nTIME SPENT OPTIMIZING: $(round(opt_time, digits=2)) seconds\n")
 
     if termination_status(opt_model) == MOI.OPTIMAL
         println("SOLVED TO OPTIMALITY: $(objective_value(opt_model))")
         return get_solution(n_feats, opt_model, n_splits, ordered_splits), opt_model
     else
-        println("SOLVE FAILED, TIME LIMIT 60s REACHED")
+        println("SOLVE FAILED, TIME LIMIT 300s REACHED")
         return nothing, opt_model
     end
 

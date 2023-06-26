@@ -50,7 +50,7 @@ n_feats = 8
 
 "TREE MODEL CONFIGURATION AND TRAINING"
 
-tree_depth, forest_size = 15, 100
+tree_depth, forest_size = 17, 500
 
 config = EvoTreeRegressor(nrounds=forest_size, max_depth=tree_depth, T=Float64, loss=:linear);
 model = fit_evotree(config; x_train, y_train);

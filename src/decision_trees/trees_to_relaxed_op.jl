@@ -16,7 +16,7 @@ function trees_to_relaxed_MIP(tree_model, tree_depth; objective, constraints)
         child_leaves[tree] = Array{Any}(undef, length(tree_model.trees[tree + 1].split))
 
         for node in eachindex(child_leaves[tree])
-            child_leaves[tree][node] = children(node, leaf_dict[tree], last(leaves[tree]))[1]
+            child_leaves[tree][node] = children(node, leaf_dict[tree], last(leaves[tree]))
         end
     end
 

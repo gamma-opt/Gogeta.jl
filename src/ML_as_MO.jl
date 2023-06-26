@@ -1,15 +1,7 @@
 module ML_as_MO
 
-# current_dir =  @__DIR__
-# cd(current_dir)
-
-# using Pkg
-# Pkg.activate(".")
-# Pkg.instantiate()
-
-using MLDatasets, CUDA, FileIO, ImageShow 
+using MLDatasets, FileIO, ImageShow 
 using MLJBase # for conf matrix
-using Plots, Images
 using Statistics
 using Random
 using Flux
@@ -22,15 +14,14 @@ using CSV
 using DataFrames
 using StatsBase
 using MLJ
+using JLD
+using Profile
+using Interpolations
+using XLSX
+using Distributed, SharedArrays
 
-# include("JuMP_model.jl")
-# include("MNIST.jl")
-# include("bound_tightening.jl")
-
-# include.(filter(contains(r".jl$"), readdir(current_dir*"/decision_trees/"; join=true)))
-
-include("JuMP_model.jl")
-include("bound_tightening.jl")
+include("nn/JuMP_model.jl")
+include("nn/bound_tightening.jl")
 
 export create_JuMP_model,
     evaluate!
@@ -38,6 +29,6 @@ export create_JuMP_model,
 export bound_tightening,
     bound_tightening_threads
     bound_tightening_workers
-    bound_calculating
+    # bound_calculating # inner function does not need to be public
 
 end # module

@@ -1,4 +1,4 @@
-include("initialisation.jl")
+include("src/initialisation.jl")
 
 # read iris data 
 

@@ -50,7 +50,7 @@ worker = workers()
     # include("initialisation.jl")
 end
 
-@everywhere include("initialisation.jl")
+@everywhere include("../initialisation.jl")
 
 
 bad_U1 = Float32[if i <= 784 1 else 1000 end for i in 1:842]

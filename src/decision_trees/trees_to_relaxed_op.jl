@@ -10,13 +10,17 @@ function trees_to_relaxed_MIP(tree_model, tree_depth; objective, constraints)
     [leaf_dict[tree] = Dict([(leaves[tree][leaf], leaf) for leaf in eachindex(leaves[tree])]) for tree in 1:n_trees]
 
     # pre-compute all children for all nodes of all trees
-    child_leaves = Array{Any}(undef, n_trees)
+    global child_leaves = Array{Any}(undef, n_trees)
     for tree in 1:n_trees
         
         child_leaves[tree] = Array{Any}(undef, length(tree_model.trees[tree + 1].split))
 
         for node in eachindex(child_leaves[tree])
-            child_leaves[tree][node] = children(node, leaf_dict[tree], last(leaves[tree]))
+            if tree_model.trees[tree + 1].split[node] == true
+                child_leaves[tree][node] = children(node, leaf_dict[tree], last(leaves[tree]))
+            else
+                child_leaves[tree][node] = get(leaf_dict[tree], node, 0) != 0 ? [leaf_dict[tree][node]] : []
+            end
         end
     end
 
@@ -93,7 +97,7 @@ function trees_to_relaxed_MIP(tree_model, tree_depth; objective, constraints)
                         split_cons = @build_constraint(sum(y[tree, leaf] for leaf in right_leaves) <= 1 - x[current_feat, current_splitpoint_index])
                         MOI.submit(opt_model, MOI.LazyConstraint(cb_data), split_cons)
                         generated_constraints += 1
-                        return
+                        break
 
                     else # ...and found from left
                         current_node = current_node << 1 # check left child - continue search
@@ -105,7 +109,7 @@ function trees_to_relaxed_MIP(tree_model, tree_depth; objective, constraints)
                         split_cons = @build_constraint(sum(y[tree, leaf] for leaf in left_leaves) <= x[current_feat, current_splitpoint_index])
                         MOI.submit(opt_model, MOI.LazyConstraint(cb_data), split_cons)
                         generated_constraints += 1
-                        return
+                        break
 
                     else # ...and found from right
                         current_node = current_node << 1 + 1 # check right child - continue search
@@ -130,7 +134,7 @@ function trees_to_relaxed_MIP(tree_model, tree_depth; objective, constraints)
         println("SOLVED TO OPTIMALITY: $(objective_value(opt_model))")
         return get_solution(n_feats, opt_model, n_splits, ordered_splits), opt_model
     else
-        println("SOLVE FAILED, TIME LIMIT 300s REACHED")
+        println("SOLVE FAILED, TIME LIMIT REACHED")
         return nothing, opt_model
     end
 

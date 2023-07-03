@@ -1,3 +1,5 @@
+using ML_as_MO
+using Random
 # This file contains random code snppets that are ONLY used for development and testing
 
 x_train, y_train = MNIST(split=:train)[:]
@@ -25,11 +27,11 @@ function test_nns(seed)
     return nn1, nn2, nn3
 end
 
-raw_nn1, raw_nn2, raw_nn3 = test_nns(42)
+nn1, nn2, nn3 = test_nns(42)
 
-nn1, acc1 = train_mnist_nn(raw_nn1)
-nn2, acc2 = train_mnist_nn(raw_nn2)
-nn3, acc3 = train_mnist_nn(raw_nn3)
+train_mnist_DNN!(nn1)
+train_mnist_DNN!(nn2)
+train_mnist_DNN!(nn3)
 
 
 using Distributed

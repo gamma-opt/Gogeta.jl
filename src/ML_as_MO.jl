@@ -27,7 +27,7 @@ export create_JuMP_model,
     evaluate!
 
 export bound_tightening,
-    bound_tightening_threads
+    bound_tightening_threads,
     bound_tightening_workers
     # bound_calculating # inner function does not need to be public
 

@@ -371,38 +371,7 @@ function bound_tightening_workers(DNN::Chain, init_U_bounds::Vector{Float32}, in
     return curr_U_bounds, curr_L_bounds
 end
 
-"""
-bound_calculating(
-    K::Int64, 
-    k::Int64, 
-    node::Int64, 
-    W::Vector{Matrix{Float32}}, 
-    b::Vector{Vector{Float32}}, 
-    node_count::Vector{Int64}, 
-    curr_U_bounds::Vector{Float32}, 
-    curr_L_bounds::Vector{Float32}, 
-    verbose::Bool=false
-    )
-
-An inner function to bound_tightening_workers that handles solving bounds in available
-workers. This function is used with Distributed.pmap() to get all bounds in one list.
-
-# Arguments
-- `K::Int64`: same as length(DNN). There are K+1 layers in the DNN.
-- `k::Int64`: Current layer from 1:K layers.
-- `node::Int64`: Current node in the layer. This value is from 1 to twice the amount of nodes, such that the first repetition calculates L-bounds and the second U-bounds.
-- `W::Vector{Matrix{Float32}}`: The weight matrices of the DNN
-- `b::Vector{Vector{Float32}}`: The bias vectors of the DNN
-- `node_count::Vector{Int64}`: Stores the amount of nodes in each layer.
-- `curr_U_bounds::Vector{Float32}`: Current optimal upper bounds.
-- `curr_L_bounds::Vector{Float32}`: Current optimal lower bounds.
-- `verbose::Bool=false`: Controls Gurobi logs.
-
-# Examples
-```julia
-L_U_bounds = Distributed.pmap(node -> bound_calculating(K, k, node, W, b, node_count, curr_U_bounds, curr_L_bounds, verbose), 1:(2*4))
-```
-"""
+# Inner function to bound_tightening_workers: assigns a JuMP model to the current worker
 
 function bound_calculating(
     K::Int64, 

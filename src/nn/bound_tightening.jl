@@ -343,7 +343,7 @@ function bound_tightening_workers(DNN::Chain, init_U_bounds::Vector{Float32}, in
     for k in 1:K
 
         # Distributed.pmap returns the bounds in order
-        L_U_bounds = Distributed.pmap(node -> bound_calculating(K, k, node, W, b, node_count, curr_U_bounds, curr_L_bounds, verbose), 1:(2*node_count[k+1]))
+        L_U_bounds = Distributed.pmap(node -> bt_workers_inner(K, k, node, W, b, node_count, curr_U_bounds, curr_L_bounds, verbose), 1:(2*node_count[k+1]))
 
         for node in 1:node_count[k+1]
             prev_layers_node_sum = 0
@@ -374,7 +374,7 @@ end
 
 # Inner function to bound_tightening_workers: assigns a JuMP model to the current worker
 
-function bound_calculating(
+function bt_workers_inner(
     K::Int64, 
     k::Int64, 
     node::Int64, 
@@ -479,9 +479,6 @@ function bound_calculating(
     return optimal
 end
 
-
-
-
 """
 bound_tightening_2workers(DNN::Chain, init_U_bounds::Vector{Float32}, init_L_bounds::Vector{Float32}, verbose::Bool=false)
 
@@ -533,7 +530,7 @@ function bound_tightening_2workers(DNN::Chain, init_U_bounds::Vector{Float32}, i
 end
 
 
-# Inner function to solve_optimal_bounds_2workers
+# Inner function to solve_optimal_bounds_2workers: solves L or U bounds for all nodes in a layer using the same JuMP model
 
 function bt_2workers_inner(
     K::Int64, 
@@ -630,34 +627,29 @@ function bt_2workers_inner(
         solve_time = round(solve_time; sigdigits = 3)
         @assert termination_status(model) == OPTIMAL || termination_status(model) == TIME_LIMIT
             "Problem (layer $k (from 1:$K), node $node, $(obj_function == 1 ? "L" : "U")-bound) is infeasible."
-        println("Solve time (layer $k, node $node, $(obj_function == 1 ? "L" : "U")-bound): $(solve_time)s")
         optimal = objective_value(model)
-        println("thread: ", myid(), ", node: ", node, ", optimal value: ", optimal)
+        println("Worker: $(myid()), layer $k, node $curr_node, $(obj_function == 1 ? "L" : "U")-bound: solve time $(solve_time)s, optimal value $(optimal)")
 
         # fix the model variable L or U corresponding to the current node to be the optimal value
         if obj_function == 1 # Min
             curr_L_bounds_copy[curr_node_index] = optimal
-            # fix(L[k, curr_node], optimal)
         elseif obj_function == 2 # Max
             curr_U_bounds_copy[curr_node_index] = optimal
-            # fix(U[k, curr_node], optimal)
         end
 
+        # deleting and unregistering the constraints assigned to the current node
         delete(model, node_con)
         delete(model, node_L)
         delete(model, node_U)
         unregister(model, :node_con)
         unregister(model, :node_L)
         unregister(model, :node_U)
-
     end
 
     if obj_function == 1 # Min
         return curr_L_bounds_copy
-        # fix(L[k, curr_node], optimal)
     elseif obj_function == 2 # Max
         return curr_U_bounds_copy
-        # fix(U[k, curr_node], optimal)
     end
 
 end

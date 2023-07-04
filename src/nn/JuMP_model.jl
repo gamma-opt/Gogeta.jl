@@ -122,7 +122,7 @@ evaluate!(JuMP_model, input)
 function evaluate!(JuMP_model::Model, input::Vector{Float32})
     x = JuMP_model[:x] # stores the @variable with name x from the JuMP_model
     input_len = length(input)
-    @assert input_len == length(x[0, :]) "'input' has wrong dimension"
+    @assert input_len == length(x[0, :]) "\"input\" has wrong dimension"
     for input_node in 1:input_len
         fix(x[0, input_node], input[input_node], force=true) # fix value of input to x[0,j]
     end

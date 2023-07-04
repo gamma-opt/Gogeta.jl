@@ -1,5 +1,7 @@
 using ML_as_MO
 using Random
+include("JuMP_model.jl")
+include("bound_tightening.jl")
 # This file contains random code snppets that are ONLY used for development and testing
 
 x_train, y_train = MNIST(split=:train)[:]
@@ -68,7 +70,7 @@ bad_L3 = Float32[if i <= 784 0 else -1000 end for i in 1:884]
 @time optimal_U1_threads, optimal_L1_threads = bound_tightening_threads(nn1, bad_U1, bad_L1)
 
 @time pmap_U1, pmap_L1 = bound_tightening_workers(nn1, bad_U1, bad_L1)
-@time workers2_U1, workers2_L1 = solve_optimal_bounds_2workers(nn1, bad_U1, bad_L1)
+@time workers2_U1, workers2_L1 = bound_tightening_2workers(nn1, bad_U1, bad_L1)
 
 
 

@@ -11,7 +11,7 @@ The activation function must be "relu" in all hidden layers and "identity" in th
 - `DNN::Chain`: A trained ReLU DNN.
 - `U_bounds::Vector{Float32}`: Upper bounds on the node values of the DNN.
 - `L_bounds::Vector{Float32}`: Lower bounds on the node values of the DNN.
-- `bt::String="none"`: Optional bound tightening of the constraint bounds. Can be set to "none" (default), "singlethread", "threads" or "workers".
+- `bt::String="none"`: Optional bound tightening of the constraint bounds. Can be set to "none" (default), "singlethread", "threads", "workers" or "2 workers".
 - `verbose::Bool=false`: Controls Gurobi logs.
 
 # Examples
@@ -40,14 +40,16 @@ function create_JuMP_model(DNN::Chain, U_bounds::Vector{Float32}, L_bounds::Vect
     final_L_bounds = copy(L_bounds)
 
     # optional: calculates optimal lower and upper bounds L and U
-    @assert bt == "none" || bt == "singlethread" || bt == "threads" || bt == "workers"
-        "bound_tightening has to be set to \"none\", \"singlethread\", \"threads\", or \"workers\"."
+    @assert bt == "none" || bt == "singlethread" || bt == "threads" || bt == "workers" || bt == "2 workers"
+        "bound_tightening has to be set to \"none\", \"singlethread\", \"threads\", \"workers\" or \"2 workers\"."
     if bt == "singlethread"
         final_L_bounds, final_U_bounds = bound_tightening(DNN, U_bounds, L_bounds, verbose)
     elseif bt == "threads"
         final_L_bounds, final_U_bounds = bound_tightening_threads(DNN, U_bounds, L_bounds, verbose)
     elseif bt == "workers"
         final_L_bounds, final_U_bounds = bound_tightening_workers(DNN, U_bounds, L_bounds, verbose)
+    elseif bt == "2 workers"
+        final_L_bounds, final_U_bounds = bound_tightening_2workers(DNN, U_bounds, L_bounds, verbose)
     end
 
     model = Model(optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => (verbose ? 1 : 0)))

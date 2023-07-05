@@ -1,8 +1,10 @@
+### This file contains random code snppets that are ONLY used for development and testing
+
 using ML_as_MO
 using Random
 include("JuMP_model.jl")
 include("bound_tightening.jl")
-# This file contains random code snppets that are ONLY used for development and testing
+include("../../examples/helper_functions.jl")
 
 x_train, y_train = MNIST(split=:train)[:]
 x_test, y_test = MNIST(split=:test)[:]
@@ -54,7 +56,7 @@ worker = workers()
     # include("initialisation.jl")
 end
 
-@everywhere include("../initialisation.jl")
+# @everywhere include("../initialisation.jl")
 
 
 bad_U1 = Float32[if i <= 784 1 else 1000 end for i in 1:842]

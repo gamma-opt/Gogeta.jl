@@ -628,7 +628,7 @@ function bt_2workers_inner(
         @assert termination_status(model) == OPTIMAL || termination_status(model) == TIME_LIMIT
             "Problem (layer $k (from 1:$K), node $node, $(obj_function == 1 ? "L" : "U")-bound) is infeasible."
         optimal = objective_value(model)
-        println("Worker: $(myid()), layer $k, node $curr_node, $(obj_function == 1 ? "L" : "U")-bound: solve time $(solve_time)s, optimal value $(optimal)")
+        println("Worker: $(myid()), layer $k, node $node, $(obj_function == 1 ? "L" : "U")-bound: solve time $(solve_time)s, optimal value $(optimal)")
 
         # fix the model variable L or U corresponding to the current node to be the optimal value
         if obj_function == 1 # Min

@@ -383,7 +383,7 @@ function bt_workers_inner(
     node_count::Vector{Int64}, 
     curr_U_bounds::Vector{Float32}, 
     curr_L_bounds::Vector{Float32}, 
-    verbose::Bool=false
+    verbose::Bool
     )
 
     model = Model(optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => (verbose ? 1 : 0), "Threads" => 1))
@@ -514,10 +514,15 @@ function bound_tightening_2workers(DNN::Chain, init_U_bounds::Vector{Float32}, i
     # store the current optimal bounds in the algorithm
     curr_U_bounds = copy(init_U_bounds)
     curr_L_bounds = copy(init_L_bounds)
+
+    # split the available threads into 2 to be assigned to each worker.
+    n = Threads.nthreads()
+    threads_split = [div(n, 2), n-div(n, 2)]
     
     for k in 1:K
 
-        L_U_bounds = Distributed.pmap(obj_function -> bt_2workers_inner(K, k, obj_function, W, b, node_count, curr_U_bounds, curr_L_bounds, verbose), 1:2)
+        L_U_bounds = Distributed.pmap(obj_function -> 
+            bt_2workers_inner(K, k, obj_function, W, b, node_count, curr_U_bounds, curr_L_bounds, threads_split[obj_function], verbose), 1:2)
 
         curr_L_bounds = L_U_bounds[1]
         curr_U_bounds = L_U_bounds[2]
@@ -541,12 +546,14 @@ function bt_2workers_inner(
     node_count::Vector{Int64}, 
     curr_U_bounds::Vector{Float32}, 
     curr_L_bounds::Vector{Float32}, 
-    verbose::Bool=false
+    n_threads::Int64,
+    verbose::Bool
     )
+
     curr_U_bounds_copy = copy(curr_U_bounds)
     curr_L_bounds_copy = copy(curr_L_bounds)
 
-    model = Model(optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => (verbose ? 1 : 0), "Threads" => 4))
+    model = Model(optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => (verbose ? 1 : 0), "Threads" => n_threads))
 
     # NOTE! below variables and constraints for all opt problems
     @variable(model, x[k in 0:K, j in 1:node_count[k+1]] >= 0)

@@ -1,4 +1,4 @@
-function plot_model_quality(x, y, z, plot_title, label_x, label_y)
+function plot_model_quality(x, y, z; plot_title="TITLE", label_x="X LABEL", label_y="Y LABEL", lim_l=minimum(z), lim_h=maximum(z))
 
     # Interpolatant object
     itp = LinearInterpolation((x, y), z)
@@ -13,9 +13,10 @@ function plot_model_quality(x, y, z, plot_title, label_x, label_y)
                 c=cgrad(:roma, scale=:log), 
                 xlabel=label_x, 
                 ylabel=label_y, 
-                clim=(minimum(z), maximum(z)), 
+                clim=(lim_l, lim_h), 
                 title=plot_title,
                 xticks=(x, string.(x)),
                 yticks=(y, string.(y)))
-    #scatter!(p, [x for _ in y for x in x], [y for y in y for _ in x], zcolor=z[:]; lab="original data") 
+    
+    #scatter!(p, [x for _ in y for x in x], [y for y in y for _ in x], zcolor=z[:]; lab="original data")
 end

@@ -41,11 +41,17 @@ time4 = @elapsed begin
     mdl_bt_workers = @time create_JuMP_model(mnist_DNN, U_bounds, L_bounds, "workers")
 end
 
+@info "Testing create_JuMP_model() with bt=\"2 workers\""
+time5 = @elapsed begin
+    mdl_bt_2workers = @time create_JuMP_model(mnist_DNN, U_bounds, L_bounds, "2 workers")
+end
+
 @info "============= Results =============
 Creating the JuMP model without bound tightening (default bounds): $(round(time1; sigdigits = 3))s
 Creating the JuMP model with single-threaded bound tightening: $(round(time2; sigdigits = 3))s
 Creating the JuMP model with multithreaded bound tightening (Threads): $(round(time3; sigdigits = 3))s
-Creating the JuMP model with multithreaded bound tightening (Workers): $(round(time4; sigdigits = 3))s"
+Creating the JuMP model with multithreaded bound tightening (Workers): $(round(time4; sigdigits = 3))s
+Creating the JuMP model with multithreaded bound tightening (2 Workers): $(round(time5; sigdigits = 3))s"
 
 @test true
 

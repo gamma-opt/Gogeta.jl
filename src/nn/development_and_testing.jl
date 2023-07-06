@@ -1,4 +1,10 @@
-# This file contains random code snppets that are ONLY used for development and testing
+### This file contains random code snppets that are ONLY used for development and testing
+
+using ML_as_MO
+using Random
+include("JuMP_model.jl")
+include("bound_tightening.jl")
+include("../../examples/helper_functions.jl")
 
 x_train, y_train = MNIST(split=:train)[:]
 x_test, y_test = MNIST(split=:test)[:]
@@ -25,11 +31,11 @@ function test_nns(seed)
     return nn1, nn2, nn3
 end
 
-raw_nn1, raw_nn2, raw_nn3 = test_nns(42)
+nn1, nn2, nn3 = test_nns(42)
 
-nn1, acc1 = train_mnist_nn(raw_nn1)
-nn2, acc2 = train_mnist_nn(raw_nn2)
-nn3, acc3 = train_mnist_nn(raw_nn3)
+train_mnist_DNN!(nn1)
+train_mnist_DNN!(nn2)
+train_mnist_DNN!(nn3)
 
 
 using Distributed
@@ -50,7 +56,7 @@ worker = workers()
     # include("initialisation.jl")
 end
 
-@everywhere include("../initialisation.jl")
+# @everywhere include("../initialisation.jl")
 
 
 bad_U1 = Float32[if i <= 784 1 else 1000 end for i in 1:842]
@@ -66,7 +72,7 @@ bad_L3 = Float32[if i <= 784 0 else -1000 end for i in 1:884]
 @time optimal_U1_threads, optimal_L1_threads = bound_tightening_threads(nn1, bad_U1, bad_L1)
 
 @time pmap_U1, pmap_L1 = bound_tightening_workers(nn1, bad_U1, bad_L1)
-@time workers2_U1, workers2_L1 = solve_optimal_bounds_2workers(nn1, bad_U1, bad_L1)
+@time workers2_U1, workers2_L1 = bound_tightening_2workers(nn1, bad_U1, bad_L1)
 
 
 

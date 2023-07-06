@@ -6,12 +6,18 @@ create_JuMP_model(DNN::Chain, bounds_U::Vector{Float32}, bounds_L::Vector{Float3
 
 Converts a ReLU DNN to a 0-1 MILP JuMP model. The ReLU DNN is assumed to be a Flux.Chain.
 The activation function must be "relu" in all hidden layers and "identity" in the output layer.
+The keyword argument "bt" determines if bound tightening is to be used on the constraint bounds:
+— "none": No bound tightening is used.
+— "singletread": One shared JuMP model is used to calculate bounds one at a time.
+— "threads": The bounds are calculated using a separate model for each subproblem using Threads
+— "workers": The bounds are calculated using a separate model for each subproblem using Workers
+— "2 workers": The bounds are calculated with a maximum of two workers at each layer (upper and lower bounds). Each worker reuses the JuMP model.
 
 # Arguments
 - `DNN::Chain`: A trained ReLU DNN.
 - `U_bounds::Vector{Float32}`: Upper bounds on the node values of the DNN.
 - `L_bounds::Vector{Float32}`: Lower bounds on the node values of the DNN.
-- `bt::String="none"`: Optional bound tightening of the constraint bounds. Can be set to "none" (default), "singlethread", "threads" or "workers".
+- `bt::String="none"`: Optional bound tightening of the constraint bounds. Can be set to "none", "singlethread", "threads", "workers" or "2 workers".
 - `verbose::Bool=false`: Controls Gurobi logs.
 
 # Examples
@@ -23,9 +29,9 @@ function create_JuMP_model(DNN::Chain, U_bounds::Vector{Float32}, L_bounds::Vect
 
     K = length(DNN) # NOTE! there are K+1 layers in the nn
     for i in 1:K-1
-        @assert DNN[i].σ == relu "Hidden layers must use 'relu' as the activation function"
+        @assert DNN[i].σ == relu "Hidden layers must use \"relu\" as the activation function"
     end
-    @assert DNN[K].σ == identity "Output layer must use the 'identity' activation function"
+    @assert DNN[K].σ == identity "Output layer must use the \"identity\" activation function"
 
     # store the DNN weights and biases
     DNN_params = Flux.params(DNN)
@@ -40,14 +46,16 @@ function create_JuMP_model(DNN::Chain, U_bounds::Vector{Float32}, L_bounds::Vect
     final_L_bounds = copy(L_bounds)
 
     # optional: calculates optimal lower and upper bounds L and U
-    @assert bt == "none" || bt == "singlethread" || bt == "threads" || bt == "workers"
-        "bound_tightening has to be set to \"none\", \"singlethread\", \"threads\", or \"workers\"."
+    @assert bt == "none" || bt == "singlethread" || bt == "threads" || bt == "workers" || bt == "2 workers"
+        "bound_tightening has to be set to \"none\", \"singlethread\", \"threads\", \"workers\" or \"2 workers\"."
     if bt == "singlethread"
         final_L_bounds, final_U_bounds = bound_tightening(DNN, U_bounds, L_bounds, verbose)
     elseif bt == "threads"
         final_L_bounds, final_U_bounds = bound_tightening_threads(DNN, U_bounds, L_bounds, verbose)
     elseif bt == "workers"
         final_L_bounds, final_U_bounds = bound_tightening_workers(DNN, U_bounds, L_bounds, verbose)
+    elseif bt == "2 workers"
+        final_L_bounds, final_U_bounds = bound_tightening_2workers(DNN, U_bounds, L_bounds, verbose)
     end
 
     model = Model(optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => (verbose ? 1 : 0)))
@@ -122,7 +130,7 @@ evaluate!(JuMP_model, input)
 function evaluate!(JuMP_model::Model, input::Vector{Float32})
     x = JuMP_model[:x] # stores the @variable with name x from the JuMP_model
     input_len = length(input)
-    @assert input_len == length(x[0, :]) "'input' has wrong dimension"
+    @assert input_len == length(x[0, :]) "\"input\" has wrong dimension"
     for input_node in 1:input_len
         fix(x[0, input_node], input[input_node], force=true) # fix value of input to x[0,j]
     end

@@ -108,3 +108,36 @@ function get_solution(n_feats, model, n_splits, splits_ordered)
 
     return solution
 end
+
+function load_drug_data(dataset_name)
+
+    train_data = CSV.read(string(@__DIR__)*"/data/"*dataset_name*"_training_disguised.csv", DataFrame)
+    train_names = names(train_data)[3:end]
+
+    test_data = CSV.read(string(@__DIR__)*"/data/"*dataset_name*"_test_disguised.csv", DataFrame)
+    test_names = names(test_data)[3:end]
+
+    for col_name in setdiff(test_names, train_names)
+        col_to_add = zeros(Int64, size(train_data)[1])
+        train_data[!, col_name] = col_to_add
+    end
+
+    feat_names = sort(unique([train_names; test_names]))
+    select!(train_data, ["MOLECULE"; "Act"; feat_names])
+
+    for col_name in setdiff(train_names, test_names)
+        col_to_add = zeros(Int64, size(test_data)[1])
+        test_data[!, col_name] = col_to_add
+    end
+
+    select!(test_data, ["MOLECULE"; "Act"; feat_names])
+
+    x_train = Matrix(train_data[:, 3:end]);
+    y_train = Vector(train_data[:, 2]);
+
+    x_test = Matrix(test_data[:, 3:end]);
+    y_test = Vector(test_data[:, 2]);
+
+    return train_data, x_train, y_train, x_test, y_test, feat_names
+    
+end

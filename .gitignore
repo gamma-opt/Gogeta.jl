@@ -28,3 +28,6 @@ docs/site/
 
 # VSCode settings of the local Julia environment
 .vscode/settings.json
+
+# Data files used for training decision trees
+src/decision_trees/data/

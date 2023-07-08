@@ -31,3 +31,6 @@ docs/site/
 
 # Data files used for training decision trees
 src/decision_trees/data/
+
+# Trained models - too large for GitHub
+src/decision_trees/trained_models/

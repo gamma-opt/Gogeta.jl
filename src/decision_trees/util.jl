@@ -1,9 +1,9 @@
 """
 Gets the data required for constructing the corresponding MIP from an [EvoTrees](https://github.com/Evovest/EvoTrees.jl) model `evo_model`. Returns a custom datatype `TEModel` which contains the necessary information.
 """
-function extract_evotrees_info(evo_model)
+function extract_evotrees_info(evo_model; tree_limit=length(evo_model.trees))
 
-    n_trees = length(evo_model.trees)
+    n_trees = tree_limit
     n_feats = length(evo_model.info[:fnames])
 
     n_leaves = Array{Int64}(undef, n_trees) # number of leaves on each tree

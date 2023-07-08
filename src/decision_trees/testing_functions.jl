@@ -31,14 +31,35 @@ function load_drug_data(dataset_name)
     
 end
 
-function train_evo_models(depths, trees, train_data, feat_names, x_train, y_train, x_test, y_test)
+function load_concrete_data(dataset_name)
+
+    data = CSV.read(string(@__DIR__)*"/data/"*dataset_name, DataFrame)
+    feat_names = names(data)[1:8]
+
+    Random.seed!(1)
+    data = data[shuffle(1:end), :]
+
+    train_split::Int = floor(0.75 * length(data[:, 1]));
+    train_data = data[1:train_split, :];
+
+    x_train = data[1:train_split, 1:8];
+    y_train = data[1:train_split, 9];
+
+    x_test = data[train_split+1:end, 1:8];
+    y_test = data[train_split+1:end, 9];
+
+    return train_data, x_train, y_train, x_test, y_test, feat_names
+
+end
+
+function train_evo_models(depths, trees, train_data, feat_names, x_train, y_train, x_test, y_test, filename, dataset_name, target)
 
     for depth in depths
 
         config = EvoTreeRegressor(nrounds=maximum(trees), max_depth=depth);
-        train_time = @elapsed model = fit_evotree(config, train_data[:, 2:end]; target_name="Act", verbosity=0, fnames=feat_names);
-        
-        result_file = open(string(@__DIR__)*"/drug_test_results.txt", "a");
+        train_time = @elapsed model = fit_evotree(config, train_data; target_name=target, verbosity=0, fnames=feat_names);
+
+        result_file = open(string(@__DIR__)*"/"*filename, "a");
         write(result_file, "\nDataset: $dataset_name, Trees: $(maximum(trees)), Depth: $depth, Train time: $(train_time)\n");
         close(result_file)
     
@@ -54,11 +75,37 @@ function train_evo_models(depths, trees, train_data, feat_names, x_train, y_trai
             r2_score_train = 1 - sum((y_train .- pred_train).^2) / sum((y_train .- mean(y_train)).^2)
             r2_score_test = 1 - sum((y_test .- pred_test).^2) / sum((y_test .- mean(y_test)).^2)
     
-            result_file = open(string(@__DIR__)*"/drug_test_results.txt", "a");
+            result_file = open(string(@__DIR__)*"/test_results/"*filename, "a");
             write(result_file, "Dataset: $dataset_name, Trees: $forest_size, Depth: $depth, R2 train: $(r2_score_train), R2 test: $(r2_score_test)\n");
             close(result_file)
     
         end
     
+    end
+end
+
+function optimize_models(trees, depths, dataset_name, filename; time_limit=100)
+
+    for depth in depths
+
+        loaded_model = EvoTrees.load(string(@__DIR__)*"/trained_models/$(dataset_name)_$(maximum(trees))_trees_$(depth)_depth.bson");
+
+        result_file = open(string(@__DIR__)*"/"*filename, "a");
+        write(result_file, "\n");
+        close(result_file)
+        
+        for forest_size in trees
+    
+            universal_model = extract_evotrees_info(loaded_model; tree_limit=forest_size+1);
+    
+            time_normal = @elapsed x_new, m_new = tree_model_to_MIP(universal_model; create_initial=true, objective=MAX_SENSE, gurobi_env=ENV, timelimit=time_limit);
+            time_alg = @elapsed x_alg, m_alg = tree_model_to_MIP(universal_model; create_initial=false, objective=MAX_SENSE, gurobi_env=ENV, timelimit=time_limit);
+    
+            result_file = open(string(@__DIR__)*"/test_results/"*filename, "a");
+            normal_status = termination_status(m_new) == MOI.OPTIMAL ? "Optimality: $(objective_value(m_new))" : "Gap: $(relative_gap(m_new))"
+            alg_status = termination_status(m_alg) == MOI.OPTIMAL ? "Optimality: $(objective_value(m_alg))" : "Gap: $(relative_gap(m_alg))"
+            write(result_file, "Dataset: $dataset_name, Trees: $(forest_size), Depth: $depth, Normal time: $(time_normal) - $(normal_status), Alg time: $(time_alg) - $(alg_status), N levels: $(length(eachindex(m_new[:x]))), N leaves: $(length(eachindex(m_new[:y])))\n");
+            close(result_file)
+        end
     end
 end

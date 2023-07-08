@@ -25,3 +25,9 @@ Dataset: OX2, Trees: 50, Depth: 10, R2 train: 0.9241337823966375, R2 test: 0.533
 Dataset: OX2, Trees: 100, Depth: 10, R2 train: 0.9488271053560277, R2 test: 0.5436295662967652
 Dataset: OX2, Trees: 250, Depth: 10, R2 train: 0.9718061580281183, R2 test: 0.5503659933550649
 Dataset: OX2, Trees: 500, Depth: 10, R2 train: 0.9827086395115555, R2 test: 0.5598005400019247
+
+Dataset: OX2, Trees: 10, Depth: 3, Train time: 87.396760625
+Dataset: OX2, Trees: 10, Depth: 3, R2 train: 0.32740599354763245, R2 test: 0.13650538196336803
+
+Dataset: OX2, Trees: 10, Depth: 5, Train time: 35.333664042
+Dataset: OX2, Trees: 10, Depth: 5, R2 train: 0.4348035909568311, R2 test: 0.25404777789452815

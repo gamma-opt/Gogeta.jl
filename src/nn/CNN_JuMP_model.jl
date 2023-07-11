@@ -11,112 +11,154 @@ using Random
 Random.seed!(42)
 DNN = Chain(
     Conv((2,2), 1 => 3, identity),
-    Conv((1,1), 3 => 2, identity),
+    Conv((2,2), 3 => 2, identity),
 )
 
 # Conv((a,b), c => d, relu) gives parameters[1] in form a×b×c×d matrix
 p = params(DNN)
 p[1]
-
+p[3]
 # Array order a×b×c×d: a×b image shape, c color channels (RGB 3, grayscale 1, etc.), d image count
 # 3×3×1×1 Array{Float32, 4}
 # data = Float32[0.1 0.2 0.3; 0.4 0.5 0.6; 0.7 0.8 0.9;;;;]
-data = Float32[1 0 0; 0 0 0; 0 0 0;;;;]
+data = Float32[1 0 0; 0 1 0; 0 0 1;;;;]
 # data = rand32(3, 3, 1, 1)
+DNN(data)
 
 input_size = (3,3)
 
 # function create_CNN_model(DNN::Chain, input_size::Tuple{Int64, Int64}, verbose::Bool=false)
 
-    K = length(DNN) # NOTE! there are K+1 layers in the nn
-    layers = DNN.layers
+K = length(DNN) # NOTE! there are K+1 layers in the nn
+layers = DNN.layers
 
-    # store the DNN weights and biases
-    DNN_params = Flux.params(DNN)
-    W = [DNN_params[2*i-1] for i in 1:K]
-    b = [DNN_params[2*i] for i in 1:K]
+# store the DNN weights and biases
+DNN_params = Flux.params(DNN)
+W = [DNN_params[2*i-1] for i in 1:K]
+b = [DNN_params[2*i] for i in 1:K]
 
-    function next_layer_nodes(img::Tuple{Int64, Int64}, filter::Tuple{Int64, Int64})
-        new_height = img[1] - filter[1] + 1
-        new_width = img[2] - filter[2] + 1
-        return (new_height, new_width)
+function next_sub_img_size(img::Tuple{Int64, Int64}, filter::Tuple{Int64, Int64})
+    new_height = img[1] - filter[1] + 1
+    new_width = img[2] - filter[2] + 1
+    return (new_height, new_width)
+end
+
+# tuples of layer shapes 
+sub_img_size = Array{Tuple{Int64, Int64}}(undef, K+1)
+for k in 0:K
+    if k == 0 
+        sub_img_size[k+1] = input_size 
+    else 
+        sub_img_size[k+1] = next_sub_img_size(sub_img_size[k], size(W[k][:,:,1,1])) 
     end
+end
 
-    # tuples of layer shapes 
-    node_count = Array{Tuple{Int64, Int64}}(undef, K+1)
-    for k in 0:K
-        if k == 0 
-            node_count[k+1] = input_size 
-        else 
-            node_count[k+1] = next_layer_nodes(node_count[k], size(W[k][:,:,1,1])) 
+# stores tuples (img index, img h, img w), such that each convoluted subimage pixel can be accesses
+DNN_nodes = Array{Tuple{Int64, Int64, Int64}}(undef, K+1)
+for k in 0:K
+    if k == 0 
+        DNN_nodes[k+1] = (1, sub_img_size[k+1]...)
+    else 
+        DNN_nodes[k+1] = (size(W[k])[4], next_sub_img_size(sub_img_size[k], (size(W[k])[1], size(W[k])[2]))...)
+    end
+end
+
+# model = Model(optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => (verbose ? 1 : 0)))
+model = Model(optimizer_with_attributes(Gurobi.Optimizer))
+
+# variables x correspond to convolutional layer pixel values: x[k, i, h, w] -> layer, sub img index, img h, img w
+@variable(model, x[k in 0:K, i in 1:DNN_nodes[k+1][1], h in 1:DNN_nodes[k+1][2], w in 1:DNN_nodes[k+1][3]] >= 0)
+# variables L and U: lower and upper bounds for pixel values (= hidden node values) in the CNN
+@variable(model, L[k in 0:K, i in 1:DNN_nodes[k+1][1], h in 1:DNN_nodes[k+1][2], w in 1:DNN_nodes[k+1][3]] == -1000)
+@variable(model, U[k in 0:K, i in 1:DNN_nodes[k+1][1], h in 1:DNN_nodes[k+1][2], w in 1:DNN_nodes[k+1][3]] == 1000)
+
+
+# fix L and U bounds to input nodes
+for i in 1:DNN_nodes[1][1]
+    for h in 1:DNN_nodes[1][2]
+        for w in 1:DNN_nodes[1][3]
+            delete_lower_bound(x[0, i, h, w])
+            @constraint(model, L[0, i, h, w] <= x[0, i, h, w])
+            @constraint(model, x[0, i, h, w] <= U[0, i, h, w])
         end
     end
+end
 
-    # stores tuples (img h, img w, number of output images from the current layer)
-    DNN_nodes = Array{Tuple{Int64, Int64, Int64}}(undef, K+1)
-    for k in 0:K
-        if k == 0 
-            DNN_nodes[k+1] = (input_size..., 1)
-        else 
-            DNN_nodes[k+1] = (next_layer_nodes(node_count[k], (size(W[k])[1], size(W[k])[2]))..., size(W[k])[4]*DNN_nodes[k][3])
-        end
-    end
+# @variable(model, x[k in 0:K, j in 1:node_count[k+1]] >= 0)
+# @variable(model, s[k in 1:K, j in 1:node_count[k+1]] >= 0)
+# # @variable(model, z[k in 1:K, j in 1:node_count[k+1]], Bin)
+# @variable(model, U[k in 0:K, j in 1:node_count[k+1]])
+# @variable(model, L[k in 0:K, j in 1:node_count[k+1]]) 
 
-    # model = Model(optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => (verbose ? 1 : 0)))
-    model = Model(optimizer_with_attributes(Gurobi.Optimizer))
+# # arbitrary lower and upper bounds for all nodes
+# index = 1
+# for k in 0:K
+#     for j in 1:node_count[k+1]
+#         fix(U[k, j], 1000)
+#         fix(L[k, j], -1000)
+#         index += 1
+#     end
+# end
 
-    # sets the variables x[k,j] and s[k,j], the binary variables z[k,j] and the big-M values U[k,j] and L[k,j]
-    @variable(model, x[k in 0:K, h in 1:DNN_nodes[k+1][1], w in 1:DNN_nodes[k+1][2], o in 1:DNN_nodes[k+1][3]] >= 0)
+# # fix bounds U and L to input nodes
+# for input_node in 1:node_count[1]
+#     delete_lower_bound(x[0, input_node])
+#     @constraint(model, L[0, input_node] <= x[0, input_node])
+#     @constraint(model, x[0, input_node] <= U[0, input_node])
+# end
 
-    # @variable(model, x[k in 0:K, j in 1:node_count[k+1]] >= 0)
-    # @variable(model, s[k in 1:K, j in 1:node_count[k+1]] >= 0)
-    # # @variable(model, z[k in 1:K, j in 1:node_count[k+1]], Bin)
-    # @variable(model, U[k in 0:K, j in 1:node_count[k+1]])
-    # @variable(model, L[k in 0:K, j in 1:node_count[k+1]]) 
+# # constraints corresponding to the ReLU activation functions
+# for k in 1:K
+#     for node in 1:node_count[k+1] # node count of the next layer of k, i.e., the layer k+1
+#         temp_sum = sum(W[k][node, j] * x[k-1, j] for j in 1:node_count[k])
+#         if k < K # hidden layers: k = 1, ..., K-1
+#             @constraint(model, temp_sum + b[k][node] == x[k, node] - s[k, node])
+#         else # output layer: k == K
+#             @constraint(model, temp_sum + b[k][node] == x[k, node])
+#         end
+#     end
+# end
 
-    # # arbitrary lower and upper bounds for all nodes
-    # index = 1
-    # for k in 0:K
-    #     for j in 1:node_count[k+1]
-    #         fix(U[k, j], 1000)
-    #         fix(L[k, j], -1000)
-    #         index += 1
-    #     end
-    # end
+# # fix bounds to the hidden layer nodes
+# @constraint(model, [k in 1:K, j in 1:node_count[k+1]], x[k, j] <= U[k, j] * z[k, j])
+# @constraint(model, [k in 1:K, j in 1:node_count[k+1]], s[k, j] <= -L[k, j] * (1 - z[k, j]))
 
-    # # fix bounds U and L to input nodes
-    # for input_node in 1:node_count[1]
-    #     delete_lower_bound(x[0, input_node])
-    #     @constraint(model, L[0, input_node] <= x[0, input_node])
-    #     @constraint(model, x[0, input_node] <= U[0, input_node])
-    # end
+# # fix bounds to the output nodes
+# for output_node in 1:node_count[K+1]
+#     delete_lower_bound(x[K, output_node])
+#     @constraint(model, L[K, output_node] <= x[K, output_node])
+#     @constraint(model, x[K, output_node] <= U[K, output_node])
+# end
 
-    # # constraints corresponding to the ReLU activation functions
-    # for k in 1:K
-    #     for node in 1:node_count[k+1] # node count of the next layer of k, i.e., the layer k+1
-    #         temp_sum = sum(W[k][node, j] * x[k-1, j] for j in 1:node_count[k])
-    #         if k < K # hidden layers: k = 1, ..., K-1
-    #             @constraint(model, temp_sum + b[k][node] == x[k, node] - s[k, node])
-    #         else # output layer: k == K
-    #             @constraint(model, temp_sum + b[k][node] == x[k, node])
-    #         end
-    #     end
-    # end
+@objective(model, Max, x[K, 1]) # arbitrary objective function to have a complete JuMP model
 
-    # # fix bounds to the hidden layer nodes
-    # @constraint(model, [k in 1:K, j in 1:node_count[k+1]], x[k, j] <= U[k, j] * z[k, j])
-    # @constraint(model, [k in 1:K, j in 1:node_count[k+1]], s[k, j] <= -L[k, j] * (1 - z[k, j]))
+# return model
 
-    # # fix bounds to the output nodes
-    # for output_node in 1:node_count[K+1]
-    #     delete_lower_bound(x[K, output_node])
-    #     @constraint(model, L[K, output_node] <= x[K, output_node])
-    #     @constraint(model, x[K, output_node] <= U[K, output_node])
-    # end
-
-    @objective(model, Max, x[K, 1]) # arbitrary objective function to have a complete JuMP model
-
-    # return model
 # end
 
 # reversed_matrix = reverse(matrix, dims=(1, 2))
+
+joo = Float32[0.1 0.2 0.3; 0.4 0.5 0.6; 0.7 0.8 0.9;;;;]
+
+ei = Float32[-1 -2; -3 -4;;;;]
+
+ei_rev = reverse(ei, dims=(1, 2))
+
+ehkä = Float32[-100, -200]
+
+row, column = size(ei)[1], size(ei)[2]
+
+joojoo = Array{Float32}(undef, row * column)
+
+ind = 1
+i, j = 2, 1
+for rows in i:row
+    for cols in j:column
+        joojoo[ind] = joo[:,:,1,1][rows, cols]
+        ind += 1
+    end
+end
+
+eiei = vec(ei_rev)
+
+temp_sum = transpose(joojoo) * eiei + ehkä[1]

@@ -32,7 +32,7 @@ input_size = (3,3)
 K = length(DNN) # NOTE! there are K+1 layers in the nn
 layers = DNN.layers
 
-# store the DNN weights and biases
+# store the DNN weights (filters for Conv layers) and biases
 DNN_params = Flux.params(DNN)
 W = [DNN_params[2*i-1] for i in 1:K]
 b = [DNN_params[2*i] for i in 1:K]
@@ -43,30 +43,33 @@ function next_sub_img_size(img::Tuple{Int64, Int64}, filter::Tuple{Int64, Int64}
     return (new_height, new_width)
 end
 
+# store the filter shapes in each layer 1:K
+filter_sizes = [size(W[k][:,:,1,1]) for k in 1:K]
+
 # tuples of layer shapes 
-sub_img_size = Array{Tuple{Int64, Int64}}(undef, K+1)
-for k in 0:K
-    if k == 0 
-        sub_img_size[k+1] = input_size 
+sub_img_sizes = Array{Tuple{Int64, Int64}}(undef, K+1)
+for k in 1:K+1
+    if k == 1
+        sub_img_sizes[k] = input_size 
     else 
-        sub_img_size[k+1] = next_sub_img_size(sub_img_size[k], size(W[k][:,:,1,1])) 
+        sub_img_sizes[k] = next_sub_img_size(sub_img_sizes[k-1], filter_sizes[k-1]) 
     end
 end
 
 # stores tuples (img index, img h, img w), such that each convoluted subimage pixel can be accesses
 DNN_nodes = Array{Tuple{Int64, Int64, Int64}}(undef, K+1)
-for k in 0:K
-    if k == 0 
-        DNN_nodes[k+1] = (1, sub_img_size[k+1]...)
+for k in 1:K+1
+    if k == 1
+        DNN_nodes[k] = (1, sub_img_sizes[k]...)
     else 
-        DNN_nodes[k+1] = (size(W[k])[4], next_sub_img_size(sub_img_size[k], (size(W[k])[1], size(W[k])[2]))...)
+        DNN_nodes[k] = (size(W[k-1])[4], next_sub_img_size(sub_img_sizes[k-1], (size(W[k-1])[1], size(W[k-1])[2]))...)
     end
 end
 
 # model = Model(optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => (verbose ? 1 : 0)))
 model = Model(optimizer_with_attributes(Gurobi.Optimizer))
 
-# variables x correspond to convolutional layer pixel values: x[k, i, h, w] -> layer, sub img index, img h, img w
+# variables x correspond to convolutional layer pixel values: x[k, i, h, w] -> layer, sub img index, img row, img col
 @variable(model, x[k in 0:K, i in 1:DNN_nodes[k+1][1], h in 1:DNN_nodes[k+1][2], w in 1:DNN_nodes[k+1][3]] >= 0)
 # variables L and U: lower and upper bounds for pixel values (= hidden node values) in the CNN
 @variable(model, L[k in 0:K, i in 1:DNN_nodes[k+1][1], h in 1:DNN_nodes[k+1][2], w in 1:DNN_nodes[k+1][3]] == -1000)
@@ -80,6 +83,28 @@ for i in 1:DNN_nodes[1][1]
             delete_lower_bound(x[0, i, h, w])
             @constraint(model, L[0, i, h, w] <= x[0, i, h, w])
             @constraint(model, x[0, i, h, w] <= U[0, i, h, w])
+        end
+    end
+end
+
+# loop through layers
+for k in 1:K
+    # prev_img_size = sub_img_sizes[k]
+    curr_sub_img_size = sub_img_sizes[k+1] # index k+1 becasue sub_img_sizes contains input size
+    
+    # loop through each (sub)image in the layer
+    for i in 1:DNN_nodes[k][1]
+        # loop through each (sub)image index (i,j) where we place the filter ((1,1) is top left pixel)
+        for h in 1:curr_sub_img_size[1]
+            # loop through image columns
+            for w in 1:curr_sub_img_size[2]
+                println("$k, $i, $h, $w")
+
+
+
+
+
+            end
         end
     end
 end

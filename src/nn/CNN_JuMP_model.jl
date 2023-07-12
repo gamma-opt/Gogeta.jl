@@ -89,24 +89,44 @@ end
 
 # loop through layers
 for k in 1:K
-    # prev_img_size = sub_img_sizes[k]
     curr_sub_img_size = sub_img_sizes[k+1] # index k+1 becasue sub_img_sizes contains input size
-    
-    # loop through each (sub)image in the layer
-    for i in 1:DNN_nodes[k][1]
+    curr_filter_size = filter_sizes[k]
+    W_rev = reverse(W[k], dims=(1, 2)) # curr layer weights (filters) (rows and columns inverted)
+
+    # loop through number of filters for this (sub)image
+    for filter in 1:DNN_nodes[k+1][1]
+
         # loop through each (sub)image index (i,j) where we place the filter ((1,1) is top left pixel)
         for h in 1:curr_sub_img_size[1]
+
             # loop through image columns
             for w in 1:curr_sub_img_size[2]
-                println("$k, $i, $h, $w")
+                
+                # loop through each (sub)image in the layer
+                for i in 1:DNN_nodes[k][1]
 
+                    # here equation for the variable x[k,i,h,w]
+                    # println("$k, $i, $h, $w")
+                    W_vec = vec(W_rev[:,:,i,filter])
 
+                    x_vec = vec([x[k-1,i,ii,jj] for ii in h:(h+curr_sub_img_size[1]-1), jj in w:(w+curr_sub_img_size[w]-1)])
+                    # println(size(W_vec))
+                    # println(size(x_vec))
+                    mult = W_vec .* x_vec
+                    println("x[$k,$filter,$h,$w]: $mult")
+                    # println(x_vec)
+                    
+                    # calculate the value for node x[k,i,h,w]
+                    # temp_sum = sum(W_vec[ff] * x[k-1,i,ii,jj] 
+                    #     for ii in h:(h+curr_sub_img_size[1]-1), jj in w:(w+curr_sub_img_size[w]-1), ff in 1:sum(curr_filter_size)
+                    #         ) + b[1][filter]
 
-
-
+                    # println("$k, $i, $h, $w: temp_sum: $temp_sum")
+                end
             end
         end
     end
+    
 end
 
 # @variable(model, x[k in 0:K, j in 1:node_count[k+1]] >= 0)

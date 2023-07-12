@@ -10,17 +10,18 @@ using Random
 # MeanPool: :k, :pad, :stride
 Random.seed!(42)
 DNN = Chain(
-    Conv((2,2), 2 => 3, identity),
-    Conv((2,2), 3 => 2, identity),
+    Conv((2,2), 1 => 2, identity, bias = [0.1, 0.2]),
+    # Conv((2,2), 3 => 2, identity),
 )
 
 # Conv((a,b), c => d, relu) gives parameters[1] in form a×b×c×d matrix
 p = params(DNN)
 p[1]
-p[3]
+# p[3]
 # Array order a×b×c×d: a×b image shape, c color channels (RGB 3, grayscale 1, etc.), d image count
 # 3×3×1×1 Array{Float32, 4}
-# data = Float32[0.1 0.2 0.3; 0.4 0.5 0.6; 0.7 0.8 0.9;;;;]
+data = Float32[0.1 0.2 0.3; 0.4 0.5 0.6; 0.7 0.8 0.9;;; 0.11 0.22 0.33; 0.44 0.55 0.66; 0.77 0.88 0.99;;;;]
+data = Float32[0.1 0.2 0.3; 0.4 0.5 0.6; 0.7 0.8 0.9;;;;]
 data = Float32[1 0 0; 0 1 0; 0 0 1;;; 0 0 0; 0 0 0; 0 0 0;;;;]
 # data = Float32[1 0 0; 0 1 0; 0 0 1;;;;]
 # data = rand32(3, 3, 1, 1)
@@ -30,7 +31,7 @@ DNN(data)
 
 
 
-input_size = (2,3,3)
+input_size = (1,3,3)
 
 # function create_CNN_model(DNN::Chain, input_size::Tuple{Int64, Int64}, verbose::Bool=false)
 
@@ -106,7 +107,10 @@ for k in 1:K
 
             # loop through image columns
             for w in 1:curr_sub_img_size[2]
-                
+                var_expression_count = DNN_nodes[k][1] * reduce(*, curr_filter_size)
+                var_expression = Array{AffExpr}(undef, var_expression_count)
+                index = 1
+
                 # loop through each (sub)image in the layer
                 for i in 1:DNN_nodes[k][1]
 
@@ -118,21 +122,54 @@ for k in 1:K
                     # println(size(W_vec))
                     # println(size(x_vec))
                     mult = W_vec .* x_vec
-                    println("x[$k,$filter,$h,$w]: $mult")
+                    # println("x[$k,$filter,$h,$w]: $mult")
+                    for expr in 1:reduce(*, curr_filter_size)
+                        var_expression[index] = mult[expr]
+                        index += 1
+                    end
                     # println(x_vec)
-                    
-                    # calculate the value for node x[k,i,h,w]
-                    # temp_sum = sum(W_vec[ff] * x[k-1,i,ii,jj] 
-                    #     for ii in h:(h+curr_sub_img_size[1]-1), jj in w:(w+curr_sub_img_size[w]-1), ff in 1:sum(curr_filter_size)
-                    #         ) + b[1][filter]
 
                     # println("$k, $i, $h, $w: temp_sum: $temp_sum")
                 end
+                temp_sum = sum(var_expression)
+                println(temp_sum)
+                @constraint(model, temp_sum + b[k][filter] == x[k, filter, h, w])
             end
         end
     end
     
 end
+
+for i in 1:DNN_nodes[1][1]
+    for h in 1:DNN_nodes[1][2]
+        for w in 1:DNN_nodes[1][3]
+            fix(x[0,i,h,w], data[h,w,i,1], force=true)
+        end
+    end
+end
+
+@objective(model, Max, x[1,1,1,1])
+
+optimize!(model)
+
+function extract_output(model::Model, DNN_nodes)
+    x = model[:x]
+    output = []
+    len = length(DNN_nodes)
+    for i in 1:DNN_nodes[len][1]
+        # println("i $i")
+        for h in 1:DNN_nodes[len][2]
+            # println("h $h")
+            for w in 1:DNN_nodes[len][3]
+                # println("w $w")
+                push!(output, value(x[len-1,i,h,w]))
+            end
+        end
+    end
+    return output
+end
+
+output = extract_output(model, DNN_nodes)
 
 # @variable(model, x[k in 0:K, j in 1:node_count[k+1]] >= 0)
 # @variable(model, s[k in 1:K, j in 1:node_count[k+1]] >= 0)
@@ -180,35 +217,10 @@ end
 #     @constraint(model, x[K, output_node] <= U[K, output_node])
 # end
 
-@objective(model, Max, x[K, 1]) # arbitrary objective function to have a complete JuMP model
+# @objective(model, Max, x[K, 1]) # arbitrary objective function to have a complete JuMP model
 
 # return model
 
 # end
 
 # reversed_matrix = reverse(matrix, dims=(1, 2))
-
-joo = Float32[0.1 0.2 0.3; 0.4 0.5 0.6; 0.7 0.8 0.9;;;;]
-
-ei = Float32[-1 -2; -3 -4;;;;]
-
-ei_rev = reverse(ei, dims=(1, 2))
-
-ehkä = Float32[-100, -200]
-
-row, column = size(ei)[1], size(ei)[2]
-
-joojoo = Array{Float32}(undef, row * column)
-
-ind = 1
-i, j = 2, 1
-for rows in i:row
-    for cols in j:column
-        joojoo[ind] = joo[:,:,1,1][rows, cols]
-        ind += 1
-    end
-end
-
-eiei = vec(ei_rev)
-
-temp_sum = transpose(joojoo) * eiei + ehkä[1]

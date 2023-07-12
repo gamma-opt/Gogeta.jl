@@ -10,7 +10,7 @@ using Random
 # MeanPool: :k, :pad, :stride
 Random.seed!(42)
 DNN = Chain(
-    Conv((2,2), 1 => 3, identity),
+    Conv((2,2), 2 => 3, identity),
     Conv((2,2), 3 => 2, identity),
 )
 
@@ -21,11 +21,16 @@ p[3]
 # Array order a×b×c×d: a×b image shape, c color channels (RGB 3, grayscale 1, etc.), d image count
 # 3×3×1×1 Array{Float32, 4}
 # data = Float32[0.1 0.2 0.3; 0.4 0.5 0.6; 0.7 0.8 0.9;;;;]
-data = Float32[1 0 0; 0 1 0; 0 0 1;;;;]
+data = Float32[1 0 0; 0 1 0; 0 0 1;;; 0 0 0; 0 0 0; 0 0 0;;;;]
+# data = Float32[1 0 0; 0 1 0; 0 0 1;;;;]
 # data = rand32(3, 3, 1, 1)
 DNN(data)
 
-input_size = (3,3)
+
+
+
+
+input_size = (2,3,3)
 
 # function create_CNN_model(DNN::Chain, input_size::Tuple{Int64, Int64}, verbose::Bool=false)
 
@@ -50,7 +55,7 @@ filter_sizes = [size(W[k][:,:,1,1]) for k in 1:K]
 sub_img_sizes = Array{Tuple{Int64, Int64}}(undef, K+1)
 for k in 1:K+1
     if k == 1
-        sub_img_sizes[k] = input_size 
+        sub_img_sizes[k] = (input_size[2], input_size[3])
     else 
         sub_img_sizes[k] = next_sub_img_size(sub_img_sizes[k-1], filter_sizes[k-1]) 
     end
@@ -60,7 +65,7 @@ end
 DNN_nodes = Array{Tuple{Int64, Int64, Int64}}(undef, K+1)
 for k in 1:K+1
     if k == 1
-        DNN_nodes[k] = (1, sub_img_sizes[k]...)
+        DNN_nodes[k] = input_size
     else 
         DNN_nodes[k] = (size(W[k-1])[4], next_sub_img_size(sub_img_sizes[k-1], (size(W[k-1])[1], size(W[k-1])[2]))...)
     end

@@ -10,7 +10,7 @@ using Random
 # MeanPool: :k, :pad, :stride
 Random.seed!(42)
 DNN = Chain(
-    Conv((2,2), 1 => 2, identity, bias = [0.1, 0.2]),
+    Conv((1,3), 2 => 4, identity, bias = [0.1, 0.2, 0.3, 0.4]),
     # Conv((2,2), 3 => 2, identity),
 )
 
@@ -20,18 +20,18 @@ p[1]
 # p[3]
 # Array order a×b×c×d: a×b image shape, c color channels (RGB 3, grayscale 1, etc.), d image count
 # 3×3×1×1 Array{Float32, 4}
-data = Float32[0.1 0.2 0.3; 0.4 0.5 0.6; 0.7 0.8 0.9;;; 0.11 0.22 0.33; 0.44 0.55 0.66; 0.77 0.88 0.99;;;;]
+data = Float32[0.1 0.2 0.3 0.4; 0.4 0.5 0.6 0.7; 0.7 0.8 0.9 1;;; 0.11 0.22 0.33 0.44; 0.44 0.55 0.66 0.77; 0.77 0.88 0.99 1;;;;]
 data = Float32[0.1 0.2 0.3; 0.4 0.5 0.6; 0.7 0.8 0.9;;;;]
-data = Float32[1 0 0; 0 1 0; 0 0 1;;; 0 0 0; 0 0 0; 0 0 0;;;;]
+data = Float32[0.1 0.2 0.3 0.4; 0.4 0.5 0.6 0.6; 0.7 0.8 0.9 0.9; 0.7 0.8 0.9 0.9;;;;]
+
+data = Float32[0.1 0.2; 0.3 0.4;;; 0.5 0.6; 0.7 0.8;;;;]
 # data = Float32[1 0 0; 0 1 0; 0 0 1;;;;]
 # data = rand32(3, 3, 1, 1)
 DNN(data)
 
 
 
-
-
-input_size = (1,3,3)
+input_size = (size(data)[3], size(data)[1], size(data)[2])
 
 # function create_CNN_model(DNN::Chain, input_size::Tuple{Int64, Int64}, verbose::Bool=false)
 
@@ -82,13 +82,24 @@ model = Model(optimizer_with_attributes(Gurobi.Optimizer))
 @variable(model, U[k in 0:K, i in 1:DNN_nodes[k+1][1], h in 1:DNN_nodes[k+1][2], w in 1:DNN_nodes[k+1][3]] == 1000)
 
 
-# fix L and U bounds to input nodes
+# delete lower bound and fix L and U bounds to input nodes
 for i in 1:DNN_nodes[1][1]
     for h in 1:DNN_nodes[1][2]
         for w in 1:DNN_nodes[1][3]
             delete_lower_bound(x[0, i, h, w])
             @constraint(model, L[0, i, h, w] <= x[0, i, h, w])
             @constraint(model, x[0, i, h, w] <= U[0, i, h, w])
+        end
+    end
+end
+
+# delete lower bound and fix L and U bounds to output nodes
+for i in 1:DNN_nodes[K+1][1]
+    for h in 1:DNN_nodes[K+1][2]
+        for w in 1:DNN_nodes[K+1][3]
+            delete_lower_bound(x[K, i, h, w])
+            @constraint(model, L[K, i, h, w] <= x[K, i, h, w])
+            @constraint(model, x[K, i, h, w] <= U[K, i, h, w])
         end
     end
 end
@@ -115,24 +126,19 @@ for k in 1:K
                 for i in 1:DNN_nodes[k][1]
 
                     # here equation for the variable x[k,i,h,w]
-                    # println("$k, $i, $h, $w")
                     W_vec = vec(W_rev[:,:,i,filter])
 
-                    x_vec = vec([x[k-1,i,ii,jj] for ii in h:(h+curr_sub_img_size[1]-1), jj in w:(w+curr_sub_img_size[w]-1)])
-                    # println(size(W_vec))
-                    # println(size(x_vec))
+                    x_vec = vec([x[k-1,i,ii,jj] for ii in h:(h+curr_filter_size[1]-1), jj in w:(w+curr_filter_size[2]-1)])
+                    # println("h: $h, curr_filter_size[1]: $(curr_filter_size[1]), w: $w, curr_filter_size[2]: $(curr_filter_size[2])")
                     mult = W_vec .* x_vec
-                    # println("x[$k,$filter,$h,$w]: $mult")
+
                     for expr in 1:reduce(*, curr_filter_size)
                         var_expression[index] = mult[expr]
                         index += 1
                     end
-                    # println(x_vec)
-
-                    # println("$k, $i, $h, $w: temp_sum: $temp_sum")
                 end
+
                 temp_sum = sum(var_expression)
-                println(temp_sum)
                 @constraint(model, temp_sum + b[k][filter] == x[k, filter, h, w])
             end
         end
@@ -140,6 +146,7 @@ for k in 1:K
     
 end
 
+# fix input values to known data (testing purposes only!)
 for i in 1:DNN_nodes[1][1]
     for h in 1:DNN_nodes[1][2]
         for w in 1:DNN_nodes[1][3]
@@ -148,20 +155,19 @@ for i in 1:DNN_nodes[1][1]
     end
 end
 
+# arbitrary objective function to allow optimization
 @objective(model, Max, x[1,1,1,1])
 
 optimize!(model)
 
+# extract output values from the JuMP model, same as from the CNN
 function extract_output(model::Model, DNN_nodes)
     x = model[:x]
     output = []
     len = length(DNN_nodes)
     for i in 1:DNN_nodes[len][1]
-        # println("i $i")
         for h in 1:DNN_nodes[len][2]
-            # println("h $h")
             for w in 1:DNN_nodes[len][3]
-                # println("w $w")
                 push!(output, value(x[len-1,i,h,w]))
             end
         end

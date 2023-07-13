@@ -10,8 +10,8 @@ using Random
 # MeanPool: :k, :pad, :stride
 Random.seed!(42)
 DNN = Chain(
-    Conv((1,2), 2 => 2, identity, bias = [0.1, 0.2]),
-    Conv((2,1), 2 => 2, identity, bias = [0.4, 0.5]),
+    Conv((2,1), 2 => 3, relu, bias = rand32(3)),
+    Conv((1,2), 3 => 2, identity, bias = rand32(2)),
 )
 
 # Conv((a,b), c => d, relu) gives parameters[1] in form a×b×c×d matrix
@@ -26,7 +26,7 @@ data = Float32[0.1 0.2 0.3 0.4; 0.4 0.5 0.6 0.6; 0.7 0.8 0.9 0.9; 0.7 0.8 0.9 0.
 
 data = Float32[0.1 0.2; 0.3 0.4;;; 0.5 0.6; 0.7 0.8;;;;]
 # data = Float32[1 0 0; 0 1 0; 0 0 1;;;;]
-# data = rand32(3, 3, 1, 1)
+data = rand32(10, 10, 3, 1)
 DNN(data)
 
 
@@ -76,7 +76,11 @@ end
 model = Model(optimizer_with_attributes(Gurobi.Optimizer))
 
 # variables x correspond to convolutional layer pixel values: x[k, i, h, w] -> layer, sub img index, img row, img col
-@variable(model, x[k in 0:K, i in 1:DNN_nodes[k+1][1], h in 1:DNN_nodes[k+1][2], w in 1:DNN_nodes[k+1][3]]) # >= 0 for RELU!!!
+@variable(model, x[k in 0:K, i in 1:DNN_nodes[k+1][1], h in 1:DNN_nodes[k+1][2], w in 1:DNN_nodes[k+1][3]] >= 0)
+if K > 1 # s and z variables only to hidden layers, i.e., when K > 1
+    @variable(model, s[k in 1:K-1, i in 1:DNN_nodes[k+1][1], h in 1:DNN_nodes[k+1][2], w in 1:DNN_nodes[k+1][3]] >= 0)
+    @variable(model, z[k in 1:K-1, i in 1:DNN_nodes[k+1][1], h in 1:DNN_nodes[k+1][2], w in 1:DNN_nodes[k+1][3]], Bin)
+end
 # variables L and U: lower and upper bounds for pixel values (= hidden node values) in the CNN
 @variable(model, L[k in 0:K, i in 1:DNN_nodes[k+1][1], h in 1:DNN_nodes[k+1][2], w in 1:DNN_nodes[k+1][3]] == -1000)
 @variable(model, U[k in 0:K, i in 1:DNN_nodes[k+1][1], h in 1:DNN_nodes[k+1][2], w in 1:DNN_nodes[k+1][3]] == 1000)
@@ -86,7 +90,7 @@ model = Model(optimizer_with_attributes(Gurobi.Optimizer))
 for i in 1:DNN_nodes[1][1]
     for h in 1:DNN_nodes[1][2]
         for w in 1:DNN_nodes[1][3]
-            # delete_lower_bound(x[0, i, h, w])
+            delete_lower_bound(x[0, i, h, w])
             @constraint(model, L[0, i, h, w] <= x[0, i, h, w])
             @constraint(model, x[0, i, h, w] <= U[0, i, h, w])
         end
@@ -97,7 +101,7 @@ end
 for i in 1:DNN_nodes[K+1][1]
     for h in 1:DNN_nodes[K+1][2]
         for w in 1:DNN_nodes[K+1][3]
-            # delete_lower_bound(x[K, i, h, w])
+            delete_lower_bound(x[K, i, h, w])
             @constraint(model, L[K, i, h, w] <= x[K, i, h, w])
             @constraint(model, x[K, i, h, w] <= U[K, i, h, w])
         end
@@ -139,11 +143,20 @@ for k in 1:K
                 end
 
                 temp_sum = sum(var_expression)
-                @constraint(model, temp_sum + b[k][filter] == x[k, filter, h, w])
+                if k < K # hidden layers: k = 1, ..., K-1
+                    @constraint(model, temp_sum + b[k][filter] == x[k, filter, h, w] - s[k, filter, h, w])
+                else # output layer: k == K
+                    @constraint(model, temp_sum + b[k][filter] == x[k, filter, h, w])
+                end
             end
         end
     end
-    
+end
+
+if K > 1
+    # fix bounds to the hidden layers
+    @constraint(model, [k in 1:K-1, i in 1:DNN_nodes[k+1][1], h in 1:DNN_nodes[k+1][2], w in 1:DNN_nodes[k+1][3]], x[k, i, h, w] <= U[k, i, h, w] * z[k, i, h, w])
+    @constraint(model, [k in 1:K-1, i in 1:DNN_nodes[k+1][1], h in 1:DNN_nodes[k+1][2], w in 1:DNN_nodes[k+1][3]], s[k, i, h, w] <= -L[k, i, h, w] * (1 - z[k, i, h, w]))
 end
 
 # fix input values to known data (testing purposes only!)

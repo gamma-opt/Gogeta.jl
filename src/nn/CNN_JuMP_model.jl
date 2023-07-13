@@ -10,8 +10,8 @@ using Random
 # MeanPool: :k, :pad, :stride
 Random.seed!(42)
 DNN = Chain(
-    Conv((1,3), 2 => 4, identity, bias = [0.1, 0.2, 0.3, 0.4]),
-    # Conv((2,2), 3 => 2, identity),
+    Conv((1,2), 2 => 2, identity, bias = [0.1, 0.2]),
+    Conv((2,1), 2 => 2, identity, bias = [0.4, 0.5]),
 )
 
 # Conv((a,b), c => d, relu) gives parameters[1] in form a×b×c×d matrix
@@ -20,7 +20,7 @@ p[1]
 # p[3]
 # Array order a×b×c×d: a×b image shape, c color channels (RGB 3, grayscale 1, etc.), d image count
 # 3×3×1×1 Array{Float32, 4}
-data = Float32[0.1 0.2 0.3 0.4; 0.4 0.5 0.6 0.7; 0.7 0.8 0.9 1;;; 0.11 0.22 0.33 0.44; 0.44 0.55 0.66 0.77; 0.77 0.88 0.99 1;;;;]
+data = Float32[0.1 0.2 0.3; 0.4 0.5 0.6; 0.7 0.8 0.9;;; 0.11 0.22 0.33; 0.44 0.55 0.66; 0.77 0.88 0.99;;;;]
 data = Float32[0.1 0.2 0.3; 0.4 0.5 0.6; 0.7 0.8 0.9;;;;]
 data = Float32[0.1 0.2 0.3 0.4; 0.4 0.5 0.6 0.6; 0.7 0.8 0.9 0.9; 0.7 0.8 0.9 0.9;;;;]
 
@@ -76,7 +76,7 @@ end
 model = Model(optimizer_with_attributes(Gurobi.Optimizer))
 
 # variables x correspond to convolutional layer pixel values: x[k, i, h, w] -> layer, sub img index, img row, img col
-@variable(model, x[k in 0:K, i in 1:DNN_nodes[k+1][1], h in 1:DNN_nodes[k+1][2], w in 1:DNN_nodes[k+1][3]] >= 0)
+@variable(model, x[k in 0:K, i in 1:DNN_nodes[k+1][1], h in 1:DNN_nodes[k+1][2], w in 1:DNN_nodes[k+1][3]]) # >= 0 for RELU!!!
 # variables L and U: lower and upper bounds for pixel values (= hidden node values) in the CNN
 @variable(model, L[k in 0:K, i in 1:DNN_nodes[k+1][1], h in 1:DNN_nodes[k+1][2], w in 1:DNN_nodes[k+1][3]] == -1000)
 @variable(model, U[k in 0:K, i in 1:DNN_nodes[k+1][1], h in 1:DNN_nodes[k+1][2], w in 1:DNN_nodes[k+1][3]] == 1000)
@@ -86,7 +86,7 @@ model = Model(optimizer_with_attributes(Gurobi.Optimizer))
 for i in 1:DNN_nodes[1][1]
     for h in 1:DNN_nodes[1][2]
         for w in 1:DNN_nodes[1][3]
-            delete_lower_bound(x[0, i, h, w])
+            # delete_lower_bound(x[0, i, h, w])
             @constraint(model, L[0, i, h, w] <= x[0, i, h, w])
             @constraint(model, x[0, i, h, w] <= U[0, i, h, w])
         end
@@ -97,7 +97,7 @@ end
 for i in 1:DNN_nodes[K+1][1]
     for h in 1:DNN_nodes[K+1][2]
         for w in 1:DNN_nodes[K+1][3]
-            delete_lower_bound(x[K, i, h, w])
+            # delete_lower_bound(x[K, i, h, w])
             @constraint(model, L[K, i, h, w] <= x[K, i, h, w])
             @constraint(model, x[K, i, h, w] <= U[K, i, h, w])
         end
@@ -126,8 +126,8 @@ for k in 1:K
                 for i in 1:DNN_nodes[k][1]
 
                     # here equation for the variable x[k,i,h,w]
-                    W_vec = vec(W_rev[:,:,i,filter])
 
+                    W_vec = vec(W_rev[:,:,i,filter])
                     x_vec = vec([x[k-1,i,ii,jj] for ii in h:(h+curr_filter_size[1]-1), jj in w:(w+curr_filter_size[2]-1)])
                     # println("h: $h, curr_filter_size[1]: $(curr_filter_size[1]), w: $w, curr_filter_size[2]: $(curr_filter_size[2])")
                     mult = W_vec .* x_vec

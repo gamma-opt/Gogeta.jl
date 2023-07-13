@@ -117,4 +117,3 @@ difference3 = bad_times3 - optimal_times3
 
 @time test = create_JuMP_model(nn1, bad_U1, bad_L1, "threads")
 
-test_time, test_img = create_adversarials(nn1, bad_U1, bad_L1, 1, 1, "L1", true)

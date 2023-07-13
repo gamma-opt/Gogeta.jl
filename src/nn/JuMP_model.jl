@@ -6,6 +6,7 @@ create_JuMP_model(DNN::Chain, bounds_U::Vector{Float32}, bounds_L::Vector{Float3
 
 Converts a ReLU DNN to a 0-1 MILP JuMP model. The ReLU DNN is assumed to be a Flux.Chain.
 The activation function must be "relu" in all hidden layers and "identity" in the output layer.
+The lower and upper bounds to the function are given as a Vector{Float32}. The bounds are in order from the input layer to the output layer.
 The keyword argument "bt" determines if bound tightening is to be used on the constraint bounds:
 — "none": No bound tightening is used.
 — "singletread": One shared JuMP model is used to calculate bounds one at a time.

@@ -10,8 +10,11 @@ using Random
 # MeanPool: :k, :pad, :stride
 Random.seed!(42)
 DNN = Chain(
-    Conv((2,1), 2 => 3, relu, bias = rand32(3)),
-    Conv((1,2), 3 => 2, identity, bias = rand32(2)),
+    Conv((2,2), 3 => 3, relu, bias = rand32(3)),
+    MeanPool((3,3)),
+    Conv((2,2), 3 => 2, relu, bias = rand32(2)),
+    MeanPool((2,2)),
+    # MeanPool((1,2)),
 )
 
 # Conv((a,b), c => d, relu) gives parameters[1] in form a×b×c×d matrix
@@ -27,6 +30,8 @@ data = Float32[0.1 0.2 0.3 0.4; 0.4 0.5 0.6 0.6; 0.7 0.8 0.9 0.9; 0.7 0.8 0.9 0.
 data = Float32[0.1 0.2; 0.3 0.4;;; 0.5 0.6; 0.7 0.8;;;;]
 # data = Float32[1 0 0; 0 1 0; 0 0 1;;;;]
 data = rand32(10, 10, 3, 1)
+data = rand32(32, 32, 3, 1)
+
 DNN(data)
 
 
@@ -35,31 +40,43 @@ input_size = (size(data)[3], size(data)[1], size(data)[2])
 
 # function create_CNN_model(DNN::Chain, input_size::Tuple{Int64, Int64}, verbose::Bool=false)
 
-K = length(DNN) # NOTE! there are K+1 layers in the nn
-layers = DNN.layers
+K = length(DNN) # NOTE! there are K+1 layers in the CNN
 
 # store the DNN weights (filters for Conv layers) and biases
+# for non Conv or Dense layers, stores [NaN32] so that weight and bias indexing stays consistent
+layers = DNN.layers
 DNN_params = Flux.params(DNN)
-W = [DNN_params[2*i-1] for i in 1:K]
-b = [DNN_params[2*i] for i in 1:K]
-
-function next_sub_img_size(img::Tuple{Int64, Int64}, filter::Tuple{Int64, Int64})
-    new_height = img[1] - filter[1] + 1
-    new_width = img[2] - filter[2] + 1
-    return (new_height, new_width)
+W = Vector{Array{Float32}}(undef, K)
+b = Vector{Vector{Float32}}(undef, K)
+idx = 1
+for k in 1:K
+    if isa(layers[k], Conv) || isa(layers[k], Dense)
+        W[k] = DNN_params[2*idx-1]
+        b[k] = DNN_params[2*idx]
+        idx += 1
+    else # MaxPool, MeanPool or reshape layer does not have weights or biases associated with them
+        W[k] = [NaN32]
+        b[k] = [NaN32]
+    end
 end
 
 # store the filter shapes in each layer 1:K
-filter_sizes = [size(W[k][:,:,1,1]) for k in 1:K]
-
-# tuples of layer shapes 
-sub_img_sizes = Array{Tuple{Int64, Int64}}(undef, K+1)
-for k in 1:K+1
-    if k == 1
-        sub_img_sizes[k] = (input_size[2], input_size[3])
-    else 
-        sub_img_sizes[k] = next_sub_img_size(sub_img_sizes[k-1], filter_sizes[k-1]) 
+filter_sizes = Vector{Tuple{Int64, Int64}}(undef, K)
+for k in 1:K
+    if isa(layers[k], Conv)
+        filter_sizes[k] = size(W[k][:,:,1,1])
+    elseif isa(layers[k], MeanPool) || isa(layers[k], MaxPool)
+        filter_sizes[k] = layers[k].k
+    else
+        filter_sizes[k] = (0, 0) # arbitrary filter for layers with no filters (these are never used)
     end
+end
+
+# new img size after passing through 1) Conv layer filter or 2) a MaxPool or MeanPool layer
+function next_sub_img_size(img::Tuple{Int64, Int64}, filter::Tuple{Int64, Int64}, pooling_layer::Bool = false)
+    new_height = pooling_layer ? div(img[1], filter[1]) : (img[1] - filter[1] + 1)
+    new_width  = pooling_layer ? div(img[2], filter[2]) : (img[2] - filter[2] + 1)
+    return (new_height, new_width)
 end
 
 # stores tuples (img index, img h, img w), such that each convoluted subimage pixel can be accesses
@@ -67,13 +84,26 @@ DNN_nodes = Array{Tuple{Int64, Int64, Int64}}(undef, K+1)
 for k in 1:K+1
     if k == 1
         DNN_nodes[k] = input_size
-    else 
-        DNN_nodes[k] = (size(W[k-1])[4], next_sub_img_size(sub_img_sizes[k-1], (size(W[k-1])[1], size(W[k-1])[2]))...)
+    else
+        if isa(layers[k-1], Conv)
+            DNN_nodes[k] = (size(W[k-1])[4], next_sub_img_size(DNN_nodes[k-1][2:3], filter_sizes[k-1])...)
+        elseif isa(layers[k-1], MaxPool) || isa(layers[k-1], MeanPool)
+            DNN_nodes[k] = (DNN_nodes[k-1][1], next_sub_img_size(DNN_nodes[k-1][2:3], filter_sizes[k-1], true)...)
+        else
+            DNN_nodes[k] = (0,0,0)
+        end
     end
+end
+
+sub_img_sizes = Array{Tuple{Int64, Int64}}(undef, K+1)
+for k in 1:K+1
+    sub_img_sizes[k] = DNN_nodes[k][2:3]
 end
 
 # model = Model(optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => (verbose ? 1 : 0)))
 model = Model(optimizer_with_attributes(Gurobi.Optimizer))
+
+# TÄHÄN x VAAN CONV JA POOLING, ERI x (esim x_dense) DENSE LAYEREILLE
 
 # variables x correspond to convolutional layer pixel values: x[k, i, h, w] -> layer, sub img index, img row, img col
 @variable(model, x[k in 0:K, i in 1:DNN_nodes[k+1][1], h in 1:DNN_nodes[k+1][2], w in 1:DNN_nodes[k+1][3]] >= 0)
@@ -171,6 +201,8 @@ end
 # arbitrary objective function to allow optimization
 @objective(model, Max, x[1,1,1,1])
 
+# end
+
 optimize!(model)
 
 # extract output values from the JuMP model, same as from the CNN
@@ -189,57 +221,3 @@ function extract_output(model::Model, DNN_nodes)
 end
 
 output = extract_output(model, DNN_nodes)
-
-# @variable(model, x[k in 0:K, j in 1:node_count[k+1]] >= 0)
-# @variable(model, s[k in 1:K, j in 1:node_count[k+1]] >= 0)
-# # @variable(model, z[k in 1:K, j in 1:node_count[k+1]], Bin)
-# @variable(model, U[k in 0:K, j in 1:node_count[k+1]])
-# @variable(model, L[k in 0:K, j in 1:node_count[k+1]]) 
-
-# # arbitrary lower and upper bounds for all nodes
-# index = 1
-# for k in 0:K
-#     for j in 1:node_count[k+1]
-#         fix(U[k, j], 1000)
-#         fix(L[k, j], -1000)
-#         index += 1
-#     end
-# end
-
-# # fix bounds U and L to input nodes
-# for input_node in 1:node_count[1]
-#     delete_lower_bound(x[0, input_node])
-#     @constraint(model, L[0, input_node] <= x[0, input_node])
-#     @constraint(model, x[0, input_node] <= U[0, input_node])
-# end
-
-# # constraints corresponding to the ReLU activation functions
-# for k in 1:K
-#     for node in 1:node_count[k+1] # node count of the next layer of k, i.e., the layer k+1
-#         temp_sum = sum(W[k][node, j] * x[k-1, j] for j in 1:node_count[k])
-#         if k < K # hidden layers: k = 1, ..., K-1
-#             @constraint(model, temp_sum + b[k][node] == x[k, node] - s[k, node])
-#         else # output layer: k == K
-#             @constraint(model, temp_sum + b[k][node] == x[k, node])
-#         end
-#     end
-# end
-
-# # fix bounds to the hidden layer nodes
-# @constraint(model, [k in 1:K, j in 1:node_count[k+1]], x[k, j] <= U[k, j] * z[k, j])
-# @constraint(model, [k in 1:K, j in 1:node_count[k+1]], s[k, j] <= -L[k, j] * (1 - z[k, j]))
-
-# # fix bounds to the output nodes
-# for output_node in 1:node_count[K+1]
-#     delete_lower_bound(x[K, output_node])
-#     @constraint(model, L[K, output_node] <= x[K, output_node])
-#     @constraint(model, x[K, output_node] <= U[K, output_node])
-# end
-
-# @objective(model, Max, x[K, 1]) # arbitrary objective function to have a complete JuMP model
-
-# return model
-
-# end
-
-# reversed_matrix = reverse(matrix, dims=(1, 2))

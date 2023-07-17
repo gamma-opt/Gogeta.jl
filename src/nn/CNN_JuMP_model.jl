@@ -10,12 +10,22 @@ using Random
 # MeanPool: :k, :pad, :stride
 Random.seed!(42)
 DNN = Chain(
-    Conv((2,2), 3 => 3, relu, bias = rand32(3)),
-    MeanPool((3,3)),
-    Conv((2,2), 3 => 2, relu, bias = rand32(2)),
+    Conv((2,2), 3 => 4, relu, bias = rand32(4)),
     MeanPool((2,2)),
+    # Conv((2,2), 4 => 2, relu, bias = rand32(2)),
+    # MeanPool((2,2)),
     # MeanPool((1,2)),
 )
+# DNN = Chain(
+#     Conv((5,5), 3=>16, relu),
+#     MeanPool((2,2)),
+#     Conv((5,5), 16=>8, relu),
+#     MeanPool((2,2)),
+#     Flux.flatten,
+#     Dense(200, 120),
+#     Dense(120, 84),
+#     Dense(84, 10),
+# )
 
 # Conv((a,b), c => d, relu) gives parameters[1] in form a×b×c×d matrix
 p = params(DNN)
@@ -39,12 +49,18 @@ DNN(data)
 input_size = (size(data)[3], size(data)[1], size(data)[2])
 
 # function create_CNN_model(DNN::Chain, input_size::Tuple{Int64, Int64}, verbose::Bool=false)
-
+layers = DNN.layers
 K = length(DNN) # NOTE! there are K+1 layers in the CNN
+K = 0
+# number of layers before Flux.flatten (K+1 layers before flatten)
+for layer in layers
+    if isa(layer, Conv) || isa(layer, MaxPool) || isa(layer, MeanPool)
+        K += 1
+    end
+end
 
 # store the DNN weights (filters for Conv layers) and biases
 # for non Conv or Dense layers, stores [NaN32] so that weight and bias indexing stays consistent
-layers = DNN.layers
 DNN_params = Flux.params(DNN)
 W = Vector{Array{Float32}}(undef, K)
 b = Vector{Vector{Float32}}(undef, K)
@@ -66,7 +82,7 @@ for k in 1:K
     if isa(layers[k], Conv)
         filter_sizes[k] = size(W[k][:,:,1,1])
     elseif isa(layers[k], MeanPool) || isa(layers[k], MaxPool)
-        filter_sizes[k] = layers[k].k
+        filter_sizes[k] = layers[k].k # .k = pooling layer shape
     else
         filter_sizes[k] = (0, 0) # arbitrary filter for layers with no filters (these are never used)
     end
@@ -138,49 +154,82 @@ for i in 1:DNN_nodes[K+1][1]
     end
 end
 
-# loop through layers
+# loop through hidden layers (NOTE! only Conv and pooling layers)
 for k in 1:K
     curr_sub_img_size = sub_img_sizes[k+1] # index k+1 becasue sub_img_sizes contains input size
     curr_filter_size = filter_sizes[k]
-    W_rev = reverse(W[k], dims=(1, 2)) # curr layer weights (filters) (rows and columns inverted)
 
-    # loop through number of filters for this (sub)image
-    for filter in 1:DNN_nodes[k+1][1]
+    if isa(layers[k], Conv)
 
-        # loop through each (sub)image index (i,j) where we place the filter ((1,1) is top left pixel)
-        for h in 1:curr_sub_img_size[1]
+        W_rev = reverse(W[k], dims=(1, 2)) # curr layer weights (filters) (rows and columns inverted)
 
-            # loop through image columns
-            for w in 1:curr_sub_img_size[2]
-                var_expression_count = DNN_nodes[k][1] * reduce(*, curr_filter_size)
-                var_expression = Array{AffExpr}(undef, var_expression_count)
-                index = 1
+        # loop through number of filters for this (sub)image
+        for filter in 1:DNN_nodes[k+1][1]
 
-                # loop through each (sub)image in the layer
-                for i in 1:DNN_nodes[k][1]
+            # loop through each subimage index (h,w) in the following layer
+            for h in 1:curr_sub_img_size[1]
+                for w in 1:curr_sub_img_size[2]
 
-                    # here equation for the variable x[k,i,h,w]
+                    var_expression_count = DNN_nodes[k][1] * reduce(*, curr_filter_size)
+                    var_expression = Array{AffExpr}(undef, var_expression_count)
+                    index = 1
 
-                    W_vec = vec(W_rev[:,:,i,filter])
-                    x_vec = vec([x[k-1,i,ii,jj] for ii in h:(h+curr_filter_size[1]-1), jj in w:(w+curr_filter_size[2]-1)])
-                    # println("h: $h, curr_filter_size[1]: $(curr_filter_size[1]), w: $w, curr_filter_size[2]: $(curr_filter_size[2])")
-                    mult = W_vec .* x_vec
+                    # loop through each (sub)image in the layer
+                    for i in 1:DNN_nodes[k][1]
 
-                    for expr in 1:reduce(*, curr_filter_size)
-                        var_expression[index] = mult[expr]
-                        index += 1
+                        # here equation for the variable x[k,i,h,w]
+
+                        W_vec = vec(W_rev[:,:,i,filter])
+                        x_vec = vec([x[k-1,i,ii,jj] for ii in h:(h+curr_filter_size[1]-1), jj in w:(w+curr_filter_size[2]-1)])
+                        # println("h: $h, curr_filter_size[1]: $(curr_filter_size[1]), w: $w, curr_filter_size[2]: $(curr_filter_size[2])")
+                        mult = W_vec .* x_vec
+
+                        for expr in 1:reduce(*, curr_filter_size)
+                            var_expression[index] = mult[expr]
+                            index += 1
+                        end
                     end
-                end
 
-                temp_sum = sum(var_expression)
-                if k < K # hidden layers: k = 1, ..., K-1
-                    @constraint(model, temp_sum + b[k][filter] == x[k, filter, h, w] - s[k, filter, h, w])
-                else # output layer: k == K
-                    @constraint(model, temp_sum + b[k][filter] == x[k, filter, h, w])
+                    temp_sum = sum(var_expression)
+                    if k < K # hidden layers: k = 1, ..., K-1
+                        @constraint(model, temp_sum + b[k][filter] == x[k, filter, h, w] - s[k, filter, h, w])
+                    else # output layer: k == K
+                        @constraint(model, temp_sum + b[k][filter] == x[k, filter, h, w])
+                    end
                 end
             end
         end
+
+    else
+
+        # loop through each subimage index (h,w) in the following layer
+        for h in 1:curr_sub_img_size[1]
+            for w in 1:curr_sub_img_size[2]
+
+                if isa(layers[k], MeanPool)
+
+                    # loop through each (sub)image in the layer
+                    for i in 1:DNN_nodes[k][1]
+
+                        # here equation for the variable x[k,i,h,w]
+
+                        x_vec = vec([x[k-1,i,ii,jj] for ii in (2*h-1):(2*h-1)+(curr_filter_size[1]-1), jj in (2*w-1):(2*w-1)+(curr_filter_size[2]-1)])
+
+                        temp_sum = sum(x_vec) / reduce(*, curr_filter_size)
+                        @constraint(model, temp_sum == x[k, i, h, w])
+
+                    end
+
+                elseif isa(layers[k], MaxPool)
+                    error("MaxPooling not implemented yet!")
+                end
+
+            end
+
+        end
+
     end
+
 end
 
 if K > 1
@@ -221,3 +270,5 @@ function extract_output(model::Model, DNN_nodes)
 end
 
 output = extract_output(model, DNN_nodes)
+
+DNN(data)

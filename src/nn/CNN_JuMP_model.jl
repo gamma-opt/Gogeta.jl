@@ -10,11 +10,10 @@ using Random
 # MeanPool: :k, :pad, :stride
 Random.seed!(42)
 DNN = Chain(
-    Conv((2,2), 3 => 4, relu, bias = rand32(4)),
+    Conv((3,3), 3 => 2, relu, bias = rand32(2)),
     MeanPool((2,2)),
-    # Conv((2,2), 4 => 2, relu, bias = rand32(2)),
-    # MeanPool((2,2)),
-    # MeanPool((1,2)),
+    # Conv((3,3), 2 => 2, relu, bias = rand32(2)),
+    # MeanPool((3,3)),
 )
 # DNN = Chain(
 #     Conv((5,5), 3=>16, relu),
@@ -212,8 +211,9 @@ for k in 1:K
                     for i in 1:DNN_nodes[k][1]
 
                         # here equation for the variable x[k,i,h,w]
-
-                        x_vec = vec([x[k-1,i,ii,jj] for ii in (2*h-1):(2*h-1)+(curr_filter_size[1]-1), jj in (2*w-1):(2*w-1)+(curr_filter_size[2]-1)])
+                        h_in = curr_filter_size[1]
+                        w_in = curr_filter_size[2]
+                        x_vec = vec([x[k-1,i,ii,jj] for ii in (h_in*(h-1)+1):(h_in*h), jj in (w_in*(w-1)+1):(w_in*w)])
 
                         temp_sum = sum(x_vec) / reduce(*, curr_filter_size)
                         @constraint(model, temp_sum == x[k, i, h, w])

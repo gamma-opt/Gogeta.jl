@@ -11,7 +11,7 @@ function extract_evotrees_info(evo_model; tree_limit=length(evo_model.trees))
 
     # Get number of leaves and ids of the leaves on each tree
     for tree in 1:n_trees
-        leaves[tree] = findall(pred -> pred != 0, vec(evo_model.trees[tree].pred))
+        leaves[tree] = findall(node -> evo_model.trees[tree].split[node] == false && (node == 1 || evo_model.trees[tree].split[floor(Int, node / 2)] == true), 1:length(evo_model.trees[tree].split))
         n_leaves[tree] = length(leaves[tree])
     end
 

@@ -59,7 +59,7 @@ function train_evo_models(depths, trees, train_data, feat_names, x_train, y_trai
         config = EvoTreeRegressor(nrounds=maximum(trees), max_depth=depth);
         train_time = @elapsed model = fit_evotree(config, train_data; target_name=target, verbosity=0, fnames=feat_names);
 
-        result_file = open(string(@__DIR__)*"/"*filename, "a");
+        result_file = open(string(@__DIR__)*"/test_results/"*filename, "a");
         write(result_file, "\nDataset: $dataset_name, Trees: $(maximum(trees)), Depth: $depth, Train time: $(train_time)\n");
         close(result_file)
     
@@ -90,7 +90,7 @@ function optimize_models(trees, depths, dataset_name, filename; time_limit=100)
 
         loaded_model = EvoTrees.load(string(@__DIR__)*"/trained_models/$(dataset_name)_$(maximum(trees))_trees_$(depth)_depth.bson");
 
-        result_file = open(string(@__DIR__)*"/"*filename, "a");
+        result_file = open(string(@__DIR__)*"/test_results/"*filename, "a");
         write(result_file, "\n");
         close(result_file)
         
@@ -98,13 +98,13 @@ function optimize_models(trees, depths, dataset_name, filename; time_limit=100)
     
             universal_model = extract_evotrees_info(loaded_model; tree_limit=forest_size+1);
     
-            time_normal = @elapsed x_new, m_new = tree_model_to_MIP(universal_model; create_initial=true, objective=MAX_SENSE, gurobi_env=ENV, timelimit=time_limit);
-            time_alg = @elapsed x_alg, m_alg = tree_model_to_MIP(universal_model; create_initial=false, objective=MAX_SENSE, gurobi_env=ENV, timelimit=time_limit);
+            x_new, m_new, init_cons, n_creation_time, n_opt_time = tree_model_to_MIP(universal_model; create_initial=true, objective=MAX_SENSE, gurobi_env=ENV, timelimit=time_limit);
+            x_alg, m_alg, gen_cons, alg_creation_time, alg_opt_time = tree_model_to_MIP(universal_model; create_initial=false, objective=MAX_SENSE, gurobi_env=ENV, timelimit=time_limit);
     
             result_file = open(string(@__DIR__)*"/test_results/"*filename, "a");
             normal_status = termination_status(m_new) == MOI.OPTIMAL ? "Optimality: $(objective_value(m_new))" : "Gap: $(relative_gap(m_new))"
             alg_status = termination_status(m_alg) == MOI.OPTIMAL ? "Optimality: $(objective_value(m_alg))" : "Gap: $(relative_gap(m_alg))"
-            write(result_file, "Dataset: $dataset_name, Trees: $(forest_size), Depth: $depth, Normal time: $(time_normal) - $(normal_status), Alg time: $(time_alg) - $(alg_status), N levels: $(length(eachindex(m_new[:x]))), N leaves: $(length(eachindex(m_new[:y])))\n");
+            write(result_file, "Dataset: $dataset_name, Trees: $(forest_size), Depth: $depth, Normal time: $(n_creation_time) + $(n_opt_time) - $(normal_status), Alg time: $(alg_creation_time) + $(alg_opt_time) - $(alg_status), N levels: $(length(eachindex(m_new[:x]))), N leaves: $(length(eachindex(m_new[:y]))), Initial constraints: $(init_cons), Generated constraints: $(gen_cons)\n");
             close(result_file)
         end
     end

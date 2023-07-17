@@ -26,18 +26,15 @@ function tree_model_to_MIP(tree_model; create_initial=false, objective=MAX_SENSE
     leaf_dict = Array{Any}(undef, n_trees)
     [leaf_dict[tree] = Dict([(leaves[tree][leaf], leaf) for leaf in eachindex(leaves[tree])]) for tree in 1:n_trees]
 
-    # pre-compute all children for all nodes of all trees
+    # pre-compute all children for all active nodes of all trees
     child_leaves = Array{Any}(undef, n_trees)
     for tree in 1:n_trees
         
-        child_leaves[tree] = Array{Any}(undef, length(split_nodes[tree]))
+        nodes_with_split = findall(split -> split == true, split_nodes[tree])
+        child_leaves[tree] = Array{Any}(undef, maximum(leaves[tree]))
 
-        for node in eachindex(child_leaves[tree])
-            if split_nodes[tree][node] == true
-                child_leaves[tree][node] = children(node, leaf_dict[tree], last(leaves[tree]))
-            else
-                child_leaves[tree][node] = get(leaf_dict[tree], node, 0) != 0 ? [leaf_dict[tree][node]] : []
-            end
+        for node in [nodes_with_split; leaves[tree]]
+            child_leaves[tree][node] = children(node, leaf_dict[tree], last(leaves[tree]))
         end
     end
 
@@ -97,7 +94,7 @@ function tree_model_to_MIP(tree_model; create_initial=false, objective=MAX_SENSE
             current_node = 1 # start investigating from root
         
             while split_nodes[tree][current_node] == true # traverse from root until hitting a leaf
-                
+
                 right_leaves = child_leaves[tree][current_node << 1 + 1]
                 left_leaves = child_leaves[tree][current_node << 1]
 
@@ -145,14 +142,16 @@ function tree_model_to_MIP(tree_model; create_initial=false, objective=MAX_SENSE
 
     println("\nTIME SPENT OPTIMIZING: $(round(opt_time, digits=2)) seconds\n")
 
+    constraints = create_initial == true ? initial_constraints : generated_constraints
+
     # Print solution
     if termination_status(opt_model) == MOI.OPTIMAL
         println("SOLVED TO OPTIMALITY: $(objective_value(opt_model))")
-        return get_solution(n_feats, opt_model, n_splits, splits_ordered), opt_model
+        return get_solution(n_feats, opt_model, n_splits, splits_ordered), opt_model, constraints, creation_time, opt_time
     elseif termination_status(opt_model) == MOI.TIME_LIMIT
         println("SOLVE FAILED, TIME LIMIT REACHED")
     else
         println("SOLVE FAILED")
     end
-    return nothing, opt_model
+    return nothing, opt_model, constraints, creation_time, opt_time
 end

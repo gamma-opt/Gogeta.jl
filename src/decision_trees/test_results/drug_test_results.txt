@@ -1,33 +1,90 @@
-Dataset: OX2, Trees: 500, Depth: 3, Train time: 179.507173417
-Dataset: OX2, Trees: 10, Depth: 3, R2 train: 0.32740599354763245, R2 test: 0.13650538196336803
-Dataset: OX2, Trees: 50, Depth: 3, R2 train: 0.5695146757819516, R2 test: 0.3819668503937762
-Dataset: OX2, Trees: 100, Depth: 3, R2 train: 0.6337602451392401, R2 test: 0.4473895544927545
-Dataset: OX2, Trees: 250, Depth: 3, R2 train: 0.7051675122586092, R2 test: 0.4951259191551417
+
+Dataset: OX2, Trees: 1000, Depth: 3, Train time: 441.4112636
+Dataset: OX2, Trees: 10, Depth: 3, R2 train: 0.32740599354763245, R2 test: 0.13650538196336792
+Dataset: OX2, Trees: 50, Depth: 3, R2 train: 0.5695146757819516, R2 test: 0.381966850393776
+Dataset: OX2, Trees: 100, Depth: 3, R2 train: 0.6337602451392401, R2 test: 0.4473895544927543
+Dataset: OX2, Trees: 200, Depth: 3, R2 train: 0.6882705524688013, R2 test: 0.4816837268672901
+Dataset: OX2, Trees: 350, Depth: 3, R2 train: 0.7315322402257096, R2 test: 0.514050588682458
 Dataset: OX2, Trees: 500, Depth: 3, R2 train: 0.7590234522483239, R2 test: 0.5300783829178295
+Dataset: OX2, Trees: 750, Depth: 3, R2 train: 0.7902325548880211, R2 test: 0.5462403061328773
+Dataset: OX2, Trees: 1000, Depth: 3, R2 train: 0.8119006158549695, R2 test: 0.5527246561805876
 
-Dataset: OX2, Trees: 500, Depth: 5, Train time: 207.8811845
-Dataset: OX2, Trees: 10, Depth: 5, R2 train: 0.4348035909568311, R2 test: 0.25404777789452815
+Dataset: OX2, Trees: 1000, Depth: 5, Train time: 322.7102577
+Dataset: OX2, Trees: 10, Depth: 5, R2 train: 0.4348035909568312, R2 test: 0.25404777789452815
 Dataset: OX2, Trees: 50, Depth: 5, R2 train: 0.7025082649842667, R2 test: 0.48943872255918996
-Dataset: OX2, Trees: 100, Depth: 5, R2 train: 0.7601347888087324, R2 test: 0.5262668366222236
-Dataset: OX2, Trees: 250, Depth: 5, R2 train: 0.8332426929805051, R2 test: 0.5499654745809519
+Dataset: OX2, Trees: 100, Depth: 5, R2 train: 0.7601347888087324, R2 test: 0.5262668366222237
+Dataset: OX2, Trees: 200, Depth: 5, R2 train: 0.8156026378371969, R2 test: 0.5479448563462823
+Dataset: OX2, Trees: 350, Depth: 5, R2 train: 0.8603406693725795, R2 test: 0.552906045181488
 Dataset: OX2, Trees: 500, Depth: 5, R2 train: 0.8856173390310644, R2 test: 0.5606760554358197
+Dataset: OX2, Trees: 750, Depth: 5, R2 train: 0.9141039481090263, R2 test: 0.5640712100515244
+Dataset: OX2, Trees: 1000, Depth: 5, R2 train: 0.932169433139849, R2 test: 0.564230555560219
 
-Dataset: OX2, Trees: 500, Depth: 7, Train time: 246.897116791
-Dataset: OX2, Trees: 10, Depth: 7, R2 train: 0.524645810051088, R2 test: 0.3301019030235317
+Dataset: OX2, Trees: 1000, Depth: 7, Train time: 445.838385
+Dataset: OX2, Trees: 10, Depth: 7, R2 train: 0.5246458100510881, R2 test: 0.33010190302353193
 Dataset: OX2, Trees: 50, Depth: 7, R2 train: 0.8081626736808345, R2 test: 0.5268171746480281
-Dataset: OX2, Trees: 100, Depth: 7, R2 train: 0.8564970297178733, R2 test: 0.558687001641809
-Dataset: OX2, Trees: 250, Depth: 7, R2 train: 0.9148940450305904, R2 test: 0.5753272416012947
+Dataset: OX2, Trees: 100, Depth: 7, R2 train: 0.8564970297178733, R2 test: 0.5586870016418088
+Dataset: OX2, Trees: 200, Depth: 7, R2 train: 0.9012846701322341, R2 test: 0.5763386873392589
+Dataset: OX2, Trees: 350, Depth: 7, R2 train: 0.9354415573440835, R2 test: 0.5753696069183961
 Dataset: OX2, Trees: 500, Depth: 7, R2 train: 0.9515953423587491, R2 test: 0.5742686189436954
+Dataset: OX2, Trees: 750, Depth: 7, R2 train: 0.9668691453033232, R2 test: 0.5830845961533914
+Dataset: OX2, Trees: 1000, Depth: 7, R2 train: 0.9747118712291143, R2 test: 0.5851910353583671
 
-Dataset: OX2, Trees: 500, Depth: 10, Train time: 362.152163834
-Dataset: OX2, Trees: 10, Depth: 10, R2 train: 0.632984024210282, R2 test: 0.33529870348274626
-Dataset: OX2, Trees: 50, Depth: 10, R2 train: 0.9241337823966375, R2 test: 0.5334527694182931
-Dataset: OX2, Trees: 100, Depth: 10, R2 train: 0.9488271053560277, R2 test: 0.5436295662967652
-Dataset: OX2, Trees: 250, Depth: 10, R2 train: 0.9718061580281183, R2 test: 0.5503659933550649
-Dataset: OX2, Trees: 500, Depth: 10, R2 train: 0.9827086395115555, R2 test: 0.5598005400019247
+Dataset: OX2, Trees: 1000, Depth: 9, Train time: 663.0860789
+Dataset: OX2, Trees: 10, Depth: 9, R2 train: 0.6020005713602645, R2 test: 0.3372258097895837
+Dataset: OX2, Trees: 50, Depth: 9, R2 train: 0.8940720096345562, R2 test: 0.5427612101367163
+Dataset: OX2, Trees: 100, Depth: 9, R2 train: 0.924991341852205, R2 test: 0.5489837739357251
+Dataset: OX2, Trees: 200, Depth: 9, R2 train: 0.9522218852260944, R2 test: 0.5538842710218519
+Dataset: OX2, Trees: 350, Depth: 9, R2 train: 0.9701024223047452, R2 test: 0.5590905889264769
+Dataset: OX2, Trees: 500, Depth: 9, R2 train: 0.9773394982701694, R2 test: 0.5600066627688893
+Dataset: OX2, Trees: 750, Depth: 9, R2 train: 0.9829320261796763, R2 test: 0.5590553607824802
+Dataset: OX2, Trees: 1000, Depth: 9, R2 train: 0.9851454719022901, R2 test: 0.5604999162415213
 
-Dataset: OX2, Trees: 10, Depth: 3, Train time: 87.396760625
-Dataset: OX2, Trees: 10, Depth: 3, R2 train: 0.32740599354763245, R2 test: 0.13650538196336803
+Dataset: OX2, Trees: 1000, Depth: 12, Train time: 9261.0441394
+Dataset: OX2, Trees: 10, Depth: 12, R2 train: 0.6905692722823522, R2 test: 0.33000467239856457
+Dataset: OX2, Trees: 50, Depth: 12, R2 train: 0.9615585052023271, R2 test: 0.4958826317231677
+Dataset: OX2, Trees: 100, Depth: 12, R2 train: 0.9736519237449374, R2 test: 0.49913753292993146
+Dataset: OX2, Trees: 200, Depth: 12, R2 train: 0.9815866710550406, R2 test: 0.5045821776192251
+Dataset: OX2, Trees: 350, Depth: 12, R2 train: 0.9850916125007624, R2 test: 0.5075900875462442
+Dataset: OX2, Trees: 500, Depth: 12, R2 train: 0.9861780579091004, R2 test: 0.510149454932933
+Dataset: OX2, Trees: 750, Depth: 12, R2 train: 0.9866808378498721, R2 test: 0.5121388616665361
+Dataset: OX2, Trees: 1000, Depth: 12, R2 train: 0.9867879575952863, R2 test: 0.5124657954294118
 
-Dataset: OX2, Trees: 10, Depth: 5, Train time: 35.333664042
-Dataset: OX2, Trees: 10, Depth: 5, R2 train: 0.4348035909568311, R2 test: 0.25404777789452815
+Dataset: 3A4, Trees: 1000, Depth: 3, Train time: 1670.7851583
+Dataset: 3A4, Trees: 10, Depth: 3, R2 train: 0.20695641728498615, R2 test: 0.1593485231108127
+Dataset: 3A4, Trees: 50, Depth: 3, R2 train: 0.4333493497211752, R2 test: 0.32400844500068116
+Dataset: 3A4, Trees: 100, Depth: 3, R2 train: 0.5009475551137552, R2 test: 0.3671315966595101
+Dataset: 3A4, Trees: 200, Depth: 3, R2 train: 0.5548346889486141, R2 test: 0.39783036094652147
+Dataset: 3A4, Trees: 350, Depth: 3, R2 train: 0.5906831349337884, R2 test: 0.42314172226778435
+Dataset: 3A4, Trees: 500, Depth: 3, R2 train: 0.612212611365405, R2 test: 0.43595514883158504
+Dataset: 3A4, Trees: 750, Depth: 3, R2 train: 0.6386783680282588, R2 test: 0.4525972310940215
+Dataset: 3A4, Trees: 1000, Depth: 3, R2 train: 0.6581117122114576, R2 test: 0.46129978122063464
+
+Dataset: 3A4, Trees: 1000, Depth: 5, Train time: 1466.8752897
+Dataset: 3A4, Trees: 10, Depth: 5, R2 train: 0.32922205948278427, R2 test: 0.21926550940321166
+Dataset: 3A4, Trees: 50, Depth: 5, R2 train: 0.5749809201511968, R2 test: 0.3810386106722914
+Dataset: 3A4, Trees: 100, Depth: 5, R2 train: 0.6338021161867804, R2 test: 0.4147573104315099
+Dataset: 3A4, Trees: 200, Depth: 5, R2 train: 0.6866331622461865, R2 test: 0.44954055494241674
+Dataset: 3A4, Trees: 350, Depth: 5, R2 train: 0.7303881944003603, R2 test: 0.46883208863148906
+Dataset: 3A4, Trees: 500, Depth: 5, R2 train: 0.7611537836735262, R2 test: 0.4737190141560216
+Dataset: 3A4, Trees: 750, Depth: 5, R2 train: 0.7953976131622758, R2 test: 0.4792872457041665
+Dataset: 3A4, Trees: 1000, Depth: 5, R2 train: 0.8227591329815246, R2 test: 0.479518486692193
+
+Dataset: 3A4, Trees: 1000, Depth: 7, Train time: 1895.5669231
+Dataset: 3A4, Trees: 10, Depth: 7, R2 train: 0.4146660990778962, R2 test: 0.27369425917201695
+Dataset: 3A4, Trees: 50, Depth: 7, R2 train: 0.677508406221565, R2 test: 0.43157406118221564
+Dataset: 3A4, Trees: 100, Depth: 7, R2 train: 0.7379261625956458, R2 test: 0.4630449531235974
+Dataset: 3A4, Trees: 200, Depth: 7, R2 train: 0.7920385400135447, R2 test: 0.4834311397623344
+Dataset: 3A4, Trees: 350, Depth: 7, R2 train: 0.8391607549903688, R2 test: 0.49296718615845203
+Dataset: 3A4, Trees: 500, Depth: 7, R2 train: 0.8701487355287149, R2 test: 0.4936979628100093
+Dataset: 3A4, Trees: 750, Depth: 7, R2 train: 0.9068517208038138, R2 test: 0.49747181406783825
+Dataset: 3A4, Trees: 1000, Depth: 7, R2 train: 0.9296548327303744, R2 test: 0.49705361952484284
+
+Dataset: 3A4, Trees: 1000, Depth: 9, Train time: 4063.0193329
+Dataset: 3A4, Trees: 10, Depth: 9, R2 train: 0.4892650758149697, R2 test: 0.3007041126843931
+Dataset: 3A4, Trees: 50, Depth: 9, R2 train: 0.7692662811733482, R2 test: 0.45365400936093025
+Dataset: 3A4, Trees: 100, Depth: 9, R2 train: 0.8269213354726628, R2 test: 0.4755808922966207
+Dataset: 3A4, Trees: 200, Depth: 9, R2 train: 0.8794631366439691, R2 test: 0.4870883584685636
+Dataset: 3A4, Trees: 350, Depth: 9, R2 train: 0.9183587992282775, R2 test: 0.4923610861557064
+Dataset: 3A4, Trees: 500, Depth: 9, R2 train: 0.9414161168569671, R2 test: 0.4947319911998467
+Dataset: 3A4, Trees: 750, Depth: 9, R2 train: 0.964141441435388, R2 test: 0.4950221749676038
+Dataset: 3A4, Trees: 1000, Depth: 9, R2 train: 0.9763804891200829, R2 test: 0.49542683519110986

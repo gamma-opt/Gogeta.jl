@@ -12,4 +12,4 @@ train_evo_models(depths, trees, train_data, feat_names, x_train, y_train, x_test
 
 "OPTIMIZATION"
 
-optimize_models(trees, depths, dataset_name, "concrete_opt_results.txt"; time_limit=1000)
+optimize_models(trees, depths, dataset_name, "concrete_opt_results.txt"; time_limit=7200)

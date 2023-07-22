@@ -92,7 +92,7 @@ function create_CNN_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64, Int
         sub_img_sizes[k] = CNN_nodes[k][2:3]
     end
 
-    model = Model(optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => (verbose ? 1 : 0)))
+    model = Model(optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => (verbose ? 1 : 0), "TimeLimit" => 600))
     # model = Model(optimizer_with_attributes(Gurobi.Optimizer))
 
     # variables x correspond to convolutional layer pixel values: x[k, i, h, w] -> layer, sub img index, img row, img col
@@ -119,8 +119,10 @@ function create_CNN_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64, Int
         for h in 1:CNN_nodes[1][2]
             for w in 1:CNN_nodes[1][3]
                 delete_lower_bound(x[0, i, h, w])
-                @constraint(model, L[0, i, h, w] <= x[0, i, h, w])
-                @constraint(model, x[0, i, h, w] <= U[0, i, h, w])
+                # @constraint(model, L[0, i, h, w] <= x[0, i, h, w]) # [-1000,1000] for general cases
+                # @constraint(model, x[0, i, h, w] <= U[0, i, h, w])
+                @constraint(model, 0 <= x[0, i, h, w]) # [0,1] for image examples
+                @constraint(model, x[0, i, h, w] <= 1)
             end
         end
     end

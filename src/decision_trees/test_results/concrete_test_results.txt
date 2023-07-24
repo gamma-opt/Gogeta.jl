@@ -1,4 +1,4 @@
-Dataset: Concrete_Data.csv, Trees: 1000, Depth: 3, Train time: 0.8384972
+Dataset: Concrete_Data.csv, Trees: 1000, Depth: 3, Train time: 0.1392809
 Dataset: Concrete_Data.csv, Trees: 10, Depth: 3, R2 train: 0.48700873131259037, R2 test: 0.4513873064728592
 Dataset: Concrete_Data.csv, Trees: 50, Depth: 3, R2 train: 0.8468673883648803, R2 test: 0.8147472840776291
 Dataset: Concrete_Data.csv, Trees: 100, Depth: 3, R2 train: 0.8984606177484501, R2 test: 0.8652953404026279

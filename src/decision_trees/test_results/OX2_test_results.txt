@@ -1,4 +1,4 @@
-Dataset: OX2, Trees: 1000, Depth: 3, Train time: 441.4112636
+Dataset: OX2, Trees: 1000, Depth: 3, Train time: 259.0055114
 Dataset: OX2, Trees: 10, Depth: 3, R2 train: 0.32740599354763245, R2 test: 0.13650538196336792
 Dataset: OX2, Trees: 50, Depth: 3, R2 train: 0.5695146757819516, R2 test: 0.381966850393776
 Dataset: OX2, Trees: 100, Depth: 3, R2 train: 0.6337602451392401, R2 test: 0.4473895544927543

@@ -10,9 +10,10 @@ index = Dict([(3, 1), (5, 2), (7, 3), (9, 4), (12, 5)]);
 
 elements = dataset == "3A4" ? 4 : 5;
 
-solution_times = Array{Array}(undef, elements);
-[solution_times[depth] = [] for depth in 1:elements];
+solution_times = [];
 trees = [];
+last_depth = 3;
+pl.plot();
 
 for line in eachline(filepath)
     
@@ -35,26 +36,43 @@ for line in eachline(filepath)
         init_cons = Int.(numbers[11])
         added_cons = Int.(numbers[12])
 
+        if last_depth != depth
+            pl.plot!(   trees[2:end], 
+                        solution_times[2:end],
+                        markershape=:xcross, 
+                        palette=:rainbow,
+                        legend=:right,
+                        yaxis=:log,
+                        yticks=([0.1, 1, 10, 100, 1000], string.([0.1, 1, 10, 100, 1000])),
+                        ylabel="Solution time (seconds)",
+                        xlabel="Number of trees",
+                        label="Depth $(last_depth)",
+                        title="Optimization performance for "*dataset*" dataset"
+                    )
+            trees = [];
+            solution_times = [];
+        end
+
         if (n_trees in trees) == false
             push!(trees, n_trees) 
         end
     
-        push!(solution_times[index[depth]], opt_time_normal)
+        push!(solution_times, opt_time_normal)
+
+        last_depth = depth
 
     end
 end
 
-display(
-pl.plot(    trees, 
-            palette=:rainbow,
+pl.plot!(   trees, 
             solution_times,
             markershape=:xcross, 
-            #yaxis=:log,
-            legend=:topleft,
-            #yticks=([0.1, 1, 10, 100, 1000], string.([0.1, 1, 10, 100, 1000])),
+            palette=:rainbow,
+            yaxis=:log,
+            legend=:right,
+            yticks=([0.1, 1, 10, 100, 1000], string.([0.1, 1, 10, 100, 1000])),
             ylabel="Solution time (seconds)",
             xlabel="Number of trees",
-            label=["Depth 3" "Depth 5" "Depth 7" "Depth 9" "Depth 12"],
+            label="Depth $(last_depth)",
             title="Optimization performance for "*dataset*" dataset"
         )
-)

@@ -43,12 +43,11 @@ display(
 pl.plot(    trees, 
             palette=:rainbow,
             r2_test_values,
-            markershape=:xcross, 
-            ylim=[minimum(vcat(r2_test_values...)) - .05, maximum(vcat(r2_test_values...)) + .05], 
+            markershape=:xcross,
             ylabel=L"R^{2}"*" for test data",
             xlabel="Number of trees",
             label=["Depth 3" "Depth 5" "Depth 7" "Depth 9" "Depth 12"],
-            title="Model quality for dataset "*dataset
+            title="Model quality for "*dataset*" dataset "
         )
 )
 

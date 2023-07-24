@@ -1,4 +1,4 @@
-Dataset: 3A4, Trees: 1000, Depth: 3, Train time: 1670.7851583
+Dataset: 3A4, Trees: 1000, Depth: 3, Train time: 1206.5691304
 Dataset: 3A4, Trees: 10, Depth: 3, R2 train: 0.20695641728498615, R2 test: 0.1593485231108127
 Dataset: 3A4, Trees: 50, Depth: 3, R2 train: 0.4333493497211752, R2 test: 0.32400844500068116
 Dataset: 3A4, Trees: 100, Depth: 3, R2 train: 0.5009475551137552, R2 test: 0.3671315966595101

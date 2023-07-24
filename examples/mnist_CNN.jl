@@ -1,7 +1,7 @@
 using Logging
 using Statistics
 using Flux
-using Flux: onehotbatch, flatten, logitcrossentropy
+using Flux: onehotbatch, flatten, logitcrossentropy, train!
 using MLDatasets: MNIST
 using MLDatasets
 using ML_as_MO
@@ -46,7 +46,7 @@ for i in 1:n
     end
 end
 
-# calculating the accuracy of the CNN
+# calculating the accuracy of the CNN (around 95% with these parameters)
 correct_guesses = 0
 test_len = length(y_test)
 for i in 1:test_len
@@ -62,12 +62,12 @@ println("Accuracy of the CNN: $(acc)%")
 
 # the index-th training image is used
 idx = 1
-time, adv = create_CNN_adv(model, idx, "image", 600, true)
+time, adv = create_CNN_adv(model, idx, "MNIST", 600, true, "L2")
 
 # the digit guess of the index-th training image and the adversarial image
-CNN_guess_original = argmax(model(reshape(x_train[:,:,:,idx], 28, 28, 1, 1)))[1]-1
+CNN_guess_orig = argmax(model(reshape(x_train[:,:,:,idx], 28, 28, 1, 1)))[1]-1
 CNN_guess_adv = argmax(model(reshape(adv, 28, 28, 1, 1)))[1]-1
-println("Original training image guess: $CNN_guess_original, adversarial image guess: $CNN_guess_adv")
+println("Original training image guess: $CNN_guess_orig, adversarial image guess: $CNN_guess_adv")
 
 # display the original training image and its adversarial counterpart
 convert2image(MNIST, reshape(x_train[:,:,:,idx], 28, 28))

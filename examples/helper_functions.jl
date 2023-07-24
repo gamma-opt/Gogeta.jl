@@ -103,54 +103,109 @@ function show_digit(img_flatten)
 end
 
 # created adversarial images (L1-norm only) based on a trained MNIST CNN
-function create_CNN_adv(model::Chain, i::Int64, data_type::String, time_limit::Int64=600, verbose::Bool=false, l_norm::String="L1")
+function create_CNN_adv(model::Chain, idx::Int64, CNN_data::String, time_limit::Int64=600, verbose::Bool=false, l_norm::String="L1")
     @assert l_norm == "L1" || l_norm == "L2" "l_norm must be either \"L1\" or \"L2\""
-    K = length(model)
-    x_train, y_train = MNIST(split=:train)[:]
+    @assert CNN_data == "MNIST" || CNN_data == "CIFAR10" "CNN_data must be either \"MNIST\" or \"CIFAR10\""
 
-    false_class = create_CNN_model(model, (28,28,1,1), data_type, time_limit, verbose)
-    cur_digit = y_train[i]
-    cur_digit_img = x_train[:, :, 1, i]
+    if CNN_data == "MNIST"
 
-    x = false_class[:x]
-    @variable(false_class, d[k in [0], i in [1], h in 1:28, w in 1:28] >= 0)
-    mult = 1.2
-    imposed_index = (cur_digit + 5) % 10 + 1
+        K = length(model)
+        x_train, y_train = MNIST(split=:train)[:]
 
-    # adversarial output index must have largest activation
-    for output_node in 1:10
-        if output_node != imposed_index
-            @constraint(false_class, x[K-1, imposed_index, 1, 1] >= mult * x[K-1, output_node, 1, 1])
+        false_class = create_CNN_model(model, (28,28,1,1), "image", time_limit, verbose)
+        cur_digit = y_train[idx]
+        cur_digit_img = x_train[:, :, 1, idx]
+
+        x = false_class[:x]
+        @variable(false_class, d[k in [0], i in [1], h in 1:28, w in 1:28] >= 0)
+        mult = 1.2
+        imposed_index = (cur_digit + 5) % 10 + 1
+
+        # adversarial output index must have largest activation
+        for output_node in 1:10
+            if output_node != imposed_index
+                @constraint(false_class, x[K-1, imposed_index, 1, 1] >= mult * x[K-1, output_node, 1, 1])
+            end
         end
-    end
 
-    # d variable bounds input nodes
-    for h in 1:28
-        for w in 1:28
-            @constraint(false_class, -d[0, 1, h, w] <= x[0, 1, h, w] - cur_digit_img[h,w])
-            @constraint(false_class, x[0, 1, h, w] - cur_digit_img[h,w] <= d[0, 1, h, w])
+        # d variable bounds input nodes
+        for h in 1:28
+            for w in 1:28
+                @constraint(false_class, -d[0, 1, h, w] <= x[0, 1, h, w] - cur_digit_img[h,w])
+                @constraint(false_class, x[0, 1, h, w] - cur_digit_img[h,w] <= d[0, 1, h, w])
+            end
         end
-    end
 
-    if l_norm == "L1"
-        @objective(false_class, Min, sum(d[0, 1, h, w] for h in 1:28, w in 1:28))
-    elseif l_norm == "L2"
-        @objective(false_class, Min, sum(d[0, 1, h, w]^2 for h in 1:28, w in 1:28))
-    else
-
-    end
-
-    time = @elapsed optimize!(false_class)
-
-    adversarial = zeros(Float32, 28, 28)
-    for h in 1:28
-        for w in 1:28
-            pixel_value = value(false_class[:x][0, 1, h, w]) # indexing
-            adversarial[h, w] = pixel_value
+        if l_norm == "L1"
+            @objective(false_class, Min, sum(d[0, 1, h, w] for h in 1:28, w in 1:28))
+        elseif l_norm == "L2"
+            @objective(false_class, Min, sum(d[0, 1, h, w]^2 for h in 1:28, w in 1:28))
         end
-    end
 
-    return time, adversarial
+        time = @elapsed optimize!(false_class)
+
+        adversarial = zeros(Float32, 28, 28)
+        for h in 1:28
+            for w in 1:28
+                pixel_value = value(false_class[:x][0, 1, h, w]) # indexing
+                adversarial[h, w] = pixel_value
+            end
+        end
+
+        return time, adversarial
+
+    elseif CNN_data == "CIFAR10"
+
+        K = length(model)
+        x_train, y_train = CIFAR10(split=:train)[:]
+
+        false_class = create_CNN_model(model, (32,32,3,1), "image", time_limit, verbose)
+        cur_img_name = y_train[idx]
+        cur_img = x_train[:, :, :, idx]
+
+        x = false_class[:x]
+        @variable(false_class, d[k in [0], i in 1:3, h in 1:32, w in 1:32] >= 0)
+        mult = 1.2
+        imposed_index = (cur_img_name + 5) % 10 + 1
+
+        # adversarial output index must have largest activation
+        for output_node in 1:10
+            if output_node != imposed_index
+                @constraint(false_class, x[K-1, imposed_index, 1, 1] >= mult * x[K-1, output_node, 1, 1])
+            end
+        end
+
+        # d variable bounds input nodes
+        for i in 1:3
+            for h in 1:32
+                for w in 1:32
+                    @constraint(false_class, -d[0, i, h, w] <= x[0, i, h, w] - cur_img[h,w,i])
+                    @constraint(false_class, x[0, i, h, w] - cur_img[h,w,i] <= d[0, i, h, w])
+                end
+            end
+        end
+
+        if l_norm == "L1"
+            @objective(false_class, Min, sum(d[0, i, h, w] for i in 1:3, h in 1:32, w in 1:32))
+        elseif l_norm == "L2"
+            @objective(false_class, Min, sum(d[0, i, h, w]^2 for i in 1:3, h in 1:32, w in 1:32))
+        end
+
+        time = @elapsed optimize!(false_class)
+
+        adversarial = zeros(Float32, 32, 32, 3)
+        for i in 1:3
+            for h in 1:32
+                for w in 1:32
+                    pixel_value = value(false_class[:x][0, i, h, w]) # indexing
+                    adversarial[h, w, i] = pixel_value
+                end
+            end
+        end
+
+        return time, adversarial
+
+    end
 end
 
 # extracts the input layer pixel values from an optimised CNN MILP model

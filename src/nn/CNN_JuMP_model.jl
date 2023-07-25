@@ -115,6 +115,21 @@ function create_CNN_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64, Int
     @variable(model, L[k in 0:K+D, i in 1:CNN_nodes[k+1][1], h in 1:CNN_nodes[k+1][2], w in 1:CNN_nodes[k+1][3]] == -1000)
     @variable(model, U[k in 0:K+D, i in 1:CNN_nodes[k+1][1], h in 1:CNN_nodes[k+1][2], w in 1:CNN_nodes[k+1][3]] == 1000)
 
+    # remove "ReLU"-variables from MeanPool layers
+    for k in 1:K
+        if isa(layers[k], MeanPool)
+            for i in 1:CNN_nodes[k+1][1]
+                for h in 1:CNN_nodes[k+1][2]
+                    for w in 1:CNN_nodes[k+1][3]
+                        delete(model, s[k, i, h, w])
+                        delete(model, z[k, i, h, w])
+                        delete(model, L[k, i, h, w])
+                        delete(model, U[k, i, h, w])
+                    end
+                end
+            end
+        end
+    end
 
     # delete lower bound and fix L and U bounds to input nodes
     for i in 1:CNN_nodes[1][1]
@@ -239,16 +254,7 @@ function create_CNN_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64, Int
         end
     end
 
-    # # fix input values to known data (testing purposes only!)
-    # for i in 1:CNN_nodes[1][1]
-    #     for h in 1:CNN_nodes[1][2]
-    #         for w in 1:CNN_nodes[1][3]
-    #             fix(x[0,i,h,w], data[h,w,i,1], force=true)
-    #         end
-    #     end
-    # end
-
-    # arbitrary objective function to allow optimization
+    # arbitrary objective function (that can and should be changed) to allow optimization
     @objective(model, Max, x[1,1,1,1])
 
     return model

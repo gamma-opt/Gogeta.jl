@@ -19,14 +19,16 @@ third index is channel count (e.g. 1 for grayscale image, 3 for RGB), fourth ind
 # Arguments
 - `CNN::Chain`: A trained ReLU CNN with the above assumptions
 - `data_shape::Tuple{Int64, Int64, Int64, Int64}`: Shape of the data used in the CNN as a Tuple, e.g., (32, 32, 3, 1) (similar logis as above)
+- `data_type::String`: When set to "image", CNN input nodes are set to the range [0,1], otherwise [-1000,1000].
+- `time_limit::Int64=3600`: A time limit to the MILP problem.
 - `verbose::Bool=false`: Controls Gurobi logs.
 
 # Examples
 ```julia
-model = create_CNN_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64, Int64}, verbose::Bool=false)
+model = create_CNN_model(CNN, data_shape, data_type, time_limit, verbose)
 ```
 """
-function create_CNN_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64, Int64}, data_type::String, time_limit::Int64=600, verbose::Bool=false)
+function create_CNN_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64, Int64}, data_type::String, time_limit::Int64=3600, verbose::Bool=false)
 
     layers = CNN.layers
     layers_no_flatten = Tuple(filter(x -> typeof(x) != typeof(Flux.flatten), layers))
@@ -166,10 +168,8 @@ function create_CNN_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64, Int
                         for i in 1:CNN_nodes[k][1]
 
                             # here equation for the variable x[k,i,h,w]
-
                             W_vec = vec(W_rev[:,:,i,filter])
                             x_vec = vec([x[k-1,i,ii,jj] for ii in h:(h+curr_filter_size[1]-1), jj in w:(w+curr_filter_size[2]-1)])
-                            # println("h: $h, curr_filter_size[1]: $(curr_filter_size[1]), w: $w, curr_filter_size[2]: $(curr_filter_size[2])")
                             mult = W_vec .* x_vec
 
                             for expr in 1:reduce(*, curr_filter_size)
@@ -255,6 +255,28 @@ function create_CNN_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64, Int
 
 end
 
+# inner function used in create_CNN_model
+# new img size after passing through 1) Conv layer filter or 2) a MeanPool layer
+function next_sub_img_size(img::Tuple{Int64, Int64}, filter::Tuple{Int64, Int64}, pooling_layer::Bool = false)
+    new_height = pooling_layer ? div(img[1], filter[1]) : (img[1] - filter[1] + 1)
+    new_width  = pooling_layer ? div(img[2], filter[2]) : (img[2] - filter[2] + 1)
+    return (new_height, new_width)
+end
+
+"""
+evaluate_CNN!(CNN_model::Model, input::Array{Float32, 4})
+
+Fixes the variables corresponding to the CNN input to a given input array.
+
+# Arguments
+- `CNN_model::Model`: A JuMP model representing a traied ReLU DNN (generated using the function create_JuMP_model).
+- `input::Array{Float32, 4}`: A given input array to the trained CNN. 
+
+# Examples
+```julia
+evaluate_CNN!(CNN_model, input)
+```
+"""
 function evaluate_CNN!(CNN_model::Model, input::Array{Float32, 4})
     x = CNN_model[:x] # stores the @variable with name x from the JuMP_model
     len = size(input)
@@ -265,29 +287,4 @@ function evaluate_CNN!(CNN_model::Model, input::Array{Float32, 4})
             end
         end
     end
-end
-
-
-# new img size after passing through 1) Conv layer filter or 2) a MeanPool layer
-function next_sub_img_size(img::Tuple{Int64, Int64}, filter::Tuple{Int64, Int64}, pooling_layer::Bool = false)
-    new_height = pooling_layer ? div(img[1], filter[1]) : (img[1] - filter[1] + 1)
-    new_width  = pooling_layer ? div(img[2], filter[2]) : (img[2] - filter[2] + 1)
-    return (new_height, new_width)
-end
-
-
-# FIX! CANT TAKE CNN_nodes AS IS
-# extract output values from the JuMP model, same as from the CNN
-function extract_output(CNN_model::Model, CNN_nodes)
-    x = CNN_model[:x]
-    output = []
-    len = length(CNN_nodes)
-    for i in 1:CNN_nodes[len][1]
-        for w in 1:CNN_nodes[len][3]
-            for h in 1:CNN_nodes[len][2]
-                push!(output, value(x[len-1,i,h,w]))
-            end
-        end
-    end
-    return output
 end

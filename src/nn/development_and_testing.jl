@@ -118,6 +118,18 @@ difference3 = bad_times3 - optimal_times3
 @time test = create_JuMP_model(nn1, bad_U1, bad_L1, "threads")
 
 
+
+# FIX! CANT TAKE CNN_nodes AS IS
+# extract output values from the JuMP model, same as from the CNN
+function extract_output(CNN_model::Model, len)
+    x = CNN_model[:x]
+    output = zeros(Float32, 10)
+    for i in 1:10
+        output[i] = value(x[len-1,i,1,1])
+    end
+    return output
+end
+
 include("CNN_JuMP_model.jl")
 
 # Chain: :layers
@@ -125,40 +137,42 @@ include("CNN_JuMP_model.jl")
 # Conv: :σ, :weight, :bias, :stride, :pad, :dilation, :groups
 # MaxPool: :k, :pad, :stride
 # MeanPool: :k, :pad, :stride
-Random.seed!(42)
+
+x_train, y_train = MNIST(split=:train)[:]
+x_test, y_test = MNIST(split=:test)[:]
+
+x_train = reshape(x_train, 28, 28, 1, 60000)
+x_test = reshape(x_test, 28, 28, 1, 10000)
+
+y_train_oh = onehotbatch(y_train, 0:9)
+
+train = [(x_train, y_train_oh)]
+test = [(x_test, y_test)]
+
 CNN = Chain(
-    Conv((2,2), 1=>2, relu),
-    # MeanPool((2,2)),
-    # MeanPool((2,2)),
-    Flux.flatten
-)
-CNN = Chain(
-    Conv((5,5), 3=>16, relu),
+    Conv((3,3), 1=>2, relu),
     MeanPool((2,2)),
-    Conv((5,5), 16=>8, relu),
-    MeanPool((2,2)),
-    Flux.flatten,
-    Dense(200 => 120, relu),
-    Dense(120 => 84, relu),
-    Dense(84 => 10),
+    flatten,
+    Dense(32, 16, relu),
+    Dense(16, 10),
 )
 
 # Conv((a,b), c => d, relu) gives parameters[1] in form a×b×c×d matrix
 p = params(CNN)
 
 data = rand32(6, 6, 1, 1)
-data = rand32(10, 10, 3, 1)
-data = rand32(32, 32, 3, 1)
+data = rand32(10, 10, 1, 1)
+data = rand32(28, 28, 1, 1)
 
 CNN(data)
 
 data_shape = size(data)
 
-CNN_model = create_CNN_model(CNN, data_shape, true)
+CNN_model = create_CNN_model(CNN, data_shape, "image", 1000, true)
 evaluate_CNN!(CNN_model, data)
 optimize!(CNN_model)
 
-
-output = extract_output(CNN_model, CNN_nodes)
+len = length(CNN)
+output = extract_output(CNN_model, len)
 
 CNN(data)

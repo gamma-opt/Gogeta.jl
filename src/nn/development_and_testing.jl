@@ -119,6 +119,19 @@ difference3 = bad_times3 - optimal_times3
 
 
 
+
+
+using Logging
+using Statistics
+using Flux
+using Flux: onehotbatch, flatten, logitcrossentropy, train!
+using MLDatasets: MNIST
+using MLDatasets
+using ML_as_MO
+
+include("CNN_JuMP_model.jl") # REMOVE THIS WHEN ADDED TO PACKAGE
+include("../../examples/helper_functions.jl")
+
 # FIX! CANT TAKE CNN_nodes AS IS
 # extract output values from the JuMP model, same as from the CNN
 function extract_output(CNN_model::Model, len)
@@ -129,8 +142,6 @@ function extract_output(CNN_model::Model, len)
     end
     return output
 end
-
-include("CNN_JuMP_model.jl")
 
 # Chain: :layers
 # Dense: :weight, :bias, :σ

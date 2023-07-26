@@ -32,17 +32,17 @@ function create_CNN_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64, Int
 
     layers = CNN.layers
     layers_no_flatten = Tuple(filter(x -> typeof(x) != typeof(Flux.flatten), layers))
-    K = 0 # number of layers before Flux.flatten (K+1 layers before flatten)
+    K = 0 # number of layers before Flux.flatten (K+1 layers before flatten as input is layer 0)
     D = 0 # number of dense layers after Flux.flatten
     for layer in layers_no_flatten
-        if isa(layer, Conv) || isa(layer, MaxPool) || isa(layer, MeanPool)
+        if isa(layer, Conv) || isa(layer, MeanPool)
             K += 1
         elseif isa(layer, Dense)
             D += 1
         end
     end
 
-    # store the CNN weights (filters for Conv layers) and biases
+    # store the CNN weights (= filters for Conv layers) and biases
     # for non Conv or Dense layers, stores [NaN32] so that weight and bias indexing stays consistent
     CNN_params = params(CNN)
     W = Vector{Array{Float32}}(undef, K+D)
@@ -54,25 +54,25 @@ function create_CNN_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64, Int
             b[k] = CNN_params[2*idx]
             idx += 1
         else 
-            # poolingl layers do not have weights or biases associated with them, these are just
+            # pooling layers do not have weights or biases associated with them, these are just
             # filler values that are never used in the JuMP model
             W[k] = [NaN32]
             b[k] = [NaN32]
         end
     end
 
-    # store the filter shapes in each layer 1:K (Conv and MeanPool)
+    # store the filter shapes in each layer 1:K (Conv and MeanPool layers)
     filter_sizes = Vector{Tuple{Int64, Int64}}(undef, K)
     for k in 1:K
         if isa(layers[k], Conv)
             filter_sizes[k] = size(W[k][:,:,1,1])
-        elseif isa(layers[k], MeanPool) # || isa(layers[k], MaxPool)
+        elseif isa(layers[k], MeanPool)
             filter_sizes[k] = layers[k].k # .k = pooling layer shape
         end
     end
 
-    # For Conv and MeanPool layers: stores tuples (img index, img h, img w), such that each convoluted subimage pixel can be accesses
-    # For Dense layers: stores the number of nodes in a layer at index 1 (number of nodes, 1, 1)
+    # For Conv and MeanPool layers: stores tuples (img idx, img h, img w), such that each convoluted subimage pixel can be accesses
+    # For Dense layers: stores the number of nodes in a layer at index 1, i.e. tuples (number of nodes, 1, 1)
     CNN_nodes = Array{Tuple{Int64, Int64, Int64}}(undef, K+1+D)
     for k in 1:K+1+D
         if k == 1
@@ -80,7 +80,7 @@ function create_CNN_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64, Int
         else
             if isa(layers[k-1], Conv)
                 CNN_nodes[k] = (size(W[k-1])[4], next_sub_img_size(CNN_nodes[k-1][2:3], filter_sizes[k-1])...)
-            elseif isa(layers[k-1], MaxPool) || isa(layers[k-1], MeanPool)
+            elseif isa(layers[k-1], MeanPool)
                 CNN_nodes[k] = (CNN_nodes[k-1][1], next_sub_img_size(CNN_nodes[k-1][2:3], filter_sizes[k-1], true)...)
             elseif k > K+1 # Dense layer
                 CNN_nodes[k] = (size(layers[k].weight)[1], 1, 1)
@@ -88,28 +88,19 @@ function create_CNN_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64, Int
         end
     end
 
-    # stored the sub image sizes (h,w) at each Conv and MeanPool layer (there are often multiple sub images at each Conv layer)
+    # stores the sub image sizes (h,w) at each Conv and MeanPool layer (there are often multiple sub images at each Conv layer)
     sub_img_sizes = Array{Tuple{Int64, Int64}}(undef, K+1)
     for k in 1:K+1
         sub_img_sizes[k] = CNN_nodes[k][2:3]
     end
 
     model = Model(optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => (verbose ? 1 : 0), "TimeLimit" => time_limit))
-    # model = Model(optimizer_with_attributes(Gurobi.Optimizer))
 
-    # variables x correspond to convolutional layer pixel values: x[k, i, h, w] -> layer, sub img index, img row, img col
+    # variables x correspond to convolutional layer pixel values: x[k,i,h,w] such that the indices are: [layer, sub img idx, img row, img col]
     @variable(model, x[k in 0:K+D, i in 1:CNN_nodes[k+1][1], h in 1:CNN_nodes[k+1][2], w in 1:CNN_nodes[k+1][3]] >= 0)
-    # CNN_nodes_relu = Array{Tuple{Int64, Int64, Int64}}(undef, K+1+D)
-    # for i in eachindex(layers)
-    #     if isa(layers[i], MeanPool) #|| isa(layers[i], typeof(Flux.flatten))
-    #         CNN_nodes_relu[i] = (CNN_nodes[i][1], 0, 0)
-    #     else
-    #         CNN_nodes_relu[i] = CNN_nodes[i]
-    #     end
-    # end
-    if K+D > 1 # s and z variables only to hidden layers, i.e., when K+D > 1
-        @variable(model, s[k in 1:K-1+D, i in 1:CNN_nodes[k+1][1], h in 1:CNN_nodes[k+1][2], w in 1:CNN_nodes[k+1][3]] >= 0)
-        @variable(model, z[k in 1:K-1+D, i in 1:CNN_nodes[k+1][1], h in 1:CNN_nodes[k+1][2], w in 1:CNN_nodes[k+1][3]], Bin)
+    if K+D > 1 # s and z variables only to hidden layers, i.e., layers 1:K+D-1
+        @variable(model, s[k in 1:K+D-1, i in 1:CNN_nodes[k+1][1], h in 1:CNN_nodes[k+1][2], w in 1:CNN_nodes[k+1][3]] >= 0)
+        @variable(model, z[k in 1:K+D-1, i in 1:CNN_nodes[k+1][1], h in 1:CNN_nodes[k+1][2], w in 1:CNN_nodes[k+1][3]], Bin)
     end
     # variables L and U: lower and upper bounds for pixel values (= hidden node values) in the CNN
     @variable(model, L[k in 0:K+D, i in 1:CNN_nodes[k+1][1], h in 1:CNN_nodes[k+1][2], w in 1:CNN_nodes[k+1][3]] == -1000)
@@ -136,14 +127,12 @@ function create_CNN_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64, Int
         for h in 1:CNN_nodes[1][2]
             for w in 1:CNN_nodes[1][3]
                 delete_lower_bound(x[0, i, h, w])
-                if data_type == "image" # input pixels bounded to [0,1]
-                    @constraint(model, 0 <= x[0, i, h, w]) # [0,1] for image examples
-                    @constraint(model, x[0, i, h, w] <= 1)
-                else # arbitrary big-M bounds of -1000 and 1000
-                    @constraint(model, L[0, i, h, w] <= x[0, i, h, w]) # [-1000,1000] for general cases
-                    @constraint(model, x[0, i, h, w] <= U[0, i, h, w])
+                if data_type == "image" # image input pixels bounded to [0,1], general case [-1000,1000]
+                    fix(L[0, i, h, w], 0)
+                    fix(U[0, i, h, w], 1)
                 end
-                
+                @constraint(model, L[0, i, h, w] <= x[0, i, h, w])
+                @constraint(model, x[0, i, h, w] <= U[0, i, h, w])
             end
         end
     end
@@ -165,36 +154,37 @@ function create_CNN_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64, Int
         curr_filter_size = filter_sizes[k]
 
         if isa(layers[k], Conv)
-
-            W_rev = reverse(W[k], dims=(1, 2)) # curr layer weights (filters) (rows and columns inverted)
+            W_rev = reverse(W[k], dims=(1, 2)) # curr layer weights (i.e., filters) (rows and columns are inverted!)
 
             # loop through number of filters for this (sub)image
             for filter in 1:CNN_nodes[k+1][1]
 
                 # loop through each subimage index (h,w) in the following layer
+                # a filter in this layer is placed at each sub img pixel index from the following layer
                 for h in 1:curr_sub_img_size[1]
                     for w in 1:curr_sub_img_size[2]
 
                         var_expression_count = CNN_nodes[k][1] * reduce(*, curr_filter_size)
                         var_expression = Array{AffExpr}(undef, var_expression_count)
-                        index = 1
+                        idx = 1
 
                         # loop through each (sub)image in the layer
                         for i in 1:CNN_nodes[k][1]
 
-                            # here equation for the variable x[k,i,h,w]
+                            # here equation for the variable x[k,i,h,w], which is gotten by placing the filter at the right index
+                            # and calculating the weighted sum of the pixel values
                             W_vec = vec(W_rev[:,:,i,filter])
                             x_vec = vec([x[k-1,i,ii,jj] for ii in h:(h+curr_filter_size[1]-1), jj in w:(w+curr_filter_size[2]-1)])
                             mult = W_vec .* x_vec
 
                             for expr in 1:reduce(*, curr_filter_size)
-                                var_expression[index] = mult[expr]
-                                index += 1
+                                var_expression[idx] = mult[expr]
+                                idx += 1
                             end
                         end
 
                         temp_sum = sum(var_expression)
-                        if k < K # && isa(layers[k], Conv) # hidden layers: k = 1, ..., K-1
+                        if k < K 
                             @constraint(model, temp_sum + b[k][filter] == x[k, filter, h, w] - s[k, filter, h, w])
                         else # output layer: k == K
                             @constraint(model, temp_sum + b[k][filter] == x[k, filter, h, w])
@@ -203,7 +193,7 @@ function create_CNN_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64, Int
                 end
             end
 
-        elseif isa(layers[k], MeanPool)
+        elseif isa(layers[k], MeanPool) # calculate the average of the pixel values over the filter
 
             # loop through each subimage index (h,w) in the following layer
             for h in 1:curr_sub_img_size[1]
@@ -225,14 +215,15 @@ function create_CNN_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64, Int
         end
     end
 
-    # loop through the Dense layers that are after the Flux.flatten "pseudolayer"
+    # loop through the Dense layers that are after the Flux.flatten non-indexed layer
+    # in layer indices, we skip the flatten layer altogether (i.e., no variables at that layer)
     for k in K+1:K+D
         for node in 1:CNN_nodes[k+1][1]
             temp_sum = 0
             if k == K+1 # previous layer nodes still in matrix form, reshaping for to a vector
                 x_vec = vec([x[k-1,i,h,w] for h in 1:CNN_nodes[k][2], w in 1:CNN_nodes[k][3], i in 1:CNN_nodes[k][1]])
                 temp_sum = sum(W[k][node, j] * x_vec[j] for j in 1:reduce(*, CNN_nodes[k]))
-            else
+            else # previous layer nodes already in vector form, no reshaping needed
                 temp_sum = sum(W[k][node, j] * x[k-1, j, 1, 1] for j in 1:reduce(*, CNN_nodes[k][1]))
             end
             if k < K+D # hidden Dense layer
@@ -244,9 +235,8 @@ function create_CNN_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64, Int
     end
 
     for k in 1:length(layers_no_flatten)-1
-        # fix bounds to the hidden layers (Conv and Dense) with relu activation function
+        # fix bounds to the hidden layers  with relu activation function (Conv and Dense)
         if isa(layers_no_flatten[k], Conv) || isa(layers_no_flatten[k], Dense)
-            # println(k)
             @constraint(model, [[k], i in 1:CNN_nodes[k+1][1], h in 1:CNN_nodes[k+1][2], w in 1:CNN_nodes[k+1][3]], 
                                 x[k, i, h, w] <= U[k, i, h, w] * z[k, i, h, w])
             @constraint(model, [[k], i in 1:CNN_nodes[k+1][1], h in 1:CNN_nodes[k+1][2], w in 1:CNN_nodes[k+1][3]], 
@@ -254,7 +244,7 @@ function create_CNN_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64, Int
         end
     end
 
-    # arbitrary objective function (that can and should be changed) to allow optimization
+    # arbitrary objective function (that can and should be changed later!) to allow optimization
     @objective(model, Max, x[1,1,1,1])
 
     return model

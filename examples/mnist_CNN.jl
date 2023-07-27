@@ -47,7 +47,7 @@ for i in 1:n
     end
 end
 
-# calculating the accuracy of the CNN (around 95% with these parameters)
+# calculating the accuracy of the CNN (around 95% with these training parameters)
 correct_guesses = 0
 test_len = length(y_test)
 for i in 1:test_len

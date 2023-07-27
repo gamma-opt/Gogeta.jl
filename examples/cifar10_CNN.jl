@@ -9,7 +9,7 @@ using ML_as_MO
 include("../src/nn/CNN_JuMP_model.jl") # REMOVE THIS WHEN ADDED TO PACKAGE
 include("helper_functions.jl")
 
-# This file shows how to use the convert a CNN into a MILP using the create_CNN_model function.
+# This file shows how to use the convert a CNN into a MILP using the create_CNN_JuMP_model function.
 
 # The CIFAR10 dataset consists of 50 000 32x32x3 images of 10 different classes. The 3rd dimension is the RGB channel.
 # The 10 classes are as follows: airplane, automobile, bird, cat, deer, dog, frog, horse, ship, truck.
@@ -52,7 +52,7 @@ for i in 1:n
     end
 end
 
-# calculating the accuracy of the CNN (around 35% with these parameters)
+# calculating the accuracy of the CNN (around 35% with these training parameters)
 correct_guesses = 0
 test_len = length(y_test)
 for i in 1:test_len

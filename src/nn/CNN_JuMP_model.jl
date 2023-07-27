@@ -3,7 +3,7 @@ using Flux: params
 using Random
 
 """
-create_CNN_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64, Int64}, verbose::Bool=false)
+create_CNN_JuMP_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64, Int64}, verbose::Bool=false)
 
 Converts a CNN with ReLU activation functions to a 0-1 MILP JuMP model. The ReLU CNN is assumed to be a Flux.Chain.
 The activation function must be "relu" in all hidden (Conv and Dense) layers and "identity" in the output layer.
@@ -25,10 +25,10 @@ third index is channel count (e.g. 1 for grayscale image, 3 for RGB), fourth ind
 
 # Examples
 ```julia
-model = create_CNN_model(CNN, data_shape, data_type, time_limit, verbose)
+model = create_CNN_JuMP_model(CNN, data_shape, data_type, time_limit, verbose)
 ```
 """
-function create_CNN_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64, Int64}, data_type::String, time_limit::Int64=3600, verbose::Bool=false)
+function create_CNN_JuMP_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64, Int64}, data_type::String, time_limit::Int64=3600, verbose::Bool=false)
 
     layers = CNN.layers
     layers_no_flatten = Tuple(filter(x -> typeof(x) != typeof(Flux.flatten), layers))
@@ -251,7 +251,7 @@ function create_CNN_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64, Int
 
 end
 
-# inner function used in create_CNN_model
+# inner function used in create_CNN_JuMP_model
 # new img size after passing through 1) Conv layer filter or 2) a MeanPool layer
 function next_sub_img_size(img::Tuple{Int64, Int64}, filter::Tuple{Int64, Int64}, pooling_layer::Bool = false)
     new_height = pooling_layer ? div(img[1], filter[1]) : (img[1] - filter[1] + 1)

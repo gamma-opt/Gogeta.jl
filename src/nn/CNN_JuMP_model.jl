@@ -3,7 +3,7 @@ using Flux: params
 using Random
 
 """
-create_CNN_JuMP_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64, Int64}, verbose::Bool=false)
+create_CNN_JuMP_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64, Int64}, data_type::String)
 
 Converts a CNN with ReLU activation functions to a 0-1 MILP JuMP model. The ReLU CNN is assumed to be a Flux.Chain.
 The activation function must be "relu" in all hidden (Conv and Dense) layers and "identity" in the output layer.
@@ -14,21 +14,18 @@ third index is channel count (e.g. 1 for grayscale image, 3 for RGB), fourth ind
 - Convolutional layers must use relu, pooling layers must be MeanPool. 
 - Layers must use default setting, such as stride, pad, dilation, etc. Conv.filter and MeanPool.k (window) can be arbitrary sizes.
 - No convolutional or pooling layers are necessary before Flux.flatten. Also, no dense layers are necessary after Flux.flatten.
-- 
 
 # Arguments
 - `CNN::Chain`: A trained ReLU CNN with the above assumptions
 - `data_shape::Tuple{Int64, Int64, Int64, Int64}`: Shape of the data used in the CNN as a Tuple, e.g., (32, 32, 3, 1) (similar logis as above)
 - `data_type::String`: When set to "image", CNN input nodes are set to the range [0,1], otherwise [-1000,1000].
-- `time_limit::Int64=3600`: A time limit to the MILP problem.
-- `verbose::Bool=false`: Controls Gurobi logs.
 
 # Examples
 ```julia
-model = create_CNN_JuMP_model(CNN, data_shape, data_type, time_limit, verbose)
+model = create_CNN_JuMP_model(CNN, data_shape, data_type)
 ```
 """
-function create_CNN_JuMP_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64, Int64}, data_type::String, time_limit::Int64=3600, verbose::Bool=false)
+function create_CNN_JuMP_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64, Int64}, data_type::String)
 
     layers = CNN.layers
     layers_no_flatten = Tuple(filter(x -> typeof(x) != typeof(Flux.flatten), layers))
@@ -94,7 +91,7 @@ function create_CNN_JuMP_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64
         sub_img_sizes[k] = CNN_nodes[k][2:3]
     end
 
-    model = Model(optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => (verbose ? 1 : 0), "TimeLimit" => time_limit))
+    model = Model(optimizer_with_attributes(Gurobi.Optimizer))
 
     # variables x correspond to convolutional layer pixel values: x[k,i,h,w] such that the indices are: [layer, sub img idx, img row, img col]
     @variable(model, x[k in 0:K+D, i in 1:CNN_nodes[k+1][1], h in 1:CNN_nodes[k+1][2], w in 1:CNN_nodes[k+1][3]] >= 0)

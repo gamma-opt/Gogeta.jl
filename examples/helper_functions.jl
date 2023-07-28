@@ -112,7 +112,9 @@ function create_CNN_adv(model::Chain, idx::Int64, CNN_data::String, time_limit::
         K = length(model)
         x_train, y_train = MNIST(split=:train)[:]
 
-        false_class = create_CNN_JuMP_model(model, (28,28,1,1), "image", time_limit, verbose)
+        false_class = create_CNN_JuMP_model(model, (28,28,1,1), "image")
+        set_optimizer_attribute(false_class, "TimeLimit", time_limit)
+        set_optimizer_attribute(false_class, "OutputFlag", verbose)
         cur_digit = y_train[idx]
         cur_digit_img = x_train[:, :, 1, idx]
 
@@ -159,7 +161,9 @@ function create_CNN_adv(model::Chain, idx::Int64, CNN_data::String, time_limit::
         K = length(model)
         x_train, y_train = CIFAR10(split=:train)[:]
 
-        false_class = create_CNN_JuMP_model(model, (32,32,3,1), "image", time_limit, verbose)
+        false_class = create_CNN_JuMP_model(model, (32,32,3,1), "image")
+        set_optimizer_attribute(false_class, "TimeLimit", time_limit)
+        set_optimizer_attribute(false_class, "OutputFlag", verbose)
         cur_img_name = y_train[idx]
         cur_img = x_train[:, :, :, idx]
 

@@ -179,7 +179,7 @@ CNN(data)
 
 data_shape = size(data)
 
-CNN_model = create_CNN_JuMP_model(CNN, data_shape, "image", 1000, true)
+CNN_model = create_CNN_JuMP_model(CNN, data_shape, "image")
 evaluate_CNN!(CNN_model, data)
 optimize!(CNN_model)
 

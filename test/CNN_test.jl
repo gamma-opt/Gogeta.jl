@@ -29,7 +29,8 @@ data = rand32(32, 32, 3, 1)
 CNN_output = model(data)
 
 # generating the MILP model and evaluating it with our input
-MILP_model = create_CNN_JuMP_model(model, (32, 32, 3, 1), "image", 600, true)
+MILP_model = create_CNN_JuMP_model(model, (32, 32, 3, 1), "image")
+set_optimizer_attribute(MILP_model, "TimeLimit", 600)
 evaluate_CNN!(MILP_model, data)
 optimize!(MILP_model)
 

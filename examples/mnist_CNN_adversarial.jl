@@ -24,7 +24,7 @@ test = [(x_test, y_test)]
 
 model = Chain(
     Conv((5,5), 1=>4, relu),
-    MeanPool((2,2)),
+    MaxPool((2,2)),
     flatten,
     Dense(576, 16, relu),
     Dense(16, 10),
@@ -65,7 +65,10 @@ println("Accuracy of the CNN: $(acc)%")
        digit 5 is missclassified as the digit 0. A timelimit of 600 sec is used. 
        (L2-norm can also be used but this requires larger computational time to give a solution)"
 
-# the idx-th training image is used
+# the idx-th training image is used (train set index 1 is a image of 5, its adversarial couterpart is an image of a 0)
+# NOTE! there is no guarantee of finding an optimal solution within the set timelimit below, if an error
+# "Result index of attribute MathOptInterface.VariablePrimal(1) out of bounds. There are currently 0 solution(s) in the model."
+# is thrown, try a larger timelimit in the function create_CNN_adv
 idx = 1
 time, adv = create_CNN_adv(model, idx, "MNIST", 600, true, "L1")
 

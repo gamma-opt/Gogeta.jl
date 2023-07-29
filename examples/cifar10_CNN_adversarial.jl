@@ -70,7 +70,12 @@ println("Accuracy: $acc")
        \"truck\" is missclassified as a \"deer\". A timelimit of 600 sec is used. 
        (L2-norm can also be used but this requires larger computational time to give a solution)"
 
-# the idx-th training image is used (index 3 is a truck at img name index 9, its couterpart at index 4 is "deer")
+# the idx-th training image is used (train set index 3 is a truck at img name index 9, its adversarial couterpart at name index 4 is "deer")
+# NOTE! there is no guarantee of finding an optimal solution within the set timelimit below, if an error
+# "Result index of attribute MathOptInterface.VariablePrimal(1) out of bounds. There are currently 0 solution(s) in the model."
+# is thrown, try a larger timelimit in the function create_CNN_adv
+# also, due to the low accuracy, the training image at index 3 might be misclassified already. If this is the case, 
+# the index should be changed so that we input a correctly classified image to the create_CNN_adv function.
 idx = 3
 time, adv = create_CNN_adv(model, idx, "CIFAR10", 600, true, "L1")
 

@@ -160,20 +160,33 @@ y_train_oh = onehotbatch(y_train, 0:9)
 train = [(x_train, y_train_oh)]
 test = [(x_test, y_test)]
 
+Random.seed!(42)
+
+# CNN = Chain(
+#     Conv((3,3), 1=>2, relu),
+#     MaxPool((2,2)),
+#     flatten,
+#     Dense(32, 16)
+# )
+
 CNN = Chain(
-    Conv((3,3), 1=>2, relu),
-    MeanPool((2,2)),
+    Conv((3,3), 1 => 2, relu),
+    MaxPool((2,2)),
+    Conv((3,3), 2 => 4, relu),
+    MaxPool((2,2)),
     flatten,
-    Dense(32, 16, relu),
-    Dense(16, 10),
+    Dense(4 => 6, relu),
+    Dense(6 => 10)
 )
 
 # Conv((a,b), c => d, relu) gives parameters[1] in form a×b×c×d matrix
 p = params(CNN)
 
-data = rand32(6, 6, 1, 1)
+data = rand32(3, 3, 1, 1)
 data = rand32(10, 10, 1, 1)
 data = rand32(28, 28, 1, 1)
+
+data = Float32[0.1 0.2; 0.3 0.4;;; 0.5 0.6; 0.7 0.8;;;;]
 
 CNN(data)
 

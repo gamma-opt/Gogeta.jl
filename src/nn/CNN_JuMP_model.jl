@@ -11,8 +11,8 @@ The model assumes the following things from the underlying CNN:
 - Input must be Array{Float32, 4}, (e.g. {32, 32, 3, 1}) where first two indices are height and width of data, 
 third index is channel count (e.g. 1 for grayscale image, 3 for RGB), fourth index is batch size (here must be 1)
 - The CNN must consist of 3 sections: the convolutional and pooling layers, Flux.flatten, and dense layers.
-- Convolutional layers must use relu, pooling layers must be MeanPool. 
-- Layers must use default setting, such as stride, pad, dilation, etc. Conv.filter and MeanPool.k (window) can be arbitrary sizes.
+- Convolutional layers must use relu, pooling layers must be MaxPool or MeanPool. 
+- Layers must use default setting, such as stride, pad, dilation, etc. Conv.filter, MaxPool.k and MeanPool.k (window) sizes can be arbitrary.
 - No convolutional or pooling layers are necessary before Flux.flatten. Also, no dense layers are necessary after Flux.flatten.
 
 # Arguments
@@ -31,9 +31,13 @@ function create_CNN_JuMP_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64
     layers_no_flatten = Tuple(filter(x -> typeof(x) != typeof(Flux.flatten), layers))
     K = 0 # number of layers before Flux.flatten (K+1 layers before flatten as input is layer 0)
     D = 0 # number of dense layers after Flux.flatten
+    n_max = 0 # number of MaxPool layers
     for layer in layers_no_flatten
         if isa(layer, Conv) || isa(layer, MeanPool)
             K += 1
+        elseif isa(layer, MaxPool)
+            K += 1
+            n_max += 1
         elseif isa(layer, Dense)
             D += 1
         end
@@ -61,31 +65,31 @@ function create_CNN_JuMP_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64
     # store the filter shapes in each layer 1:K (Conv and MeanPool layers)
     filter_sizes = Vector{Tuple{Int64, Int64}}(undef, K)
     for k in 1:K
-        if isa(layers[k], Conv)
+        if isa(layers_no_flatten[k], Conv)
             filter_sizes[k] = size(W[k][:,:,1,1])
-        elseif isa(layers[k], MeanPool)
-            filter_sizes[k] = layers[k].k # .k = pooling layer shape
+        elseif isa(layers_no_flatten[k], MaxPool) || isa(layers_no_flatten[k], MeanPool)
+            filter_sizes[k] = layers_no_flatten[k].k # .k = pooling layer shape
         end
     end
 
-    # For Conv and MeanPool layers: stores tuples (img idx, img h, img w), such that each convoluted subimage pixel can be accesses
+    # For Conv, MaxPool and MeanPool layers: stores tuples (img idx, img h, img w), such that each convoluted subimage pixel can be accesses
     # For Dense layers: stores the number of nodes in a layer at index 1, i.e. tuples (number of nodes, 1, 1)
     CNN_nodes = Array{Tuple{Int64, Int64, Int64}}(undef, K+1+D)
     for k in 1:K+1+D
         if k == 1
             CNN_nodes[k] = (data_shape[3], data_shape[1], data_shape[2])
         else
-            if isa(layers[k-1], Conv)
+            if isa(layers_no_flatten[k-1], Conv)
                 CNN_nodes[k] = (size(W[k-1])[4], next_sub_img_size(CNN_nodes[k-1][2:3], filter_sizes[k-1])...)
-            elseif isa(layers[k-1], MeanPool)
+            elseif isa(layers_no_flatten[k-1], MaxPool) || isa(layers_no_flatten[k-1], MeanPool)
                 CNN_nodes[k] = (CNN_nodes[k-1][1], next_sub_img_size(CNN_nodes[k-1][2:3], filter_sizes[k-1], true)...)
             elseif k > K+1 # Dense layer
-                CNN_nodes[k] = (size(layers[k].weight)[1], 1, 1)
+                CNN_nodes[k] = (size(layers_no_flatten[k-1].weight)[1], 1, 1)
             end
         end
     end
 
-    # stores the sub image sizes (h,w) at each Conv and MeanPool layer (there are often multiple sub images at each Conv layer)
+    # stores the sub image sizes (h,w) at each Conv, MaxPool and MeanPool layer (although there are often multiple sub images at each layer)
     sub_img_sizes = Array{Tuple{Int64, Int64}}(undef, K+1)
     for k in 1:K+1
         sub_img_sizes[k] = CNN_nodes[k][2:3]
@@ -103,9 +107,26 @@ function create_CNN_JuMP_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64
     @variable(model, L[k in 0:K+D, i in 1:CNN_nodes[k+1][1], h in 1:CNN_nodes[k+1][2], w in 1:CNN_nodes[k+1][3]] == -1000)
     @variable(model, U[k in 0:K+D, i in 1:CNN_nodes[k+1][1], h in 1:CNN_nodes[k+1][2], w in 1:CNN_nodes[k+1][3]] == 1000)
 
-    # remove "ReLU"-variables from MeanPool layers
+    if n_max > 0 # additional binary variables are required to implement MaxPool layers
+        @variable(model, z_max[k in 0:K-1, i in 1:CNN_nodes[k+1][1], h in 1:CNN_nodes[k+1][2], w in 1:CNN_nodes[k+1][3]], Bin)
+
+        # remove MaxPool binary variables from non-MaxPool layers
+        for k in 0:K-1
+            if !isa(layers_no_flatten[k+1], MaxPool)
+                for i in 1:CNN_nodes[k+1][1]
+                    for h in 1:CNN_nodes[k+1][2]
+                        for w in 1:CNN_nodes[k+1][3]
+                            delete(model, z_max[k, i, h, w])
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    # remove "ReLU"-variables from MaxPool and MeanPool layers
     for k in 1:K
-        if isa(layers[k], MeanPool)
+        if isa(layers_no_flatten[k], MaxPool) || isa(layers_no_flatten[k], MeanPool)
             for i in 1:CNN_nodes[k+1][1]
                 for h in 1:CNN_nodes[k+1][2]
                     for w in 1:CNN_nodes[k+1][3]
@@ -145,12 +166,12 @@ function create_CNN_JuMP_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64
         end
     end
 
-    # loop through Conv and MeanPool layers
+    # loop through Conv, MaxPool and MeanPool layers
     for k in 1:K
         curr_sub_img_size = sub_img_sizes[k+1] # index k+1 becasue sub_img_sizes contains input size
         curr_filter_size = filter_sizes[k]
 
-        if isa(layers[k], Conv)
+        if isa(layers_no_flatten[k], Conv)
             W_rev = reverse(W[k], dims=(1, 2)) # curr layer weights (i.e., filters) (rows and columns are inverted!)
 
             # loop through number of filters for this (sub)image
@@ -190,7 +211,7 @@ function create_CNN_JuMP_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64
                 end
             end
 
-        elseif isa(layers[k], MeanPool) # calculate the average of the pixel values over the filter
+        else # MaxPool and/or MeanPool layers
 
             # loop through each subimage index (h,w) in the following layer
             for h in 1:curr_sub_img_size[1]
@@ -198,14 +219,39 @@ function create_CNN_JuMP_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64
 
                     # loop through each (sub)image in the layer
                     for i in 1:CNN_nodes[k][1]
-
-                        # temp_sum - equation for the variable x[k,i,h,w] (mean of the values under the filter)
+                        
                         h_filter = curr_filter_size[1]
                         w_filter = curr_filter_size[2]
-                        x_vec = vec([x[k-1,i,hh,ww] for hh in (h_filter*(h-1)+1):(h_filter*h), ww in (w_filter*(w-1)+1):(w_filter*w)])
 
-                        temp_sum = sum(x_vec) / reduce(*, curr_filter_size)
-                        @constraint(model, temp_sum == x[k, i, h, w])
+                        if isa(layers_no_flatten[k], MaxPool) # pick the maximum of the pixel values over the filter
+
+                            z_vec = Array{VariableRef}(undef, h_filter * w_filter)
+                            idx = 1
+
+                            # loop through each index in the previous layer that is under the filter
+                            for hh in (h_filter*(h-1)+1):(h_filter*h)
+                                for ww in (w_filter*(w-1)+1):(w_filter*w)
+                                    @constraint(model, x[k-1,i,hh,ww] <= x[k, i, h, w])
+
+                                    # indicator constraint to choose the maximum value
+                                    @constraint(model, z_max[k-1,i,hh,ww] => {x[k-1,i,hh,ww] >= x[k, i, h, w]})
+                                    z_vec[idx] = z_max[k-1,i,hh,ww]
+                                    idx += 1
+                                end
+                            end
+
+                            z_sum = sum(z_vec)
+                            @constraint(model, z_sum == 1)
+
+                        elseif isa(layers_no_flatten[k], MeanPool) # calculate the average of the pixel values over the filter
+
+                            # loop through each index in the previous layer that is under the filter
+                            x_vec = vec([x[k-1,i,hh,ww] for hh in (h_filter*(h-1)+1):(h_filter*h), ww in (w_filter*(w-1)+1):(w_filter*w)])
+
+                            temp_sum = sum(x_vec) / reduce(*, curr_filter_size)
+                            @constraint(model, temp_sum == x[k, i, h, w])
+
+                        end
                     end
                 end
             end
@@ -217,7 +263,7 @@ function create_CNN_JuMP_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64
     for k in K+1:K+D
         for node in 1:CNN_nodes[k+1][1]
             temp_sum = 0
-            if k == K+1 # previous layer nodes still in matrix form, reshaping for to a vector
+            if k == K+1 # previous layer nodes still in matrix form, reshaping to a vector
                 x_vec = vec([x[k-1,i,h,w] for h in 1:CNN_nodes[k][2], w in 1:CNN_nodes[k][3], i in 1:CNN_nodes[k][1]])
                 temp_sum = sum(W[k][node, j] * x_vec[j] for j in 1:reduce(*, CNN_nodes[k]))
             else # previous layer nodes already in vector form, no reshaping needed
@@ -231,8 +277,8 @@ function create_CNN_JuMP_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64
         end
     end
 
+    # fix bounds to the hidden layers with relu activation function (Conv and Dense)
     for k in 1:length(layers_no_flatten)-1
-        # fix bounds to the hidden layers  with relu activation function (Conv and Dense)
         if isa(layers_no_flatten[k], Conv) || isa(layers_no_flatten[k], Dense)
             @constraint(model, [[k], i in 1:CNN_nodes[k+1][1], h in 1:CNN_nodes[k+1][2], w in 1:CNN_nodes[k+1][3]], 
                                 x[k, i, h, w] <= U[k, i, h, w] * z[k, i, h, w])
@@ -249,7 +295,7 @@ function create_CNN_JuMP_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64
 end
 
 # inner function used in create_CNN_JuMP_model
-# new img size after passing through 1) Conv layer filter or 2) a MeanPool layer
+# new img size after passing through 1) Conv layer filter or 2) a MaxPool / MeanPool layer
 function next_sub_img_size(img::Tuple{Int64, Int64}, filter::Tuple{Int64, Int64}, pooling_layer::Bool = false)
     new_height = pooling_layer ? div(img[1], filter[1]) : (img[1] - filter[1] + 1)
     new_width  = pooling_layer ? div(img[2], filter[2]) : (img[2] - filter[2] + 1)

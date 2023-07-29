@@ -10,12 +10,14 @@ include("../src/nn/CNN_JuMP_model.jl") # REMOVE THIS WHEN ADDED TO PACKAGE
        corresponging to the input layer to be same as our test image using evaluate_CNN!."
 
 model = Chain(
+    MaxPool((2,1)),
+    MaxPool((1,2)),
     Conv((5,3), 3=>16, relu),
     Conv((3,5), 16=>32, relu),
     MeanPool((3,1)),
     MeanPool((1,3)),
     Conv((3,3), 32=>64, relu),
-    MeanPool((2,2)),
+    MaxPool((2,2)),
     Flux.flatten,
     Dense(576, 64, relu),
     Dense(64, 32, relu),
@@ -23,13 +25,13 @@ model = Chain(
     Dense(16, 10),
 )
 
-# random 32x32 RGB image
-data = rand32(32, 32, 3, 1)
+# random 64x64 RGB image
+data = rand32(64, 64, 3, 1)
 
 CNN_output = model(data)
 
 # generating the MILP model and evaluating it with our input
-MILP_model = create_CNN_JuMP_model(model, (32, 32, 3, 1), "image")
+MILP_model = create_CNN_JuMP_model(model, size(data), "image")
 set_optimizer_attribute(MILP_model, "TimeLimit", 600)
 evaluate_CNN!(MILP_model, data)
 optimize!(MILP_model)

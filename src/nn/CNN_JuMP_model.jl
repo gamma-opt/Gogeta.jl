@@ -3,7 +3,7 @@ using Flux: params
 using Random
 
 """
-create_CNN_JuMP_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64, Int64}, data_type::String)
+create_CNN_JuMP_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64, Int64}, L_bounds::Vector{Array{Float32}}, U_bounds::Vector{Array{Float32}})
 
 Converts a CNN with ReLU activation functions to a 0-1 MILP JuMP model. The ReLU CNN is assumed to be a Flux.Chain.
 The activation function must be "relu" in all hidden (Conv and Dense) layers and "identity" in the output layer.
@@ -18,14 +18,15 @@ third index is channel count (e.g. 1 for grayscale image, 3 for RGB), fourth ind
 # Arguments
 - `CNN::Chain`: A trained ReLU CNN with the above assumptions
 - `data_shape::Tuple{Int64, Int64, Int64, Int64}`: Shape of the data used in the CNN as a Tuple, e.g., (32, 32, 3, 1) (similar logis as above)
-- `data_type::String`: When set to "image", CNN input nodes are set to the range [0,1], otherwise [-1000,1000].
+- `L_bounds::Vector{Array{Float32}}`: Lower bound big-M values for contraint bounds, indexed L_bounds[layer][channel, height, width]
+- `U_bounds::Vector{Array{Float32}}`: Uower bound big-M values for contraint bounds, indexed U_bounds[layer][channel, height, width]
 
 # Examples
 ```julia
-model = create_CNN_JuMP_model(CNN, data_shape, data_type)
+model = create_CNN_JuMP_model(CNN, data_shape, L_bounds, U_bounds)
 ```
 """
-function create_CNN_JuMP_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64, Int64}, data_type::String)
+function create_CNN_JuMP_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64, Int64}, L_bounds::Vector{Array{Float32}}, U_bounds::Vector{Array{Float32}})
 
     layers = CNN.layers
     layers_no_flatten = Tuple(filter(x -> typeof(x) != typeof(Flux.flatten), layers))
@@ -104,8 +105,20 @@ function create_CNN_JuMP_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64
         @variable(model, z[k in 1:K+D-1, i in 1:CNN_nodes[k+1][1], h in 1:CNN_nodes[k+1][2], w in 1:CNN_nodes[k+1][3]], Bin)
     end
     # variables L and U: lower and upper bounds for pixel values (= hidden node values) in the CNN
-    @variable(model, L[k in 0:K+D, i in 1:CNN_nodes[k+1][1], h in 1:CNN_nodes[k+1][2], w in 1:CNN_nodes[k+1][3]] == -1000)
-    @variable(model, U[k in 0:K+D, i in 1:CNN_nodes[k+1][1], h in 1:CNN_nodes[k+1][2], w in 1:CNN_nodes[k+1][3]] == 1000)
+    @variable(model, L[k in 0:K+D, i in 1:CNN_nodes[k+1][1], h in 1:CNN_nodes[k+1][2], w in 1:CNN_nodes[k+1][3]])
+    @variable(model, U[k in 0:K+D, i in 1:CNN_nodes[k+1][1], h in 1:CNN_nodes[k+1][2], w in 1:CNN_nodes[k+1][3]])
+
+    # fix the values of JuMP variables L and U from L_bounds and U_bounds
+    for k in 0:K+D
+        for i in 1:CNN_nodes[k+1][1]
+            for h in 1:CNN_nodes[k+1][2]
+                for w in 1:CNN_nodes[k+1][3]
+                    fix(L[k,i,h,w], L_bounds[k+1][i,h,w])
+                    fix(U[k,i,h,w], U_bounds[k+1][i,h,w])
+                end
+            end
+        end
+    end
 
     if n_max > 0 # additional binary variables are required to implement MaxPool layers
         @variable(model, z_max[k in 0:K-1, i in 1:CNN_nodes[k+1][1], h in 1:CNN_nodes[k+1][2], w in 1:CNN_nodes[k+1][3]], Bin)
@@ -116,7 +129,7 @@ function create_CNN_JuMP_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64
                 for i in 1:CNN_nodes[k+1][1]
                     for h in 1:CNN_nodes[k+1][2]
                         for w in 1:CNN_nodes[k+1][3]
-                            delete(model, z_max[k, i, h, w])
+                            delete(model, z_max[k,i,h,w])
                         end
                     end
                 end
@@ -130,10 +143,10 @@ function create_CNN_JuMP_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64
             for i in 1:CNN_nodes[k+1][1]
                 for h in 1:CNN_nodes[k+1][2]
                     for w in 1:CNN_nodes[k+1][3]
-                        delete(model, s[k, i, h, w])
-                        delete(model, z[k, i, h, w])
-                        delete(model, L[k, i, h, w])
-                        delete(model, U[k, i, h, w])
+                        delete(model, s[k,i,h,w])
+                        delete(model, z[k,i,h,w])
+                        delete(model, L[k,i,h,w])
+                        delete(model, U[k,i,h,w])
                     end
                 end
             end
@@ -144,13 +157,9 @@ function create_CNN_JuMP_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64
     for i in 1:CNN_nodes[1][1]
         for h in 1:CNN_nodes[1][2]
             for w in 1:CNN_nodes[1][3]
-                delete_lower_bound(x[0, i, h, w])
-                if data_type == "image" # image input pixels bounded to [0,1], general case [-1000,1000]
-                    fix(L[0, i, h, w], 0)
-                    fix(U[0, i, h, w], 1)
-                end
-                @constraint(model, L[0, i, h, w] <= x[0, i, h, w])
-                @constraint(model, x[0, i, h, w] <= U[0, i, h, w])
+                delete_lower_bound(x[0,i,h,w])
+                @constraint(model, L[0,i,h,w] <= x[0,i,h,w])
+                @constraint(model, x[0,i,h,w] <= U[0,i,h,w])
             end
         end
     end
@@ -159,9 +168,9 @@ function create_CNN_JuMP_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64
     for i in 1:CNN_nodes[K+1+D][1]
         for h in 1:CNN_nodes[K+1+D][2]
             for w in 1:CNN_nodes[K+1+D][3]
-                delete_lower_bound(x[K+D, i, h, w])
-                @constraint(model, L[K+D, i, h, w] <= x[K+D, i, h, w])
-                @constraint(model, x[K+D, i, h, w] <= U[K+D, i, h, w])
+                delete_lower_bound(x[K+D,i,h,w])
+                @constraint(model, L[K+D,i,h,w] <= x[K+D,i,h,w])
+                @constraint(model, x[K+D,i,h,w] <= U[K+D,i,h,w])
             end
         end
     end
@@ -203,9 +212,9 @@ function create_CNN_JuMP_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64
 
                         temp_sum = sum(var_expression)
                         if k < K 
-                            @constraint(model, temp_sum + b[k][filter] == x[k, filter, h, w] - s[k, filter, h, w])
+                            @constraint(model, temp_sum + b[k][filter] == x[k,filter,h,w] - s[k,filter,h,w])
                         else # output layer: k == K
-                            @constraint(model, temp_sum + b[k][filter] == x[k, filter, h, w])
+                            @constraint(model, temp_sum + b[k][filter] == x[k,filter,h,w])
                         end
                     end
                 end
@@ -231,10 +240,10 @@ function create_CNN_JuMP_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64
                             # loop through each index in the previous layer that is under the filter
                             for hh in (h_filter*(h-1)+1):(h_filter*h)
                                 for ww in (w_filter*(w-1)+1):(w_filter*w)
-                                    @constraint(model, x[k-1,i,hh,ww] <= x[k, i, h, w])
+                                    @constraint(model, x[k-1,i,hh,ww] <= x[k,i,h,w])
 
                                     # indicator constraint to choose the maximum value
-                                    @constraint(model, z_max[k-1,i,hh,ww] => {x[k-1,i,hh,ww] >= x[k, i, h, w]})
+                                    @constraint(model, z_max[k-1,i,hh,ww] => {x[k-1,i,hh,ww] >= x[k,i,h,w]})
                                     z_vec[idx] = z_max[k-1,i,hh,ww]
                                     idx += 1
                                 end
@@ -249,7 +258,7 @@ function create_CNN_JuMP_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64
                             x_vec = vec([x[k-1,i,hh,ww] for hh in (h_filter*(h-1)+1):(h_filter*h), ww in (w_filter*(w-1)+1):(w_filter*w)])
 
                             temp_sum = sum(x_vec) / reduce(*, curr_filter_size)
-                            @constraint(model, temp_sum == x[k, i, h, w])
+                            @constraint(model, temp_sum == x[k,i,h,w])
 
                         end
                     end
@@ -265,14 +274,14 @@ function create_CNN_JuMP_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64
             temp_sum = 0
             if k == K+1 # previous layer nodes still in matrix form, reshaping to a vector
                 x_vec = vec([x[k-1,i,h,w] for h in 1:CNN_nodes[k][2], w in 1:CNN_nodes[k][3], i in 1:CNN_nodes[k][1]])
-                temp_sum = sum(W[k][node, j] * x_vec[j] for j in 1:reduce(*, CNN_nodes[k]))
+                temp_sum = sum(W[k][node,j] * x_vec[j] for j in 1:reduce(*, CNN_nodes[k]))
             else # previous layer nodes already in vector form, no reshaping needed
-                temp_sum = sum(W[k][node, j] * x[k-1, j, 1, 1] for j in 1:reduce(*, CNN_nodes[k][1]))
+                temp_sum = sum(W[k][node,j] * x[k-1,j,1,1] for j in 1:reduce(*, CNN_nodes[k][1]))
             end
             if k < K+D # hidden Dense layer
-                @constraint(model, temp_sum + b[k][node] == x[k, node, 1, 1] - s[k, node, 1, 1])
+                @constraint(model, temp_sum + b[k][node] == x[k,node,1,1] - s[k,node,1,1])
             else # output layer
-                @constraint(model, temp_sum + b[k][node] == x[k, node, 1, 1])
+                @constraint(model, temp_sum + b[k][node] == x[k,node,1,1])
             end
         end
     end
@@ -281,9 +290,9 @@ function create_CNN_JuMP_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64
     for k in 1:length(layers_no_flatten)-1
         if isa(layers_no_flatten[k], Conv) || isa(layers_no_flatten[k], Dense)
             @constraint(model, [[k], i in 1:CNN_nodes[k+1][1], h in 1:CNN_nodes[k+1][2], w in 1:CNN_nodes[k+1][3]], 
-                                x[k, i, h, w] <= U[k, i, h, w] * z[k, i, h, w])
+                                x[k,i,h,w] <= U[k,i,h,w] * z[k,i,h,w])
             @constraint(model, [[k], i in 1:CNN_nodes[k+1][1], h in 1:CNN_nodes[k+1][2], w in 1:CNN_nodes[k+1][3]], 
-                                s[k, i, h, w] <= -L[k, i, h, w] * (1 - z[k, i, h, w]))
+                                s[k,i,h,w] <= -L[k,i,h,w] * (1 - z[k,i,h,w]))
         end
     end
 

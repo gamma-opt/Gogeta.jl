@@ -170,12 +170,12 @@ Random.seed!(42)
 # )
 
 CNN = Chain(
-    Conv((3,3), 1 => 2, relu),
+    Conv((3,3), 3 => 4, relu),
+    MeanPool((2,2)),
+    Conv((3,3), 4 => 5, relu),
     MaxPool((2,2)),
-    Conv((3,3), 2 => 4, relu),
-    MaxPool((2,2)),
-    flatten,
-    Dense(4 => 6, relu),
+    Flux.flatten,
+    Dense(5 => 6, relu),
     Dense(6 => 10)
 )
 
@@ -183,7 +183,7 @@ CNN = Chain(
 p = params(CNN)
 
 data = rand32(3, 3, 1, 1)
-data = rand32(10, 10, 1, 1)
+data = rand32(10, 10, 3, 1)
 data = rand32(28, 28, 1, 1)
 
 data = Float32[0.1 0.2; 0.3 0.4;;; 0.5 0.6; 0.7 0.8;;;;]
@@ -192,7 +192,19 @@ CNN(data)
 
 data_shape = size(data)
 
-CNN_model = create_CNN_JuMP_model(CNN, data_shape, "image")
+
+L_bounds = Vector{Array{Float32}}(undef, length(CNN))
+U_bounds = Vector{Array{Float32}}(undef, length(CNN))
+
+L_bounds[1] = fill(0, (3,10,10));    U_bounds[1] = fill(1, (3,10,10))
+L_bounds[2] = fill(-1000, (4,8,8));  U_bounds[2] = fill(1000, (4,8,8))
+L_bounds[3] = fill(-1000, (4,4,4));  U_bounds[3] = fill(1000, (4,4,4))
+L_bounds[4] = fill(-1000, (5,2,2));  U_bounds[4] = fill(1000, (5,2,2))
+L_bounds[5] = fill(-1000, (5,1,1));  U_bounds[5] = fill(1000, (5,1,1))
+L_bounds[6] = fill(-1000, (6,1,1));  U_bounds[6] = fill(1000, (6,1,1))
+L_bounds[7] = fill(-1000, (10,1,1)); U_bounds[7] = fill(1000, (10,1,1))
+
+CNN_model = create_CNN_JuMP_model(CNN, data_shape, L_bounds, U_bounds)
 evaluate_CNN!(CNN_model, data)
 optimize!(CNN_model)
 

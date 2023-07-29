@@ -102,8 +102,8 @@ function show_digit(img_flatten)
     return plot
 end
 
-# created adversarial images (L1-norm only) based on a trained MNIST CNN
-function create_CNN_adv(model::Chain, idx::Int64, CNN_data::String, time_limit::Int64=600, verbose::Bool=false, l_norm::String="L1")
+# created adversarial images (L1 or L2-norm) based on a trained MNIST CNN
+function create_CNN_adv(model::Chain, idx::Int64, CNN_data::String, L_bounds::Vector{Array{Float32}}, U_bounds::Vector{Array{Float32}}, time_limit::Int64=600, verbose::Bool=false, l_norm::String="L1")
     @assert l_norm == "L1" || l_norm == "L2" "l_norm must be either \"L1\" or \"L2\""
     @assert CNN_data == "MNIST" || CNN_data == "CIFAR10" "CNN_data must be either \"MNIST\" or \"CIFAR10\""
 
@@ -112,7 +112,7 @@ function create_CNN_adv(model::Chain, idx::Int64, CNN_data::String, time_limit::
         K = length(model)
         x_train, y_train = MNIST(split=:train)[:]
 
-        false_class = create_CNN_JuMP_model(model, (28,28,1,1), "image")
+        false_class = create_CNN_JuMP_model(model, (28,28,1,1), L_bounds, U_bounds)
         set_optimizer_attribute(false_class, "TimeLimit", time_limit)
         set_optimizer_attribute(false_class, "OutputFlag", verbose)
         cur_digit = y_train[idx]
@@ -161,7 +161,7 @@ function create_CNN_adv(model::Chain, idx::Int64, CNN_data::String, time_limit::
         K = length(model)
         x_train, y_train = CIFAR10(split=:train)[:]
 
-        false_class = create_CNN_JuMP_model(model, (32,32,3,1), "image")
+        false_class = create_CNN_JuMP_model(model, (32,32,3,1), L_bounds, U_bounds)
         set_optimizer_attribute(false_class, "TimeLimit", time_limit)
         set_optimizer_attribute(false_class, "OutputFlag", verbose)
         cur_img_name = y_train[idx]

@@ -1,7 +1,7 @@
 using Logging
 using Statistics
 using Flux
-using Flux: onehotbatch, flatten, logitcrossentropy, train!
+using Flux: onehotbatch, logitcrossentropy, train!
 using MLDatasets
 using MLDatasets: CIFAR10
 using ML_as_MO
@@ -70,6 +70,18 @@ println("Accuracy: $acc")
        \"truck\" is missclassified as a \"deer\". A timelimit of 600 sec is used. 
        (L2-norm can also be used but this requires larger computational time to give a solution)"
 
+# big-M values used for constraint bounds in the MILP
+L_bounds = Vector{Array{Float32}}(undef, length(model))
+U_bounds = Vector{Array{Float32}}(undef, length(model))
+
+L_bounds[1] = fill(0, (3,32,32));     U_bounds[1] = fill(1, (3,32,32))
+L_bounds[2] = fill(-1000, (5,30,30)); U_bounds[2] = fill(1000, (5,30,30))
+L_bounds[3] = fill(-1000, (5,15,15)); U_bounds[3] = fill(1000, (5,15,15))
+L_bounds[4] = fill(-1000, (6,13,13)); U_bounds[4] = fill(1000, (6,13,13))
+L_bounds[5] = fill(-1000, (6,6,6));   U_bounds[5] = fill(1000, (6,6,6))
+L_bounds[6] = fill(-1000, (24,1,1));  U_bounds[6] = fill(1000, (24,1,1))
+L_bounds[7] = fill(-1000, (10,1,1));  U_bounds[7] = fill(1000, (10,1,1))
+
 # the idx-th training image is used (train set index 3 is a truck at img name index 9, its adversarial couterpart at name index 4 is "deer")
 # NOTE! there is no guarantee of finding an optimal solution within the set timelimit below, if an error
 # "Result index of attribute MathOptInterface.VariablePrimal(1) out of bounds. There are currently 0 solution(s) in the model."
@@ -77,7 +89,7 @@ println("Accuracy: $acc")
 # also, due to the low accuracy, the training image at index 3 might be misclassified already. If this is the case, 
 # the index should be changed so that we input a correctly classified image to the create_CNN_adv function.
 idx = 3
-time, adv = create_CNN_adv(model, idx, "CIFAR10", 600, true, "L1")
+time, adv = create_CNN_adv(model, idx, "CIFAR10", L_bounds, U_bounds, 600, true, "L1")
 
 # the digit guess of the idx-th training image and the adversarial image
 CNN_guess_orig = argmax(model(reshape(x_train[:,:,:,idx], 32, 32, 3, 1)))[1]-1

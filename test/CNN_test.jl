@@ -30,8 +30,26 @@ data = rand32(64, 64, 3, 1)
 
 CNN_output = model(data)
 
+# big-M values used for constraint bounds in the MILP
+L_bounds = Vector{Array{Float32}}(undef, length(model))
+U_bounds = Vector{Array{Float32}}(undef, length(model))
+
+L_bounds[1] = fill(0, (3,64,64));      U_bounds[1] = fill(1, (3,64,64))
+L_bounds[2] = fill(-1000, (3,32,64));  U_bounds[2] = fill(1000, (3,32,64))
+L_bounds[3] = fill(-1000, (3,32,32));  U_bounds[3] = fill(1000, (3,32,32))
+L_bounds[4] = fill(-1000, (16,28,30)); U_bounds[4] = fill(1000, (16,28,30))
+L_bounds[5] = fill(-1000, (32,26,26)); U_bounds[5] = fill(1000, (32,26,26))
+L_bounds[6] = fill(-1000, (32,8,26));  U_bounds[6] = fill(1000, (32,8,26))
+L_bounds[7] = fill(-1000, (32,8,8));   U_bounds[7] = fill(1000, (32,8,8))
+L_bounds[8] = fill(-1000, (64,6,6));   U_bounds[8] = fill(1000, (64,6,6))
+L_bounds[9] = fill(-1000, (64,3,3));   U_bounds[9] = fill(1000, (64,3,3))
+L_bounds[10] = fill(-1000, (64,1,1));  U_bounds[10] = fill(1000, (64,1,1))
+L_bounds[11] = fill(-1000, (32,1,1));  U_bounds[11] = fill(1000, (32,1,1))
+L_bounds[12] = fill(-1000, (16,1,1));  U_bounds[12] = fill(1000, (16,1,1))
+L_bounds[13] = fill(-1000, (10,1,1));  U_bounds[13] = fill(1000, (10,1,1))
+
 # generating the MILP model and evaluating it with our input
-MILP_model = create_CNN_JuMP_model(model, size(data), "image")
+MILP_model = create_CNN_JuMP_model(model, size(data), L_bounds, U_bounds)
 set_optimizer_attribute(MILP_model, "TimeLimit", 600)
 evaluate_CNN!(MILP_model, data)
 optimize!(MILP_model)

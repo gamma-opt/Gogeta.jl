@@ -1,9 +1,9 @@
 using Logging
 using Statistics
 using Flux
-using Flux: onehotbatch, flatten, logitcrossentropy, train!
-using MLDatasets: MNIST
+using Flux: onehotbatch, logitcrossentropy, train!
 using MLDatasets
+using MLDatasets: MNIST
 using ML_as_MO
 
 include("../src/nn/CNN_JuMP_model.jl") # REMOVE THIS WHEN ADDED TO PACKAGE
@@ -25,7 +25,7 @@ test = [(x_test, y_test)]
 model = Chain(
     Conv((5,5), 1=>4, relu),
     MaxPool((2,2)),
-    flatten,
+    Flux.flatten,
     Dense(576, 16, relu),
     Dense(16, 10),
 )
@@ -65,12 +65,22 @@ println("Accuracy of the CNN: $(acc)%")
        digit 5 is missclassified as the digit 0. A timelimit of 600 sec is used. 
        (L2-norm can also be used but this requires larger computational time to give a solution)"
 
+# big-M values used for constraint bounds in the MILP
+L_bounds = Vector{Array{Float32}}(undef, length(model))
+U_bounds = Vector{Array{Float32}}(undef, length(model))
+
+L_bounds[1] = fill(0, (1,28,28));     U_bounds[1] = fill(1, (1,28,28))
+L_bounds[2] = fill(-1000, (4,24,24)); U_bounds[2] = fill(1000, (4,24,24))
+L_bounds[3] = fill(-1000, (4,12,12)); U_bounds[3] = fill(1000, (4,12,12))
+L_bounds[4] = fill(-1000, (16,1,1));  U_bounds[4] = fill(1000, (16,1,1))
+L_bounds[5] = fill(-1000, (10,1,1));  U_bounds[5] = fill(1000, (10,1,1))
+
 # the idx-th training image is used (train set index 1 is a image of 5, its adversarial couterpart is an image of a 0)
 # NOTE! there is no guarantee of finding an optimal solution within the set timelimit below, if an error
 # "Result index of attribute MathOptInterface.VariablePrimal(1) out of bounds. There are currently 0 solution(s) in the model."
 # is thrown, try a larger timelimit in the function create_CNN_adv
 idx = 1
-time, adv = create_CNN_adv(model, idx, "MNIST", 600, true, "L1")
+time, adv = create_CNN_adv(model, idx, "MNIST", L_bounds, U_bounds, 600, true, "L1")
 
 # the digit guess of the idx-th training image and the adversarial image
 CNN_guess_orig = argmax(model(reshape(x_train[:,:,:,idx], 28, 28, 1, 1)))[1]-1

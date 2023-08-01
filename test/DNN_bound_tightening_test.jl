@@ -19,31 +19,31 @@ U_bounds = Float32[if i <= 784 1 else 1000 end for i in 1:834]
 L_bounds = Float32[if i <= 784 0 else -1000 end for i in 1:834]
 
 # running the function once to compile it (only takes a few seconds)
-create_JuMP_model(mnist_DNN, U_bounds, L_bounds, "none")
+create_JuMP_model(mnist_DNN, L_bounds, U_bounds, "none")
 
 @info "Testing create_JuMP_model() with bt=\"none\""
 time1 = @elapsed begin
-    mdl_bt_none = @time create_JuMP_model(mnist_DNN, U_bounds, L_bounds, "none")
+    mdl_bt_none = @time create_JuMP_model(mnist_DNN, L_bounds, U_bounds, "none")
 end
 
 @info "Testing create_JuMP_model() with bt=\"singlethread\""
 time2 = @elapsed begin
-    mdl_bt_singlethread = @time create_JuMP_model(mnist_DNN, U_bounds, L_bounds, "singlethread")
+    mdl_bt_singlethread = @time create_JuMP_model(mnist_DNN, L_bounds, U_bounds, "singlethread")
 end
 
 @info "Testing create_JuMP_model() with bt=\"threads\""
 time3 = @elapsed begin
-    mdl_bt_threads = @time create_JuMP_model(mnist_DNN, U_bounds, L_bounds, "threads")
+    mdl_bt_threads = @time create_JuMP_model(mnist_DNN, L_bounds, U_bounds, "threads")
 end
 
 @info "Testing create_JuMP_model() with bt=\"workers\""
 time4 = @elapsed begin
-    mdl_bt_workers = @time create_JuMP_model(mnist_DNN, U_bounds, L_bounds, "workers")
+    mdl_bt_workers = @time create_JuMP_model(mnist_DNN, L_bounds, U_bounds, "workers")
 end
 
 @info "Testing create_JuMP_model() with bt=\"2 workers\""
 time5 = @elapsed begin
-    mdl_bt_2workers = @time create_JuMP_model(mnist_DNN, U_bounds, L_bounds, "2 workers")
+    mdl_bt_2workers = @time create_JuMP_model(mnist_DNN, L_bounds, U_bounds, "2 workers")
 end
 
 @info "============= Results =============

@@ -25,7 +25,7 @@ U_bounds = Float32[if i <= 784 1 else 1000 end for i in 1:914]
 L_bounds = Float32[if i <= 784 0 else -1000 end for i in 1:914]
 
 # generating the MILP model and evaluating it with our input
-MILP_model = create_JuMP_model(model, U_bounds, L_bounds, "none", true)
+MILP_model = create_JuMP_model(model, L_bounds, U_bounds, "none", true)
 evaluate!(MILP_model, data)
 optimize!(MILP_model)
 

@@ -64,8 +64,8 @@ function create_JuMP_model(DNN::Chain, L_bounds::Vector{Float32}, U_bounds::Vect
     # sets the variables x[k,j] and s[k,j], the binary variables z[k,j] and the big-M values U[k,j] and L[k,j]
     @variable(model, x[k in 0:K, j in 1:node_count[k+1]] >= 0)
     if K > 1 # s and z variables only to hidden layers, i.e., layers 1:K-1
-        @variable(model, s[k in 1:K-1, j in 1:node_count[k+1]] >= 0)
-        @variable(model, z[k in 1:K-1, j in 1:node_count[k+1]], Bin)
+        @variable(model, s[k in 1:K, j in 1:node_count[k+1]] >= 0)
+        @variable(model, z[k in 1:K, j in 1:node_count[k+1]], Bin)
     end
     @variable(model, U[k in 0:K, j in 1:node_count[k+1]])
     @variable(model, L[k in 0:K, j in 1:node_count[k+1]])

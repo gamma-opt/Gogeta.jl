@@ -6,7 +6,8 @@ using MLDatasets
 using MLDatasets: MNIST
 using ML_as_MO
 
-include("../src/nn/CNN_JuMP_model.jl") # REMOVE THIS WHEN ADDED TO PACKAGE
+# include("../src/nn/CNN_JuMP_model.jl") # REMOVE THIS WHEN ADDED TO PACKAGE
+# location of the create_CNN_adv function
 include("helper_functions.jl")
 
 @info "Creating and training a small ReLU CNN using Flux.jl based on the MNIST digit dataset"

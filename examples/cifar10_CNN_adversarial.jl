@@ -6,7 +6,8 @@ using MLDatasets
 using MLDatasets: CIFAR10
 using ML_as_MO
 
-include("../src/nn/CNN_JuMP_model.jl") # REMOVE THIS WHEN ADDED TO PACKAGE
+# include("../src/nn/CNN_JuMP_model.jl") # REMOVE THIS WHEN ADDED TO PACKAGE
+# location of the create_CNN_adv function
 include("helper_functions.jl")
 
 # This file shows how to use the convert a CNN into a MILP using the create_CNN_JuMP_model function.

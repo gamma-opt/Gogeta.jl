@@ -3,7 +3,7 @@ using ML_as_MO
 using Random
 using Flux, JuMP
 
-include("../src/nn/CNN_JuMP_model.jl") # REMOVE THIS WHEN ADDED TO PACKAGE
+# include("../src/nn/CNN_JuMP_model.jl") # REMOVE THIS WHEN ADDED TO PACKAGE
 
 @info "Creating an arbitrary large convolutional network designed for 32x32 RGB images.
        We represent the CNN as a MILP using create_CNN_JuMP_model and assign the variables
@@ -34,6 +34,7 @@ CNN_output = model(data)
 L_bounds = Vector{Array{Float32}}(undef, length(model))
 U_bounds = Vector{Array{Float32}}(undef, length(model))
 
+# bounds are set to [0,1] to the input layer (pixel values), and [-1000,1000] in the other layers (arbitrary large big-M)
 L_bounds[1] = fill(0, (3,64,64));      U_bounds[1] = fill(1, (3,64,64))
 L_bounds[2] = fill(-1000, (3,32,64));  U_bounds[2] = fill(1000, (3,32,64))
 L_bounds[3] = fill(-1000, (3,32,32));  U_bounds[3] = fill(1000, (3,32,32))

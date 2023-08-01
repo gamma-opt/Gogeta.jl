@@ -22,6 +22,7 @@ using Distributed, SharedArrays
 
 include("nn/JuMP_model.jl")
 include("nn/bound_tightening.jl")
+include("nn/CNN_JuMP_model.jl")
 
 export create_JuMP_model,
     evaluate!
@@ -30,5 +31,8 @@ export bound_tightening,
     bound_tightening_threads,
     bound_tightening_workers,
     bound_tightening_2workers
+
+export create_CNN_JuMP_model,
+    evaluate_CNN!
 
 end # module

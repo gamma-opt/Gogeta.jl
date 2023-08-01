@@ -1,6 +1,5 @@
 using Flux, JuMP, Gurobi
 using Flux: params
-using Random
 
 """
 create_CNN_JuMP_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64, Int64}, L_bounds::Vector{Array{Float32}}, U_bounds::Vector{Array{Float32}})

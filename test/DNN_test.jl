@@ -20,6 +20,7 @@ data = rand32(784)
 
 DNN_output = model(data)
 
+# bounds are set to [0,1] to the input layer (pixel values), and [-1000,1000] in the other layers (arbitrary large big-M)
 U_bounds = Float32[if i <= 784 1 else 1000 end for i in 1:914]
 L_bounds = Float32[if i <= 784 0 else -1000 end for i in 1:914]
 

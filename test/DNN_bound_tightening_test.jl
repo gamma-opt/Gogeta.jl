@@ -18,40 +18,29 @@ train_mnist_DNN!(mnist_DNN)
 U_bounds = Float32[if i <= 784 1 else 1000 end for i in 1:834]
 L_bounds = Float32[if i <= 784 0 else -1000 end for i in 1:834]
 
-# running the function once to compile it (only takes a few seconds)
-create_JuMP_model(mnist_DNN, U_bounds, L_bounds, "none")
+@info "Calculating tightened bounds singlethreaded (in-place JuMP model)"
+L_singlethread, U_singlethread = bound_tightening(mnist_DNN, U_bounds, L_bounds, false)
 
-@info "Testing create_JuMP_model() with bt=\"none\""
-time1 = @elapsed begin
-    mdl_bt_none = @time create_JuMP_model(mnist_DNN, U_bounds, L_bounds, "none")
+@info "Calculating tightened bounds using threads (new JuMP model for each subproblem)"
+L_threads, U_threads = bound_tightening_threads(mnist_DNN, U_bounds, L_bounds, false)
+
+@info "Calculating tightened bounds using workers (new JuMP model for each subproblem)
+       Note! New workers are not created in this test"
+L_workers, U_workers = bound_tightening_workers(mnist_DNN, U_bounds, L_bounds, false)
+
+@info "Calculating tightened bounds using 2 workers (in-place JuMP models for lower and upper bounds respectively)
+       Note! New workers are not created in this test"
+L_2workers, U_2workers = bound_tightening_2workers(mnist_DNN, U_bounds, L_bounds, false)
+
+@info "Testing that the lower and upper bounds are same for each BT-procedure"
+for i in 1:834
+    @test L_singlethread[i] ≈ L_threads[i]
+    @test L_singlethread[i] ≈ L_workers[i]
+    @test L_singlethread[i] ≈ L_2workers[i]
+
+    @test U_singlethread[i] ≈ U_threads[i]
+    @test U_singlethread[i] ≈ U_workers[i]
+    @test U_singlethread[i] ≈ U_2workers[i]
 end
-
-@info "Testing create_JuMP_model() with bt=\"singlethread\""
-time2 = @elapsed begin
-    mdl_bt_singlethread = @time create_JuMP_model(mnist_DNN, U_bounds, L_bounds, "singlethread")
-end
-
-@info "Testing create_JuMP_model() with bt=\"threads\""
-time3 = @elapsed begin
-    mdl_bt_threads = @time create_JuMP_model(mnist_DNN, U_bounds, L_bounds, "threads")
-end
-
-@info "Testing create_JuMP_model() with bt=\"workers\""
-time4 = @elapsed begin
-    mdl_bt_workers = @time create_JuMP_model(mnist_DNN, U_bounds, L_bounds, "workers")
-end
-
-@info "Testing create_JuMP_model() with bt=\"2 workers\""
-time5 = @elapsed begin
-    mdl_bt_2workers = @time create_JuMP_model(mnist_DNN, U_bounds, L_bounds, "2 workers")
-end
-
-@info "============= Results =============
-Creating the JuMP model without bound tightening (default bounds): $(round(time1; sigdigits = 3))s
-Creating the JuMP model with single-threaded bound tightening: $(round(time2; sigdigits = 3))s
-Creating the JuMP model with multithreaded bound tightening (Threads): $(round(time3; sigdigits = 3))s
-Creating the JuMP model with multithreaded bound tightening (Workers): $(round(time4; sigdigits = 3))s
-Creating the JuMP model with multithreaded bound tightening (2 Workers): $(round(time5; sigdigits = 3))s"
 
 @test true
-

@@ -16,6 +16,7 @@ using StatsBase
 using MLJ
 using JLD
 using Profile
+using Plots
 using Interpolations
 using XLSX
 using Distributed, SharedArrays

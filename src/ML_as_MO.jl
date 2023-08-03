@@ -24,6 +24,12 @@ include("nn/JuMP_model.jl")
 include("nn/bound_tightening.jl")
 include("nn/CNN_JuMP_model.jl")
 
+include("decision_trees/trees_to_relaxed_op.jl")
+include("decision_trees/util.jl")
+include("decision_trees/issue_testing.jl")
+include("decision_trees/plotting.jl")
+
+
 export create_JuMP_model,
     evaluate!
 

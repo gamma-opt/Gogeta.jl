@@ -41,4 +41,9 @@ export bound_tightening,
 export create_CNN_JuMP_model,
     evaluate_CNN!
 
+export plot_model_quality,
+    trees_to_relaxed_MIP,
+    extract_tree_model_info,
+    children
+
 end # module

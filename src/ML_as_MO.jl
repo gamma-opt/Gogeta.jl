@@ -31,9 +31,9 @@ include("decision_trees/util.jl")
 include("decision_trees/tree_model_to_MIP.jl")
 
 # read all the files in decision_trees->visualisation
-include("decision_trees/visualization/opt_visualization.jl")
-include("decision_trees/visualization/plotting.jl")
-include("decision_trees/visualization/quality_visualization.jl")
+#include("decision_trees/visualization/opt_visualization.jl")
+#include("decision_trees/visualization/plotting.jl")
+#include("decision_trees/visualization/quality_visualization.jl")
 
 export create_JuMP_model,
     evaluate!

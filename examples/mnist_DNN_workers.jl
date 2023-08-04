@@ -20,7 +20,7 @@ train_mnist_DNN!(mnist_DNN)
 U_bounds = Float32[if i <= 784 1 else 1000 end for i in 1:866]
 L_bounds = Float32[if i <= 784 0 else -1000 end for i in 1:866]
 
-# adding as many workers as there are threads (number can be changed freely)
+@info "Adding as many workers as there are available threads (number van be varied freely) and Importing ML_as_MO in all workers"
 using Distributed
 n_threads = Threads.nthreads()
 addprocs(n_threads)

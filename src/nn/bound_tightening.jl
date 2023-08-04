@@ -515,9 +515,9 @@ function bound_tightening_2workers(DNN::Chain, init_U_bounds::Vector{Float32}, i
     curr_U_bounds = copy(init_U_bounds)
     curr_L_bounds = copy(init_L_bounds)
 
-    # split the available threads into 2 to be assigned to each worker.
+    # split the available threads into 2 to be assigned to each worker (integer division)
     n = Threads.nthreads()
-    threads_split = [div(n, 2), n-div(n, 2)]
+    threads_split = [n÷2, n-(n÷2)]
     
     for k in 1:K
 

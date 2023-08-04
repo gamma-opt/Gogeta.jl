@@ -2,10 +2,11 @@ using JuMP, Flux, Gurobi
 using Flux: params
 
 """
-create_JuMP_model(DNN::Chain, bounds_U::Vector{Float32}, bounds_L::Vector{Float32}, bound_tightening::String="none", verbose::Bool=false)
+create_JuMP_model(DNN::Chain, L_bounds::Vector{Float32}, U_bounds::Vector{Float32}, bound_tightening::String="none", bt_verbose::Bool=false)
 
 Converts a ReLU DNN to a 0-1 MILP JuMP model. The ReLU DNN is assumed to be a Flux.Chain.
 The activation function must be "relu" in all hidden layers and "identity" in the output layer.
+The lower and upper bounds to the function are given as a Vector{Float32}. The bounds are in order from the input layer to the output layer.
 The keyword argument "bt" determines if bound tightening is to be used on the constraint bounds:
 — "none": No bound tightening is used.
 — "singletread": One shared JuMP model is used to calculate bounds one at a time.
@@ -15,17 +16,17 @@ The keyword argument "bt" determines if bound tightening is to be used on the co
 
 # Arguments
 - `DNN::Chain`: A trained ReLU DNN.
-- `U_bounds::Vector{Float32}`: Upper bounds on the node values of the DNN.
 - `L_bounds::Vector{Float32}`: Lower bounds on the node values of the DNN.
+- `U_bounds::Vector{Float32}`: Upper bounds on the node values of the DNN.
 - `bt::String="none"`: Optional bound tightening of the constraint bounds. Can be set to "none", "singlethread", "threads", "workers" or "2 workers".
-- `verbose::Bool=false`: Controls Gurobi logs.
+- `bt_verbose::Bool=false`: Controls Gurobi logs in bound tightening procedures.
 
 # Examples
 ```julia
-model = create_JuMP_model(DNN, U_bounds, L_bounds, "singlethread", false)
+model = create_JuMP_model(DNN, L_bounds, U_bounds, "singlethread", false)
 ```
 """
-function create_JuMP_model(DNN::Chain, U_bounds::Vector{Float32}, L_bounds::Vector{Float32}, bt::String="none", verbose::Bool=false)
+function create_JuMP_model(DNN::Chain, L_bounds::Vector{Float32}, U_bounds::Vector{Float32}, bt::String="none", bt_verbose::Bool=false)
 
     K = length(DNN) # NOTE! there are K+1 layers in the nn
     for i in 1:K-1
@@ -42,28 +43,30 @@ function create_JuMP_model(DNN::Chain, U_bounds::Vector{Float32}, L_bounds::Vect
     input_node_count = length(DNN_params[1][1, :])
     node_count = [if k == 1 input_node_count else length(DNN_params[2*(k-1)]) end for k in 1:K+1]
 
-    final_U_bounds = copy(U_bounds)
     final_L_bounds = copy(L_bounds)
+    final_U_bounds = copy(U_bounds)
 
     # optional: calculates optimal lower and upper bounds L and U
     @assert bt == "none" || bt == "singlethread" || bt == "threads" || bt == "workers" || bt == "2 workers"
         "bound_tightening has to be set to \"none\", \"singlethread\", \"threads\", \"workers\" or \"2 workers\"."
     if bt == "singlethread"
-        final_L_bounds, final_U_bounds = bound_tightening(DNN, U_bounds, L_bounds, verbose)
+        final_L_bounds, final_U_bounds = bound_tightening(DNN, U_bounds, L_bounds, bt_verbose)
     elseif bt == "threads"
-        final_L_bounds, final_U_bounds = bound_tightening_threads(DNN, U_bounds, L_bounds, verbose)
+        final_L_bounds, final_U_bounds = bound_tightening_threads(DNN, U_bounds, L_bounds, bt_verbose)
     elseif bt == "workers"
-        final_L_bounds, final_U_bounds = bound_tightening_workers(DNN, U_bounds, L_bounds, verbose)
+        final_L_bounds, final_U_bounds = bound_tightening_workers(DNN, U_bounds, L_bounds, bt_verbose)
     elseif bt == "2 workers"
-        final_L_bounds, final_U_bounds = bound_tightening_2workers(DNN, U_bounds, L_bounds, verbose)
+        final_L_bounds, final_U_bounds = bound_tightening_2workers(DNN, U_bounds, L_bounds, bt_verbose)
     end
 
-    model = Model(optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => (verbose ? 1 : 0)))
+    model = Model(optimizer_with_attributes(Gurobi.Optimizer))
 
     # sets the variables x[k,j] and s[k,j], the binary variables z[k,j] and the big-M values U[k,j] and L[k,j]
     @variable(model, x[k in 0:K, j in 1:node_count[k+1]] >= 0)
-    @variable(model, s[k in 1:K, j in 1:node_count[k+1]] >= 0)
-    @variable(model, z[k in 1:K, j in 1:node_count[k+1]], Bin)
+    if K > 1 # s and z variables only to hidden layers, i.e., layers 1:K-1
+        @variable(model, s[k in 1:K, j in 1:node_count[k+1]] >= 0)
+        @variable(model, z[k in 1:K, j in 1:node_count[k+1]], Bin)
+    end
     @variable(model, U[k in 0:K, j in 1:node_count[k+1]])
     @variable(model, L[k in 0:K, j in 1:node_count[k+1]])
 
@@ -107,7 +110,7 @@ function create_JuMP_model(DNN::Chain, U_bounds::Vector{Float32}, L_bounds::Vect
         @constraint(model, x[K, output_node] <= U[K, output_node])
     end
 
-    @objective(model, Max, x[K, 1]) # arbitrary objective function to have a complete JuMP model
+    @objective(model, Max, x[1, 1]) # arbitrary objective function to have a complete JuMP model
 
     return model
 end

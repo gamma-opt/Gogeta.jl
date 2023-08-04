@@ -1,0 +1,49 @@
+Dataset: Concrete_Data.csv, Trees: 1000, Depth: 3, Train time: 0.1392809
+Dataset: Concrete_Data.csv, Trees: 10, Depth: 3, R2 train: 0.48700873131259037, R2 test: 0.4513873064728592
+Dataset: Concrete_Data.csv, Trees: 50, Depth: 3, R2 train: 0.8468673883648803, R2 test: 0.8147472840776291
+Dataset: Concrete_Data.csv, Trees: 100, Depth: 3, R2 train: 0.8984606177484501, R2 test: 0.8652953404026279
+Dataset: Concrete_Data.csv, Trees: 200, Depth: 3, R2 train: 0.9301606687743137, R2 test: 0.8915278385009456
+Dataset: Concrete_Data.csv, Trees: 350, Depth: 3, R2 train: 0.9476652315558587, R2 test: 0.9055853295666927
+Dataset: Concrete_Data.csv, Trees: 500, Depth: 3, R2 train: 0.9560813740214513, R2 test: 0.9115893011636167
+Dataset: Concrete_Data.csv, Trees: 750, Depth: 3, R2 train: 0.9636862143163802, R2 test: 0.9164560237651326
+Dataset: Concrete_Data.csv, Trees: 1000, Depth: 3, R2 train: 0.9684923000333394, R2 test: 0.918840632718663
+
+Dataset: Concrete_Data.csv, Trees: 1000, Depth: 5, Train time: 0.2921074
+Dataset: Concrete_Data.csv, Trees: 10, Depth: 5, R2 train: 0.6799471145687201, R2 test: 0.6591516746756133
+Dataset: Concrete_Data.csv, Trees: 50, Depth: 5, R2 train: 0.9444083456228891, R2 test: 0.8897924294740663
+Dataset: Concrete_Data.csv, Trees: 100, Depth: 5, R2 train: 0.9709688379818724, R2 test: 0.9125617746454415
+Dataset: Concrete_Data.csv, Trees: 200, Depth: 5, R2 train: 0.984744627054814, R2 test: 0.9257162901932615
+Dataset: Concrete_Data.csv, Trees: 350, Depth: 5, R2 train: 0.9912952011352917, R2 test: 0.9283111919745368
+Dataset: Concrete_Data.csv, Trees: 500, Depth: 5, R2 train: 0.9937441402060754, R2 test: 0.9276902116292574
+Dataset: Concrete_Data.csv, Trees: 750, Depth: 5, R2 train: 0.995770834247686, R2 test: 0.9270992413234705
+Dataset: Concrete_Data.csv, Trees: 1000, Depth: 5, R2 train: 0.9965695986836495, R2 test: 0.9268212746931022
+
+Dataset: Concrete_Data.csv, Trees: 1000, Depth: 7, Train time: 0.8189419
+Dataset: Concrete_Data.csv, Trees: 10, Depth: 7, R2 train: 0.7796050212492984, R2 test: 0.7268318734842865
+Dataset: Concrete_Data.csv, Trees: 50, Depth: 7, R2 train: 0.985216655889292, R2 test: 0.9040079466194865
+Dataset: Concrete_Data.csv, Trees: 100, Depth: 7, R2 train: 0.9930478930514443, R2 test: 0.9129461589120887
+Dataset: Concrete_Data.csv, Trees: 200, Depth: 7, R2 train: 0.9965252553766244, R2 test: 0.9162803998931315
+Dataset: Concrete_Data.csv, Trees: 350, Depth: 7, R2 train: 0.9975294259079723, R2 test: 0.9163563854613118
+Dataset: Concrete_Data.csv, Trees: 500, Depth: 7, R2 train: 0.9977835829581878, R2 test: 0.9164201904525966
+Dataset: Concrete_Data.csv, Trees: 750, Depth: 7, R2 train: 0.9978591630800645, R2 test: 0.9162182695907283
+Dataset: Concrete_Data.csv, Trees: 1000, Depth: 7, R2 train: 0.9978704846340756, R2 test: 0.9161733286448596
+
+Dataset: Concrete_Data.csv, Trees: 1000, Depth: 9, Train time: 2.7353772
+Dataset: Concrete_Data.csv, Trees: 10, Depth: 9, R2 train: 0.8199139792073735, R2 test: 0.7337468868993533
+Dataset: Concrete_Data.csv, Trees: 50, Depth: 9, R2 train: 0.9957608804388928, R2 test: 0.8842106459319251
+Dataset: Concrete_Data.csv, Trees: 100, Depth: 9, R2 train: 0.9973911266236077, R2 test: 0.8867075193126642
+Dataset: Concrete_Data.csv, Trees: 200, Depth: 9, R2 train: 0.9978210766181194, R2 test: 0.8871864722448678
+Dataset: Concrete_Data.csv, Trees: 350, Depth: 9, R2 train: 0.9978695833031551, R2 test: 0.8872078181677004
+Dataset: Concrete_Data.csv, Trees: 500, Depth: 9, R2 train: 0.9978727336226609, R2 test: 0.8871943913988374
+Dataset: Concrete_Data.csv, Trees: 750, Depth: 9, R2 train: 0.9978730599627705, R2 test: 0.8871797259713203
+Dataset: Concrete_Data.csv, Trees: 1000, Depth: 9, R2 train: 0.9978730673282069, R2 test: 0.887174888834307
+
+Dataset: Concrete_Data.csv, Trees: 1000, Depth: 12, Train time: 8.5140458
+Dataset: Concrete_Data.csv, Trees: 10, Depth: 12, R2 train: 0.8372306504853083, R2 test: 0.7388080965796535
+Dataset: Concrete_Data.csv, Trees: 50, Depth: 12, R2 train: 0.9974476311102951, R2 test: 0.8595319564336099
+Dataset: Concrete_Data.csv, Trees: 100, Depth: 12, R2 train: 0.9978358483213403, R2 test: 0.8610922270724587
+Dataset: Concrete_Data.csv, Trees: 200, Depth: 12, R2 train: 0.9978716031000834, R2 test: 0.8613835315952788
+Dataset: Concrete_Data.csv, Trees: 350, Depth: 12, R2 train: 0.9978730516922669, R2 test: 0.861390527607847
+Dataset: Concrete_Data.csv, Trees: 500, Depth: 12, R2 train: 0.997873067019444, R2 test: 0.8613956074158621
+Dataset: Concrete_Data.csv, Trees: 750, Depth: 12, R2 train: 0.9978730675167514, R2 test: 0.8613957267045029
+Dataset: Concrete_Data.csv, Trees: 1000, Depth: 12, R2 train: 0.9978730675171703, R2 test: 0.861395700718798

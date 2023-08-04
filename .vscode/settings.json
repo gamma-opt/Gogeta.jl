@@ -1,1 +1,4 @@
-{}
+{
+    "julia.environmentPath": "/Users/eetureijonen/Desktop/THESIS/ML_as_MO",
+    "julia.lint.call": false 
+}

@@ -1,36 +1,40 @@
-function extract_tree_model_info(tree_model, tree_depth)
+"""
+Gets the data required for constructing the corresponding MIP from an [EvoTrees](https://github.com/Evovest/EvoTrees.jl) model `evo_model`. Returns a custom datatype `TEModel` which contains the necessary information.
+"""
+function extract_evotrees_info(evo_model; tree_limit=length(evo_model.trees))
 
-    n_trees = length(tree_model.trees) - 1 # number of trees in the model (excluding the bias tree)
-    n_feats = length(tree_model.info[:fnames]) # number of features (variables) in the model
+    n_trees = tree_limit
+    n_feats = length(evo_model.info[:fnames])
 
-    n_leaves = Array{Int64}(undef, n_trees) # array for the number of leaves on each tree
-    leaves = Array{Array}(undef, n_trees) # array for the ids of the leaves for each tree
+    n_leaves = Array{Int64}(undef, n_trees) # number of leaves on each tree
+    leaves = Array{Array}(undef, n_trees) # ids of the leaves of each tree
 
     # Get number of leaves and ids of the leaves on each tree
     for tree in 1:n_trees
-        leaves[tree] = findall(x -> x != 0, vec(tree_model.trees[tree + 1].pred))
+        leaves[tree] = findall(node -> evo_model.trees[tree].split[node] == false && (node == 1 || evo_model.trees[tree].split[floor(Int, node / 2)] == true), 1:length(evo_model.trees[tree].split))
         n_leaves[tree] = length(leaves[tree])
     end
 
-    splits = Matrix{Any}(undef, n_trees, 2^(tree_depth - 1))
-    splits_ordered = Array{Vector}(undef, n_feats)
+    splits = Matrix{Any}(undef, n_trees, length(evo_model.trees[2].split)) # storing the feature number and splitpoint index for each split node
+    splits_ordered = Array{Vector}(undef, n_feats) # splitpoints for each feature
+
     n_splits = zeros(Int64, n_feats)
     [splits_ordered[feat] = [] for feat in 1:n_feats]
 
     for tree in 1:n_trees
-        for node in 1:2^(tree_depth - 1)
-            if tree_model.trees[tree + 1].split[node] == true
-                splits[tree, node] = [tree_model.trees[tree + 1].feat[node], tree_model.trees[tree + 1].cond_float[node]]
-                push!(splits_ordered[tree_model.trees[tree + 1].feat[node]], tree_model.trees[tree + 1].cond_float[node]) 
+        for node in eachindex(evo_model.trees[tree].split)
+            if evo_model.trees[tree].split[node] == true
+                splits[tree, node] = [evo_model.trees[tree].feat[node], evo_model.trees[tree].cond_float[node]] # save feature and split value
+                push!(splits_ordered[evo_model.trees[tree].feat[node]], evo_model.trees[tree].cond_float[node]) # push split value to splits_ordered
             end
         end
     end
-    [unique!(sort!(splits_ordered[feat])) for feat in 1:n_feats]
-    [n_splits[feat] = length(splits_ordered[feat]) for feat in 1:n_feats]
+    [unique!(sort!(splits_ordered[feat])) for feat in 1:n_feats] # sort splits_ordered and remove copies
+    [n_splits[feat] = length(splits_ordered[feat]) for feat in 1:n_feats] # store number of split points
 
     for tree in 1:n_trees
-        for node in 1:2^(tree_depth - 1)
-            if tree_model.trees[tree + 1].split[node] == true
+        for node in eachindex(evo_model.trees[tree].split)
+            if evo_model.trees[tree].split[node] == true
                 
                 feature::Int = splits[tree, node][1]
                 value = splits[tree, node][2]
@@ -40,11 +44,19 @@ function extract_tree_model_info(tree_model, tree_depth)
             end
         end
     end
+    predictions = Array{Array}(undef, n_trees)
+    [predictions[tree] = evo_model.trees[tree].pred for tree in 1:n_trees]
 
-    return n_trees, n_feats, n_leaves, leaves, n_splits, splits, splits_ordered
+    split_nodes = Array{Array}(undef, n_trees)
+    [split_nodes[tree] = evo_model.trees[tree].split for tree in 1:n_trees]
+
+    return TEModel(n_trees, n_feats, n_leaves, leaves, splits, splits_ordered, n_splits, predictions, split_nodes)
 
 end
 
+"""
+Finds the children leaves of node `id` in a binary tree.
+"""
 function children(id, leaf_dict, max)
 
     result::Vector{Int64} = []
@@ -66,7 +78,10 @@ function children(id, leaf_dict, max)
 
 end
 
-function get_solution(n_feats, model, n_splits, splitpoints)
+"""
+Gets human-readable array `solution` where upper and lower bounds for each feature are given.
+"""
+function get_solution(n_feats, model, n_splits, splits_ordered)
 
     smallest_splitpoint = Array{Int64}(undef, n_feats)
 
@@ -83,11 +98,11 @@ function get_solution(n_feats, model, n_splits, splitpoints)
         solution[feat] = [-Inf64; Inf64]
 
         if smallest_splitpoint[feat] <= n_splits[feat]
-            solution[feat][2] = splitpoints[feat][smallest_splitpoint[feat]]
+            solution[feat][2] = splits_ordered[feat][smallest_splitpoint[feat]]
         end
 
         if smallest_splitpoint[feat] > 1
-            solution[feat][1] = splitpoints[feat][smallest_splitpoint[feat] - 1]
+            solution[feat][1] = splits_ordered[feat][smallest_splitpoint[feat] - 1]
         end
     end
 

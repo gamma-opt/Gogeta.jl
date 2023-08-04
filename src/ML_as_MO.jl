@@ -25,11 +25,15 @@ include("nn/JuMP_model.jl")
 include("nn/bound_tightening.jl")
 include("nn/CNN_JuMP_model.jl")
 
-include("decision_trees/trees_to_relaxed_op.jl")
-include("decision_trees/util.jl")
-include("decision_trees/issue_testing.jl")
-#include("decision_trees/plotting.jl")
 
+include("decision_trees/types.jl")
+include("decision_trees/util.jl")
+include("decision_trees/tree_model_to_MIP.jl")
+
+# read all the files in decision_trees->visualisation
+include("decision_trees/visualization/opt_visualization.jl")
+include("decision_trees/visualization/plotting.jl")
+include("decision_trees/visualization/quality_visualization.jl")
 
 export create_JuMP_model,
     evaluate!

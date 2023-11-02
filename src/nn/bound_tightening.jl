@@ -185,7 +185,7 @@ function bound_tightening_threads(DNN::Chain, init_U_bounds::Vector{Float32}, in
     curr_L_bounds = copy(init_L_bounds)
 
     lock = Threads.ReentrantLock()
-    
+
     for k in 1:K
 
         Threads.@threads for node in 1:(2*node_count[k+1]) # loop over both obj functions
@@ -199,7 +199,7 @@ function bound_tightening_threads(DNN::Chain, init_U_bounds::Vector{Float32}, in
             for prev_layer in 0:k-1
                 prev_layers_node_sum += node_count[prev_layer+1]
             end
-            
+
             # loops nodes twice: 1st time with obj function Min, 2nd time with Max
             curr_node = node
             obj_function = 1
@@ -295,7 +295,7 @@ function bound_tightening_threads(DNN::Chain, init_U_bounds::Vector{Float32}, in
                     fix(U[k, curr_node], optimal)
                 end
             end
-            
+
         end
 
     end
@@ -339,7 +339,7 @@ function bound_tightening_workers(DNN::Chain, init_U_bounds::Vector{Float32}, in
     # store the current optimal bounds in the algorithm
     curr_U_bounds = copy(init_U_bounds)
     curr_L_bounds = copy(init_L_bounds)
-    
+
     for k in 1:K
 
         # Distributed.pmap returns the bounds in order
@@ -350,7 +350,7 @@ function bound_tightening_workers(DNN::Chain, init_U_bounds::Vector{Float32}, in
             for prev_layer in 0:k-1
                 prev_layers_node_sum += node_count[prev_layer+1]
             end
-            
+
             # loops nodes twice: 1st time with obj function Min, 2nd time with Max
             curr_node = node
             obj_function = 1
@@ -375,14 +375,14 @@ end
 # Inner function to bound_tightening_workers: assigns a JuMP model to the current worker
 
 function bt_workers_inner(
-    K::Int64, 
-    k::Int64, 
-    node::Int64, 
-    W::Vector{Matrix{Float32}}, 
-    b::Vector{Vector{Float32}}, 
-    node_count::Vector{Int64}, 
-    curr_U_bounds::Vector{Float32}, 
-    curr_L_bounds::Vector{Float32}, 
+    K::Int64,
+    k::Int64,
+    node::Int64,
+    W::Vector{Matrix{Float32}},
+    b::Vector{Vector{Float32}},
+    node_count::Vector{Int64},
+    curr_U_bounds::Vector{Float32},
+    curr_L_bounds::Vector{Float32},
     verbose::Bool
     )
 
@@ -393,7 +393,7 @@ function bt_workers_inner(
     for prev_layer in 0:k-1
         prev_layers_node_sum += node_count[prev_layer+1]
     end
-    
+
     # loops nodes twice: 1st time with obj function Min, 2nd time with Max
     curr_node = node
     obj_function = 1
@@ -518,10 +518,10 @@ function bound_tightening_2workers(DNN::Chain, init_U_bounds::Vector{Float32}, i
     # split the available threads into 2 to be assigned to each worker (integer division)
     n = Threads.nthreads()
     threads_split = [n÷2, n-(n÷2)]
-    
+
     for k in 1:K
 
-        L_U_bounds = Distributed.pmap(obj_function -> 
+        L_U_bounds = Distributed.pmap(obj_function ->
             bt_2workers_inner(K, k, obj_function, W, b, node_count, curr_U_bounds, curr_L_bounds, threads_split[obj_function], verbose), 1:2)
 
         curr_L_bounds = L_U_bounds[1]
@@ -538,14 +538,14 @@ end
 # Inner function to solve_optimal_bounds_2workers: solves L or U bounds for all nodes in a layer using the same JuMP model
 
 function bt_2workers_inner(
-    K::Int64, 
-    k::Int64, 
-    obj_function::Int64, 
-    W::Vector{Matrix{Float32}}, 
-    b::Vector{Vector{Float32}}, 
-    node_count::Vector{Int64}, 
-    curr_U_bounds::Vector{Float32}, 
-    curr_L_bounds::Vector{Float32}, 
+    K::Int64,
+    k::Int64,
+    obj_function::Int64,
+    W::Vector{Matrix{Float32}},
+    b::Vector{Vector{Float32}},
+    node_count::Vector{Int64},
+    curr_U_bounds::Vector{Float32},
+    curr_L_bounds::Vector{Float32},
     n_threads::Int64,
     verbose::Bool
     )

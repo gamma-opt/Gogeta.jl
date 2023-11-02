@@ -1,6 +1,6 @@
 module ML_as_MO
 
-using MLDatasets, FileIO, ImageShow 
+using MLDatasets, FileIO, ImageShow
 using MLJBase # for conf matrix
 using Statistics
 using Random

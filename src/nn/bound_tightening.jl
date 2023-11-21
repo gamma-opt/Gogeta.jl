@@ -22,7 +22,7 @@ L_bounds, U_bounds = bound_tightening(DNN, init_U_bounds, init_L_bounds, false)
 ```
 """
 
-function bound_tightening(DNN::Chain, init_U_bounds::Vector{Float64}, init_L_bounds::Vector{Float64}, verbose::Bool=false)
+function bound_tightening(DNN::Chain, init_U_bounds::Vector{Float64}, init_L_bounds::Vector{Float64}, verbose::Bool=false, lp_relaxation::Bool=false, gurobi_env=Gurobi.Env())
 
     K = length(DNN) # NOTE! there are K+1 layers in the nn
 
@@ -125,6 +125,12 @@ function bound_tightening(DNN::Chain, init_U_bounds::Vector{Float64}, init_L_bou
                     @objective(model, Max, x[k, node])
                 end
 
+                if lp_relaxation
+                    undo = relax_integrality(model)
+                    set_optimizer(model, () -> Gurobi.Optimizer(gurobi_env))
+                    set_silent(model)
+                end
+
                 solve_time = @elapsed optimize!(model)
                 solve_time = round(solve_time; sigdigits = 3)
 
@@ -183,7 +189,7 @@ function bound_tightening_threads_old(DNN::Chain, init_U_bounds::Vector{Float64}
 
     lock = Threads.ReentrantLock()
 
-    for k in 1:K
+    for k in 1:2
 
         GC.gc()
 

@@ -24,7 +24,7 @@ end
 function prune_zero_weights(G1, G_bar1, W1, b1, G2, G_bar2, W2, b2)
   # add a threshold to avoid numerical errors
   # TODO: consider using a threshold instead of 0 (epsilon)
-  to_prune = [index[1] for index in findall(sum(abs.(W1), dims=2) .== 1e-5)]
+  to_prune = [index[1] for index in findall(sum(abs.(W1), dims=2) .< 1e-5)]
 
   println("amount of neurons to be pruned by zero weights: ", length(to_prune))
 
@@ -32,8 +32,8 @@ function prune_zero_weights(G1, G_bar1, W1, b1, G2, G_bar2, W2, b2)
 
   W1 = W1[setdiff(1:end, to_prune), :]
   b1 = b1[setdiff(1:end, to_prune)]
-  # G1 = G1[setdiff(1:end, to_prune)]
-  # G_bar1 = G_bar1[setdiff(1:end, to_prune)]
+  G1 = G1[setdiff(1:end, to_prune)]
+  G_bar1 = G_bar1[setdiff(1:end, to_prune)]
 
   W2 = W2[:, setdiff(1:end, to_prune)]
 
@@ -110,23 +110,23 @@ function prune_neuron(W1, b1, W2, b2, X, G1, G2, G_bar1, G_bar2)
   unstable = true
 
   G1, G_bar1, W1, b1, G2, G_bar2, W2, b2 = prune_by_upper_bound(G1, G_bar1, W1, b1, G2, G_bar2, W2, b2)
-  # G1, G_bar1, W1, b1, G2, G_bar2, W2, b2 = prune_zero_weights(G1, G_bar1, W1, b1, G2, G_bar2, W2, b2)
+  G1, G_bar1, W1, b1, G2, G_bar2, W2, b2 = prune_zero_weights(G1, G_bar1, W1, b1, G2, G_bar2, W2, b2)
 
   n_neurons_initial = size(W1, 1)
 
   n_neurons = size(W1, 1)
 
-  # for i in n_neurons:-1:1
-  #     if G_bar1[i] > 1e-5
-  #         s_before = length(S)
+  for i in n_neurons:-1:1
+      if G_bar1[i] > 1e-5
+          s_before = length(S)
 
-  #         G1, G_bar1, W1, b1, G2, G_bar2, W2, b2, S = prune_stabily_active(G1, G_bar1, W1, b1, G2, G_bar2, W2, b2, X, S, i)
+          G1, G_bar1, W1, b1, G2, G_bar2, W2, b2, S = prune_stabily_active(G1, G_bar1, W1, b1, G2, G_bar2, W2, b2, X, S, i)
 
-  #         length(S) == s_before && (pruned = true)
-  #     else
-  #         unstable = true
-  #     end
-  # end
+          length(S) == s_before && (pruned = true)
+      else
+          unstable = true
+      end
+  end
 
   n_neurons_final = size(W1, 1)
 

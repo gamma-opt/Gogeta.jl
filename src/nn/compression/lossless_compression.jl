@@ -9,8 +9,6 @@ function prune_by_upper_bound(G1, G_bar1, W1, b1, G2, G_bar2, W2, b2)
   # TODO: consider using leq and a threshold instead of 0 (epsilon)
   to_prune = [i for i = 1:size(W1, 1) if G1[i] < 0]
 
-  println("amount of neurons to be pruned by upper bound: ", length(to_prune))
-
   W1 = W1[setdiff(1:end, to_prune), :]
   b1 = b1[setdiff(1:end, to_prune)]
   G1 = G1[setdiff(1:end, to_prune)]
@@ -18,15 +16,12 @@ function prune_by_upper_bound(G1, G_bar1, W1, b1, G2, G_bar2, W2, b2)
 
   W2 = W2[:, setdiff(1:end, to_prune)]
 
-  return G1, G_bar1, W1, b1, G2, G_bar2, W2, b2
+  return G1, G_bar1, W1, b1, G2, G_bar2, W2, b2, length(to_prune)
 end
 
 function prune_zero_weights(G1, G_bar1, W1, b1, G2, G_bar2, W2, b2)
-  # add a threshold to avoid numerical errors
   # TODO: consider using a threshold instead of 0 (epsilon)
   to_prune = [index[1] for index in findall(sum(abs.(W1), dims=2) .< 1e-5)]
-
-  println("amount of neurons to be pruned by zero weights: ", length(to_prune))
 
   b2 .+= W2[:, to_prune] * b1[to_prune]
 
@@ -37,7 +32,7 @@ function prune_zero_weights(G1, G_bar1, W1, b1, G2, G_bar2, W2, b2)
 
   W2 = W2[:, setdiff(1:end, to_prune)]
 
-  return G1, G_bar1, W1, b1, G2, G_bar2, W2, b2
+  return G1, G_bar1, W1, b1, G2, G_bar2, W2, b2, length(to_prune)
 end
 
 function forward_pass(X, W1_, b1_, W2_, b2_)
@@ -70,6 +65,7 @@ function rank_threshold(M, threshold=1e-5)
   F = svd(M)
   S = F.S
 
+  # TODO: compare these two methods
   return rank(M)
   # return sum(abs.(S) .> threshold)
 end
@@ -82,9 +78,6 @@ function prune_stabily_active(G1, G_bar1, W1, b1, G2, G_bar2, W2, b2, X, S, i)
       return G1, G_bar1, W1, b1, G2, G_bar2, W2, b2, S
   end
 
-  # U, Σ, V = svd(W1[collect(S), :]')
-  # alpha = V * Diagonal(1 ./ Σ) * U' * W1[i, :]
-  # alpha = pinv(W1[collect(S), :]') * W1[i, :]
   alpha = W1[collect(S), :]' \ W1[i, :]
 
   for j in axes(W2, 1)
@@ -107,16 +100,16 @@ function prune_neuron(W1, b1, W2, b2, X, G1, G2, G_bar1, G_bar2)
 
   S = Set{Int}()
   pruned = false
+  # TODO: start updating the unstable flag when we have a stable layer
   unstable = true
 
-  G1, G_bar1, W1, b1, G2, G_bar2, W2, b2 = prune_by_upper_bound(G1, G_bar1, W1, b1, G2, G_bar2, W2, b2)
-  G1, G_bar1, W1, b1, G2, G_bar2, W2, b2 = prune_zero_weights(G1, G_bar1, W1, b1, G2, G_bar2, W2, b2)
+  # TODO: check that it works even if all neurons are pruned
+  G1, G_bar1, W1, b1, G2, G_bar2, W2, b2, n_pruned_by_upper_bound = prune_by_upper_bound(G1, G_bar1, W1, b1, G2, G_bar2, W2, b2)
+  G1, G_bar1, W1, b1, G2, G_bar2, W2, b2, n_pruned_by_zero_weight = prune_zero_weights(G1, G_bar1, W1, b1, G2, G_bar2, W2, b2)
 
   n_neurons_initial = size(W1, 1)
 
-  n_neurons = size(W1, 1)
-
-  for i in n_neurons:-1:1
+  for i in n_neurons_initial:-1:1
       if G_bar1[i] > 1e-5
           s_before = length(S)
 
@@ -129,16 +122,13 @@ function prune_neuron(W1, b1, W2, b2, X, G1, G2, G_bar1, G_bar2)
   end
 
   n_neurons_final = size(W1, 1)
+  n_pruned_by_linear_dependence = n_neurons_initial - n_neurons_final
 
-  (n_neurons_final != n_neurons_initial) && (println("Neurons pruned by linear dependence: ", n_neurons_initial - n_neurons_final))
-
-  _, A2_pruned = forward_pass(X, W1, b1, W2, b2)
-
+  _, A2_pruned = forward_pass(X, W1, b1, W2, b2) # TODO: remove this as it is inaccurate in odd bounded layers
   is_close = all(abs.(A2 - A2_pruned) .< 1e-3)
 
   if !unstable
     if length(S) == 0
-      # constant output, we can prune the full layer (network in the future)
       # TODO: update this to return the full pruned network
       Upsilon = A2_pruned
       W2 = zeros(size(W2))
@@ -149,12 +139,13 @@ function prune_neuron(W1, b1, W2, b2, X, G1, G2, G_bar1, G_bar2)
 
     W_bar, b_bar = prune_stable_layer(W1, b1, W2, b2, S, X)
 
+    # TODO: update this ridiculous naming
     A2_superpruned = W_bar * X .+ b_bar[:]
 
-    return W1, b1, W2, b2, pruned, is_close, is_close && all(abs.(A2 - A2_superpruned) .< 1e-3)
+    return W1, b1, W2, b2, pruned, is_close, is_close && all(abs.(A2 - A2_superpruned) .< 1e-3), n_pruned_by_upper_bound, n_pruned_by_zero_weight, n_pruned_by_linear_dependence
   end
 
-  return W1, b1, W2, b2, pruned, is_close, false
+  return W1, b1, W2, b2, pruned, is_close, false, n_pruned_by_upper_bound, n_pruned_by_zero_weight, n_pruned_by_linear_dependence
 end
 
 function add_linear_dependencies_to_matrix(W1, max_dependencies=2)
@@ -220,90 +211,9 @@ function prune_from_model(W1, b1, W2, b2, upper1, upper2, lower1, lower2)
   G1, G2 = upper1, upper2
   G_bar1, G_bar2 = lower1, lower2
 
-  W1, b1, W2, b2, pruned, is_close, layer_folded = prune_neuron(W1, b1, W2, b2, X, G1, G2, G_bar1, G_bar2)
+  W1, b1, W2, b2, pruned, is_close, layer_folded, n_pruned_by_upper_bound, n_pruned_by_zero_weight, n_pruned_by_linear_dependence = prune_neuron(W1, b1, W2, b2, X, G1, G2, G_bar1, G_bar2)
 
-  println("pruned: $pruned")
-  println("is_close: $is_close")
-  println("layer_folded: $layer_folded")
-
-  return W1, b1, W2, b2
-end
-
-function debug_matrices()
-  weight_paths = [
-    "/Users/vimetoivonen/code/school/kandi/train_network/layer_weights/model_Adadelta_0.001_0.001_0/layer_0_weights.npy",
-    "/Users/vimetoivonen/code/school/kandi/train_network/layer_weights/model_Adadelta_0.001_0.001_0/layer_1_weights.npy",
-    "/Users/vimetoivonen/code/school/kandi/train_network/layer_weights/model_Adadelta_0.001_0.001_0/layer_2_weights.npy",
-    "/Users/vimetoivonen/code/school/kandi/train_network/layer_weights/model_Adadelta_0.001_0.001_0/layer_3_weights.npy",
-  ]
-  bias_paths = [
-    "/Users/vimetoivonen/code/school/kandi/train_network/layer_weights/model_Adadelta_0.001_0.001_0/layer_0_biases.npy",
-    "/Users/vimetoivonen/code/school/kandi/train_network/layer_weights/model_Adadelta_0.001_0.001_0/layer_1_biases.npy",
-    "/Users/vimetoivonen/code/school/kandi/train_network/layer_weights/model_Adadelta_0.001_0.001_0/layer_2_biases.npy",
-    "/Users/vimetoivonen/code/school/kandi/train_network/layer_weights/model_Adadelta_0.001_0.001_0/layer_3_biases.npy"
-  ]
-
-  W1 = npzread(weight_paths[2])
-  b1 = npzread(bias_paths[2])
-
-  W2 = npzread(weight_paths[3])
-  b2 = npzread(bias_paths[3])
-
-  upper_new = npzread(joinpath(subdir_path, "upper_new3.npy"))
-  lower_new = npzread(joinpath(subdir_path, "lower_new3.npy"))
-
-  upper1, upper2 = upper_new[1027:1538], upper_new[1539:2051]
-  lower1, lower2 = lower_new[1027:1538], lower_new[1539:2051]
-
-  println(length(upper1))
-  println(length(upper2))
-  println(length(lower1))
-  println(length(lower2))
-
-  G1, G2 = upper1, upper2
-  G_bar1, G_bar2 = lower1, lower2
-
-  x1 = rand(10) .- 1.5
-  x2 = rand(10) .- 0.5
-
-  # println("min x1: $(minimum(x1)), max x1: $(maximum(x1))")
-  # println("min x2: $(minimum(x2)), max x2: $(maximum(x2))")
-
-  # loop over x1, x2 pairs
-  X = rand(size(W1, 2))
-  # X = [x1[1], x2[1]]
-
-  _, A2 = forward_pass(X, W1, b1, W2, b2)
-
-  W1_, b1_, W2_, b2_, pruned, is_close, layer_folded = prune_neuron(W1, b1, W2, b2, X, G1, G2, G_bar1, G_bar2)
-
-  _, A2_pruned = forward_pass(X, W1_, b1_, W2_, b2_)
-
-  difference = A2 - A2_pruned
-  println("difference: ")
-  println(maximum(difference))
-
-
-  # for iter in 1:n_iterations
-  #     W1, b1, W2, b2, X = debug_matrices()
-  #     # W1, b1, W2, b2, X = create_matrices(5, 5, 5, 0.5)
-  #     # W1, b1, W2, b2, X = create_simple_matrices() # use this for manual debugging
-
-  #     A1, A2 = forward_pass(X, W1, b1, W2, b2)
-  #     # for single outputs this works (G == G_bar)
-  #     G1, G2 = A1, A2
-  #     G_bar1, G_bar2 = A1, A2
-
-  #     W1, b1, W2, b2, pruned, is_close, layer_folded = prune_neuron(W1, b1, W2, b2, X, G1, G2, G_bar1, G_bar2)
-
-  #     pruned && (pruned_count += 1)
-  #     layer_folded && (layers_folded += 1)
-  #     !is_close && (different_output_count += 1)
-  # end
-
-  # println("Number of pruned iterations: $pruned_count")
-  # println("Number of layers folded: $layers_folded")
-  # println("Number of iterations where A_2 was different than A_2_pruned: $different_output_count")
+  return W1, b1, W2, b2, n_pruned_by_upper_bound, n_pruned_by_zero_weight, n_pruned_by_linear_dependence
 end
 
 function run_tests(n_iterations = 10)
@@ -320,7 +230,7 @@ function run_tests(n_iterations = 10)
       G1, G2 = A1, A2
       G_bar1, G_bar2 = A1, A2
 
-      W1, b1, W2, b2, pruned, is_close, layer_folded = prune_neuron(W1, b1, W2, b2, X, G1, G2, G_bar1, G_bar2)
+      W1, b1, W2, b2, pruned, is_close, layer_folded, _, _, _ = prune_neuron(W1, b1, W2, b2, X, G1, G2, G_bar1, G_bar2)
 
       pruned && (pruned_count += 1)
       layer_folded && (layers_folded += 1)
@@ -331,5 +241,3 @@ function run_tests(n_iterations = 10)
   println("Number of layers folded: $layers_folded")
   println("Number of iterations where A_2 was different than A_2_pruned: $different_output_count")
 end
-
-# debug_matrices()

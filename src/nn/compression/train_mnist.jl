@@ -123,13 +123,55 @@ end
 # constants
 n_neurons = Int64[2, 1024, 512, 512, 256, 1]
 n_neurons_cumulative_indices = [i+1 for i in [0, cumsum(n_neurons)...]]
-parent_dir = "/Users/vimetoivonen/code/school/kandi/train_network/layer_weights"
+parent_dir = joinpath(dirname(dirname(@__FILE__)), "compression", "layer_weights")
 subdirs = filter(d -> isdir(joinpath(parent_dir, d)), readdir(parent_dir))
 i, subdir = 1, subdirs[1]
 subdir_path = joinpath(parent_dir, subdir)
 println("Test with $subdir_path")
 
-find_lp_bounds(n_neurons, parent_dir)
+# find_lp_bounds(n_neurons, parent_dir)
+
+# function test_lp_bounds(n_neurons, parent_dir)
+n_neurons_initial = sum(n_neurons)
+subdirs = filter(d -> isdir(joinpath(parent_dir, d)), readdir(parent_dir))
+subdir = subdirs[1]
+
+lp_lower = npzread(joinpath(parent_dir, subdir, "lower_new_lp.npy"))
+lp_upper = npzread(joinpath(parent_dir, subdir, "upper_new_lp.npy"))
+
+model = create_model(n_neurons, joinpath(parent_dir, subdir))
+
+U_bounds = Float64[-0.5, 0.5, [1000000 for _ in 3:n_neurons_initial]...]
+L_bounds = Float64[-1.5, -0.5, [-1000000 for _ in 3:n_neurons_initial]...]
+
+# # Either create or load the threaded bounds
+# upper_threads, lower_threads = bound_tightening_threads_old(model, U_bounds, L_bounds)
+# npzwrite(joinpath(parent_dir, subdir, "upper_new_threads.npy"), upper_threads)
+# npzwrite(joinpath(parent_dir, subdir, "lower_new_threads.npy"), lower_threads)
+upper_threads = npzread(joinpath(parent_dir, subdir, "upper_new_threads.npy"))
+lower_threads = npzread(joinpath(parent_dir, subdir, "lower_new_threads.npy"))
+
+difference_U1 = (lp_upper - upper_threads)[3:1026]
+difference_U2 = (lp_upper - upper_threads)[1027:1538]
+
+difference_L1 = (lp_lower - lower_threads)[3:1026]
+difference_L2 = (lp_lower - lower_threads)[1027:1538]
+
+println("$(maximum(difference_U1)), $(minimum(difference_U1))")
+println("$(maximum(difference_U2)), $(minimum(difference_U2))")
+println("$(maximum(difference_L1)), $(minimum(difference_L1))")
+println("$(maximum(difference_L2)), $(minimum(difference_L2))")
+
+# test stability around 0 (second layer) (should not print anything)
+for i in 1027:1538
+  if lp_upper[i] > 1e-5 && upper_threads[i] < -1e-5
+    println("$(i): $(lp_upper[i]), $(upper_threads[i])")
+  elseif lp_upper[i] < -1e-5 && upper_threads[i] > 1e-5
+    println("$(i): $(lp_upper[i]), $(upper_threads[i])")
+  end
+end
+
+
 
 model = create_model(n_neurons, subdir_path)
 

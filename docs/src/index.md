@@ -6,9 +6,7 @@ CurrentModule = Gogeta
 
 Documentation for [Gogeta](https://github.com/'Nikita Belyak'/Gogeta.jl).
 
-```@index
-```
-
-```@autodocs
-Modules = [Gogeta]
+## Install
+```julia-repl
+pkg> add Gogeta
 ```

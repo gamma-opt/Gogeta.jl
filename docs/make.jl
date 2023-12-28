@@ -21,6 +21,6 @@ makedocs(;
 )
 
 deploydocs(;
-    repo="github.com/'Nikita Belyak'/Gogeta.jl",
+    repo="github.com/gamma-opt/Gogeta.jl.git",
     devbranch="main",
 )

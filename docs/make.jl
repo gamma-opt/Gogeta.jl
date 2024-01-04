@@ -1,9 +1,7 @@
 using Gogeta
 using Documenter
 
-DocMeta.setdocmeta!(Gogeta, :DocTestSetup, :(using Gogeta); recursive=true)
-
-makedocs(;
+makedocs(
     modules=[Gogeta],
     authors="Nikita Belyak <nikita.belyak1994@gmail.com> and contributors",
     sitename="Gogeta.jl",

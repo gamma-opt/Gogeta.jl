@@ -1,8 +1,4 @@
-```@meta
-CurrentModule = Gogeta
-```
-
-# Gogeta
+# Gogeta.jl
 
 Documentation for [Gogeta](https://github.com/Gogeta.jl).
 

@@ -7,6 +7,7 @@ makedocs(;
     modules=[Gogeta],
     authors="Nikita Belyak <nikita.belyak1994@gmail.com> and contributors",
     sitename="Gogeta.jl",
+    format= Documenter.HTML(),
     pages=[
         "Home" => "index.md",
         "Reference" => "reference.md",

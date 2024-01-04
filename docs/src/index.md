@@ -1,6 +1,6 @@
 # Gogeta.jl
 
-Documentation for [Gogeta](https://github.com/Gogeta.jl).
+Documentation for [Gogeta](https://gamma-opt.github.io/Gogeta.jl/).
 
 ## Install
 ```julia-repl

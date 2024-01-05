@@ -1,0 +1,5 @@
+### This folder contains the implementation of converting a gradient boosted decision tree assembly into a MILP frameworks
+
+* File tree_model_to_MIP.jl-> contains the implementations of the functions ccnverting trained gradient boosted decision trees assembly into MILP frameworks
+* File types.jl -> contains the formulation of data type that is given as an input for the functions in tree_model_to_MIP.jl 
+* File util.jl -> contains the implementation of auxiliary functions: the function extract_evotrees_info() converting the EvoTree model into type in types.jl file, the function children() that generates the information about the children of a given node in a binary decision tree and the function get_solution() that generates a human-readable form of the solution argument from the MIP problem. 

@@ -14,6 +14,18 @@ export bound_tightening,
     bound_tightening_workers,
     bound_tightening_2workers
 
+#include the files for decision trees functions and export the functions
+
+include("dt/tree_model_to_MIP.jl")
+export tree_model_to_MIP
+
+include("dt/types.jl")
+export TEModel
+
+include("dt/util.jl")
+export extract_evotrees_info,
+        children
+
 # Write your package code here.
 
 

@@ -15,6 +15,7 @@ export bound_tightening,
     bound_tightening_2workers
 
 #include the files for tree tree_ensembles functions and export the functions
+include("tree_ensembles/util.jl")
 
 include("tree_ensembles/tree_model_to_MIP.jl")
 export tree_model_to_MIP

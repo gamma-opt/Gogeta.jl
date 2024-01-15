@@ -20,13 +20,9 @@ include("dt/tree_model_to_MIP.jl")
 export tree_model_to_MIP
 
 include("dt/types.jl")
-export TEModel
-
-include("dt/util.jl")
-export extract_evotrees_info,
-        children
+export TEModel,
+    extract_evotrees_info
 
 # Write your package code here.
-
 
 end

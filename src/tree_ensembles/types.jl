@@ -1,5 +1,48 @@
 """
-Gets the data required for constructing the corresponding MIP from an [EvoTrees](https://github.com/Evovest/EvoTrees.jl) model `evo_model`. Returns a custom datatype `TEModel` which contains the necessary information.
+Universal datatype for storing information about a Tree Ensemble Model.
+This is the datatype that is used when creating the integer optimization problem from a tree ensemble.
+
+Different tree models (EvoTrees, XGBoost, RandomForest) require individual conversion functions to this datatype.
+
+# Fields
+- `n_trees`: number of trees in the ensemble
+- `n_feats`: number of features (input variables) in the model
+- `n_leaves`: number of leaves on each tree
+- `leaves`: indices of the leaves on each tree
+- `splits`: [feature, splitpoint index] pairs accessible by [tree, node]
+- `splits_ordered`: splitpoints ordered by split value for each feature
+- `n_splits`: number of splitpoints for each feature
+- `predictions`: prediction of each node (zero for nodes that are not leaves)
+- `split_nodes`: boolean array containing information whether a node is a split node or not
+
+Splitpoints is the set of unique condition values from the ensemble. Each node is associated with a condition value.
+"""
+struct TEModel
+    n_trees::Int64
+    n_feats::Int64
+    n_leaves::Array{Int64}
+    leaves::Array{Array}
+    splits::Matrix{Any}
+    splits_ordered::Array{Vector}
+    n_splits::Array{Int64}
+    predictions::Array{Array}
+    split_nodes::Array{Array}
+end
+
+"""
+```julia
+extract_evotrees_info(evo_model; tree_limit=length(evo_model.trees))
+```
+
+Gets the data required for constructing the corresponding MIP from an [EvoTrees](https://github.com/Evovest/EvoTrees.jl) model `evo_model`. 
+Returns a custom datatype `TEModel` which contains the necessary information.
+
+# Arguments
+- `evo_model`: A trained EvoTrees tree ensemble model.
+
+# Optional arguments
+- `tree_limit`: only first *n* trees specified by the argument will be used
+
 """
 function extract_evotrees_info(evo_model; tree_limit=length(evo_model.trees))
 
@@ -52,59 +95,4 @@ function extract_evotrees_info(evo_model; tree_limit=length(evo_model.trees))
 
     return TEModel(n_trees, n_feats, n_leaves, leaves, splits, splits_ordered, n_splits, predictions, split_nodes)
 
-end
-
-"""
-Finds the children leaves of node `id` in a binary tree.
-"""
-function children(id, leaf_dict, max)
-
-    result::Vector{Int64} = []
-
-    function inner(num)
-        if num <= max
-            leaf_index = get(leaf_dict, num, 0)
-            if leaf_index != 0
-                push!(result, leaf_index)
-            end
-            inner(num << 1)
-            inner(num << 1 + 1)
-        end
-    end
-
-    inner(id)
-
-    return result
-
-end
-
-"""
-Gets human-readable array `solution` where upper and lower bounds for each feature are given.
-"""
-function get_solution(n_feats, model, n_splits, splits_ordered)
-
-    smallest_splitpoint = Array{Int64}(undef, n_feats)
-
-    [smallest_splitpoint[feat] = n_splits[feat] + 1 for feat in 1:n_feats]
-    for ele in eachindex(model[:x])
-        if round(value(model[:x][ele])) == 1 && ele[2] < smallest_splitpoint[ele[1]]
-            smallest_splitpoint[ele[1]] = ele[2]
-        end
-    end
-
-    solution = Array{Vector}(undef, n_feats)
-    for feat in 1:n_feats
-
-        solution[feat] = [-Inf64; Inf64]
-
-        if smallest_splitpoint[feat] <= n_splits[feat]
-            solution[feat][2] = splits_ordered[feat][smallest_splitpoint[feat]]
-        end
-
-        if smallest_splitpoint[feat] > 1
-            solution[feat][1] = splits_ordered[feat][smallest_splitpoint[feat] - 1]
-        end
-    end
-
-    return solution
 end

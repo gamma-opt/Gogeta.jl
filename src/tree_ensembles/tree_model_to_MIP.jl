@@ -1,12 +1,25 @@
 """
-Creates a JuMP model `opt_model` and optimizes it when given a `tree_model` in the universal data type `TEModel`. Returns `opt_model`, and an array given by `get_solution` or nothing in the case of a failed solve.
+```julia
+tree_model_to_MIP(tree_model; create_initial=false, objective=MAX_SENSE, gurobi_env=Gurobi.Env(), show_output=false, timelimit=100)
+```
+
+Creates a JuMP model `opt_model` and optimizes it, i.e., finds the input that maximizes/minimizes the output.
+Returns `opt_model`, and an array corresponding to the optimal input given by `get_solution` or nothing in the case of a failed solve.
+
+# Arguments
+- `tree_model`: A tree ensemble model in the universal data type `TEModel`. 
 
 # Optional arguments
-* `create_initial` - controls whether split constraint algorithm or initial generation is used
-* `objective` - `MIN_SENSE` or default `MAX_SENSE`
-* `gurobi_env` - environment for Gurobi solver
-* `show_output` - controls whether output of Gurobi is shown
-* `timelimit` - time after which Gurobi solver terminates
+- `create_initial`: controls whether split constraint algorithm or initial generation is used
+- `objective`: `MIN_SENSE` or default `MAX_SENSE`
+- `gurobi_env`: environment for Gurobi solver
+- `show_output`: controls whether output of Gurobi is shown
+- `timelimit`: time in seconds after which Gurobi solver terminates
+
+# Examples
+```julia
+solution, objective_value, jump_model = tree_model_to_MIP(tree_model, create_initial = true, timelimit=200)
+```
 """
 function tree_model_to_MIP(tree_model; create_initial=false, objective=MAX_SENSE, gurobi_env=Gurobi.Env(), show_output=false, timelimit=100)
     

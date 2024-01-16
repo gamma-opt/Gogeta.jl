@@ -6,4 +6,4 @@ This folder contains the Julia implementation of converting a tree ensmble model
 
 `types.jl` - Contains the definition for the universal datatype `TEModel` and the functions for converting different tree ensemble models into it.
 
-`util.jl` - Contains auxiliary functions not part of the public interface.
+`util.jl` - Contains auxiliary functions.

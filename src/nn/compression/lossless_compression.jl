@@ -5,6 +5,25 @@ using NPZ
 
 Random.seed!(1234)
 
+# helper functions
+function forward_pass(X, W1_, b1_, W2_, b2_)
+  A1 = W1_ * X .+ b1_[:]
+  R1 = relu.(A1)
+  product = W2_ * R1
+  A2 = product .+ b2_[:]
+  return A1, A2
+end
+
+function rank_threshold(M, threshold=1e-5)
+  # TODO: compare these two methods
+  return rank(M)
+
+  # F = svd(M)
+  # S = F.S
+  # return sum(abs.(S) .> threshold)
+end
+
+# prune neurons that are always inactive
 function prune_by_upper_bound(G1, G_bar1, W1, b1, G2, G_bar2, W2, b2)
   # TODO: consider using leq and a threshold instead of 0 (epsilon)
   to_prune = [i for i = 1:size(W1, 1) if G1[i] < 0]
@@ -19,6 +38,7 @@ function prune_by_upper_bound(G1, G_bar1, W1, b1, G2, G_bar2, W2, b2)
   return G1, G_bar1, W1, b1, G2, G_bar2, W2, b2, length(to_prune)
 end
 
+# prune neurons that have zero weights
 function prune_zero_weights(G1, G_bar1, W1, b1, G2, G_bar2, W2, b2)
   # TODO: consider using a threshold instead of 0 (epsilon)
   to_prune = [index[1] for index in findall(sum(abs.(W1), dims=2) .< 1e-5)]
@@ -35,14 +55,7 @@ function prune_zero_weights(G1, G_bar1, W1, b1, G2, G_bar2, W2, b2)
   return G1, G_bar1, W1, b1, G2, G_bar2, W2, b2, length(to_prune)
 end
 
-function forward_pass(X, W1_, b1_, W2_, b2_)
-  A1 = W1_ * X .+ b1_[:]
-  R1 = relu.(A1)
-  product = W2_ * R1
-  A2 = product .+ b2_[:]
-  return A1, A2
-end
-
+# prune layers that are stable
 function prune_stable_layer(W1, b1, W2, b2, S, X)
   n_neurons_l_minus_1 = size(X, 1)
   n_neurons_l_plus_1 = size(W2, 1)
@@ -61,15 +74,7 @@ function prune_stable_layer(W1, b1, W2, b2, S, X)
   return W_bar', b_bar
 end
 
-function rank_threshold(M, threshold=1e-5)
-  F = svd(M)
-  S = F.S
-
-  # TODO: compare these two methods
-  return rank(M)
-  # return sum(abs.(S) .> threshold)
-end
-
+# prune neurons that are linearly dependent on other neurons
 function prune_stabily_active(G1, G_bar1, W1, b1, G2, G_bar2, W2, b2, X, S, i)
   W_current = W1[[i; collect(S)], :]
 
@@ -95,6 +100,7 @@ function prune_stabily_active(G1, G_bar1, W1, b1, G2, G_bar2, W2, b2, X, S, i)
   return G1, G_bar1, W1, b1, G2, G_bar2, W2, b2, S
 end
 
+# prune the network
 function prune_neuron(W1, b1, W2, b2, X, G1, G2, G_bar1, G_bar2)
   A1, A2 = forward_pass(X, W1, b1, W2, b2)
 
@@ -148,6 +154,21 @@ function prune_neuron(W1, b1, W2, b2, X, G1, G2, G_bar1, G_bar2)
   return W1, b1, W2, b2, pruned, is_close, false, n_pruned_by_upper_bound, n_pruned_by_zero_weight, n_pruned_by_linear_dependence
 end
 
+# main function that takes the parameters of consecutive layers and their bounds, and compresses them
+function prune_from_model(W1, b1, W2, b2, upper1, upper2, lower1, lower2)
+  n_neurons = size(W1, 2)
+
+  X = rand(n_neurons)
+
+  G1, G2 = upper1, upper2
+  G_bar1, G_bar2 = lower1, lower2
+
+  W1, b1, W2, b2, pruned, is_close, layer_folded, n_pruned_by_upper_bound, n_pruned_by_zero_weight, n_pruned_by_linear_dependence = prune_neuron(W1, b1, W2, b2, X, G1, G2, G_bar1, G_bar2)
+
+  return W1, b1, W2, b2, n_pruned_by_upper_bound, n_pruned_by_zero_weight, n_pruned_by_linear_dependence
+end
+
+# ! FOR DEBUGGING
 function add_linear_dependencies_to_matrix(W1, max_dependencies=2)
   n_rows, _ = size(W1)
   num_dependencies = rand(1:max_dependencies)
@@ -201,19 +222,6 @@ function create_simple_matrices()
   X = Float32[1.0, 1.0, 1.0]
 
   return W1, b1, W2, b2, X
-end
-
-function prune_from_model(W1, b1, W2, b2, upper1, upper2, lower1, lower2)
-  n_neurons = size(W1, 2)
-
-  X = rand(n_neurons)
-
-  G1, G2 = upper1, upper2
-  G_bar1, G_bar2 = lower1, lower2
-
-  W1, b1, W2, b2, pruned, is_close, layer_folded, n_pruned_by_upper_bound, n_pruned_by_zero_weight, n_pruned_by_linear_dependence = prune_neuron(W1, b1, W2, b2, X, G1, G2, G_bar1, G_bar2)
-
-  return W1, b1, W2, b2, n_pruned_by_upper_bound, n_pruned_by_zero_weight, n_pruned_by_linear_dependence
 end
 
 function run_tests(n_iterations = 10)

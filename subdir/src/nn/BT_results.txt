@@ -1,0 +1,129 @@
+DNN1: 784 -> 32 -> 16 -> 10 (2 hidden layers)
+
+Single thread: solve for optimal bounds: (Gurobi default thread setting)
+27.723542 seconds (1.32 M allocations: 2.056 GiB, 0.44% gc time)
+timelimit 5:
+28.228377 seconds (2.20 M allocations: 2.174 GiB, 0.47% gc time)
+
+Using workers (Gurobi Thread => 1)
+15.380159 seconds (23.64 k allocations: 940.531 KiB)
+timelimit 5:
+14.716409 seconds (27.26 k allocations: 1.027 MiB)
+
+Using threads (Gurobi default thread setting)
+18.831569 seconds (40.94 M allocations: 56.215 GiB, 12.04% gc time)
+timelimit 5:
+18.575011 seconds (40.92 M allocations: 56.214 GiB, 14.31% gc time)
+
+Using pmap (Gurobi Thread => 1)
+15.071860 seconds (32.15 k allocations: 2.240 MiB)
+timelimit 5:
+14.933070 seconds (31.25 k allocations: 2.205 MiB)
+
+Using 2 workers and in-place models (Gurobi Thread => 4)
+18.007037 seconds (14.59 k allocations: 455.227 KiB)
+timelimit 5:
+17.818053 seconds (14.62 k allocations: 455.094 KiB)
+
+Average time (s) of generating 10 adversarial images:
+Initial bounds: 9.56, optimal bounds: 2.64, difference 6.90 (avageage 262% improvement)
+
+generating 10 adversarial images (s) (difference: initial bounds - optimal bounds):
+3.31, 3.86, 0.53, 32.78, 0.65, 0.014, 4.94, 0.012, 21.29, 1.63
+
+
+
+DNN2: 784 -> 32 -> 24 -> 16 -> 10 (3 hidden layers)
+
+Single thread: solve for optimal bounds: (Gurobi default thread setting)
+232.167599 seconds (2.38 M allocations: 2.092 GiB, 0.09% gc time)
+timelimit 5:
+174.151370 seconds (4.27 M allocations: 2.293 GiB, 0.15% gc time, 0.37% compilation time)
+
+Using workers (Gurobi Thread => 1)
+219.203791 seconds (36.08 k allocations: 1.402 MiB)
+timelimit 5:
+50.948346 seconds (79.61 k allocations: 4.222 MiB, 0.09% compilation time)
+
+Using threads (Gurobi default thread setting) (Threads => 1 a lot slower!! ab 225 sec)
+176.632753 seconds (73.50 M allocations: 106.051 GiB, 3.58% gc time)
+timelimit 5:
+58.581172 seconds (72.94 M allocations: 106.032 GiB, 8.26% gc time, 0.06% compilation time)
+
+Using pmap (Gurobi Thread => 1)
+179.772016 seconds (43.64 k allocations: 3.648 MiB)
+timelimit 5:
+49.030499 seconds (89.92 k allocations: 6.293 MiB, 0.12% compilation time)
+
+Using 2 workers and in-place models (Gurobi Thread => 4)
+180.827754 seconds (55.44 k allocations: 2.967 MiB, 0.02% compilation time)
+timelimit 5:
+103.115144 seconds (54.10 k allocations: 2.874 MiB, 0.04% compilation time)
+
+Average time (s) of generating 10 adversarial images:
+Initial bounds: 57.87, optimal bounds: 29.09, difference 28.78 (avageage 99% improvement)
+
+generating 10 adversarial images (s) (difference: initial bounds - new bounds):
+-0.77, -20.19, 15.66, -2.03, -27.27, 5.96, 0.36, 6.17, 87.16, 222.77
+
+
+
+
+
+DNN3: 784 -> 30 -> 30 -> 20 -> 10 -> 10 (4 hidden layers)
+
+Single thread: solve for optimal bounds: (Gurobi default thread setting)
+1148.495728 seconds (7.39 M allocations: 2.204 GiB, 0.03% gc time, 0.01% compilation time)
+timelimit 5:
+342.257300 seconds (3.09 M allocations: 2.077 GiB, 0.03% gc time, 0.03% compilation time)
+
+Using workers (Gurobi Thread => 1)
+1106.008960 seconds (384.99 k allocations: 22.856 MiB, 0.02% gc time, 0.03% compilation time)
+timelimit 5:
+73.439038 seconds (47.72 k allocations: 1.944 MiB)
+
+Using threads (Gurobi default thread setting)
+981.570670 seconds (92.32 M allocations: 137.702 GiB, 1.13% gc time, 0.00% compilation time)
+timelimit 5:
+103.564166 seconds (152.94 M allocations: 187.932 GiB, 6.93% gc time)
+
+Using pmap (Gurobi Thread => 1)
+955.495987 seconds (97.23 k allocations: 7.588 MiB, 0.01% compilation time)
+timelimit 5:
+71.634914 seconds (98.18 k allocations: 7.463 MiB, 0.05% compilation time)^
+
+Using 2 workers and in-place models (Gurobi Thread => 4)
+838.809956 seconds (59.94 k allocations: 3.127 MiB, 0.00% compilation time)
+timelimit 5:
+176.030394 seconds (58.26 k allocations: 3.008 MiB, 0.02% compilation time)
+
+
+
+
+
+
+
+
+
+DNN4: 784 -> 40 -> 30 -> 20 -> 10 -> 10 (4 hidden layers)
+
+Single thread: solve for optimal bounds: (Gurobi default thread setting)
+3813.756949 seconds (18.10 M allocations: 3.072 GiB, 0.01% gc time)
+
+Using workers (Gurobi default thread setting)
+3491.118420 seconds (42.43 k allocations: 1.852 MiB)
+
+Using workers (Gurobi Thread => 1)
+4265.412644 seconds (47.68 k allocations: 1.943 MiB)
+timelimit 5:
+95.630447 seconds (94.14 k allocations: 4.843 MiB, 0.05% compilation time)
+
+Using threads (Gurobi Thread => 1)
+
+Using pmap (Gurobi Thread => 1)
+
+Average time (s) of generating 10 adversarial images:
+Initial bounds: 2927, optimal bounds: 240, difference 2687 (avageage 1119% improvement)
+
+generating 10 adversarial images (s) (difference: initial bounds - new bounds):
+2365, 1136, 1287, 10089, 117, -576, 3317, -176, -22, 9329

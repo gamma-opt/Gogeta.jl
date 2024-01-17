@@ -5,8 +5,8 @@ using MLDatasets
 using Statistics
 using NPZ
 
-include("./lossless_compression.jl")
-include("../bound_tightening.jl")
+include("lossless_compression.jl")
+include("bound_tightening.jl")
 
 const gurobi_env = Gurobi.Env()
 const rng = MersenneTwister(1234)
@@ -124,7 +124,7 @@ end
 # initialize constants
 n_neurons = Int64[2, 1024, 512, 512, 256, 1]
 n_neurons_cumulative_indices = [i+1 for i in [0, cumsum(n_neurons)...]]
-parent_dir = joinpath(dirname(dirname(@__FILE__)), "compression", "layer_weights")
+parent_dir = joinpath(dirname(dirname(@__FILE__)), "neural_networks", "compression", "layer_weights")
 subdirs = filter(d -> isdir(joinpath(parent_dir, d)), readdir(parent_dir))
 
 find_lp_bounds(n_neurons, parent_dir)

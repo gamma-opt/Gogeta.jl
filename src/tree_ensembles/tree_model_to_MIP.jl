@@ -15,10 +15,6 @@ Returns `opt_model`, and an array corresponding to the optimal input given by `g
 - `gurobi_env`: environment for Gurobi solver
 - `show_output`: controls whether output of Gurobi is shown
 - `timelimit`: time in seconds after which Gurobi solver terminates
-
-# Examples
-```julia
-solution, objective_value, jump_model = tree_model_to_MIP(tree_model, create_initial = true, timelimit=200)
 ```
 """
 function tree_model_to_MIP(tree_model; create_initial=false, objective=MAX_SENSE, gurobi_env=Gurobi.Env(), show_output=false, timelimit=100)

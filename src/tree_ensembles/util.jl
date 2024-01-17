@@ -1,5 +1,17 @@
 """
-Finds the indices of the children leaves of node `id` in a binary tree.
+```julia
+children(id, leaf_dict, max)
+```
+
+Finds the leaf indices of the children leaves of node `id` in a binary tree.
+
+Returns an array of the leaf indices.
+
+# Arguments
+- `id`: Index of the node in a binary tree. Indexing starts from one and follows level order.
+- `leaf_dict`: A dictionary (map) of the leaf indices accessible by the node indices.
+- `max`: Biggest possible node id in the tree. Used to terminate the search.
+
 """
 function children(id, leaf_dict, max)
 
@@ -24,6 +36,23 @@ end
 
 """
 Creates human-readable array `solution` where upper and lower bounds for each input variable are given.
+"""
+
+"""
+```julia
+get_solution(n_feats, model, n_splits, splits_ordered)
+```
+
+Finds the upper and lower bounds for each input variable are given for the optimal solution.
+
+Return the bounds in an array for each feature.
+
+# Arguments
+- `n_feats`: Number of features (input variables) in the model.
+- `model`: The optimized JuMP model.
+- `n_splits`: Number of splits for each variable.
+- `splits_ordered`: Ordered list of the splitpoints for each variable.
+
 """
 function get_solution(n_feats, model, n_splits, splits_ordered)
 

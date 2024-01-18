@@ -20,6 +20,9 @@ include("tree_ensembles/util.jl")
 include("tree_ensembles/tree_model_to_MIP.jl")
 export tree_model_to_MIP
 
+include("tree_ensembles/TE_to_MIP.jl")
+export TE_to_MIP
+
 include("tree_ensembles/types.jl")
 export TEModel,
     extract_evotrees_info

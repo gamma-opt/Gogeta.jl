@@ -1,6 +1,5 @@
 using EvoTrees
 using JuMP
-using Gurobi
 
 evo_model = EvoTrees.load("tree_ensembles/paraboloid.bson");
 

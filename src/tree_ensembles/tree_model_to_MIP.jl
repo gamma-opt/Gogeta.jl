@@ -1,3 +1,6 @@
+using Gurobi
+using JuMP
+
 """
 ```julia
 tree_model_to_MIP(tree_model; create_initial=false, objective=MAX_SENSE, gurobi_env=Gurobi.Env(), show_output=false, timelimit=100)

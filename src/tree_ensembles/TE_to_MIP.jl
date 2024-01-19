@@ -1,9 +1,22 @@
 using JuMP
 
 """
-Solver-independent version of tree ensemble to MIP conversion.
+```julia
+function TE_to_MIP(TE::TEModel, optimizer, objective)
+```
+
+Creates a JuMP model `opt_model` based on the given tree ensemble.
+Returns `opt_model`.
+
+The JuMP model is created without the split constraints.
+
+# Arguments
+- `TE`: A tree ensemble model in the universal data type `TEModel`. 
+- `optimizer`: Optimizer object that will be given to the JuMP model.
+- `objective`: MIN_SENSE or MAX_SENSE.
+
 """
-function TE_to_MIP(TE::TEModel, optimizer, objective=MAX_SENSE)
+function TE_to_MIP(TE::TEModel, optimizer, objective)
     
     # Precalculate child leaves of every node (needed for creating the split constraints)
     init_TEModel!(TE)
@@ -26,7 +39,16 @@ function TE_to_MIP(TE::TEModel, optimizer, objective=MAX_SENSE)
 end
 
 """
-Create all possible split constraints and optimize the model.
+```julia
+function optimize_with_initial_constraints!(opt_model::JuMP.Model, TE::TEModel)
+```
+
+Adds all split constraints to the formulation and then solves the MIP.
+
+# Arguments
+- `opt_model`: A JuMP model containing the formulation.
+- `TE`: A tree ensemble model in the universal data type `TEModel`. 
+
 """
 function optimize_with_initial_constraints!(opt_model::JuMP.Model, TE::TEModel)
 
@@ -48,7 +70,17 @@ function optimize_with_initial_constraints!(opt_model::JuMP.Model, TE::TEModel)
 end
 
 """
-Optimize the model using lazy constraint callback for creating the split constraints.
+```julia
+function optimize_with_lazy_constraints!(opt_model::JuMP.Model, TE::TEModel)
+```
+
+Solves the optimization model by utilizing lazy constraints.
+This means that the split constraints are added one-by-one for each tree.
+
+# Arguments
+- `opt_model`: A JuMP model containing the formulation.
+- `TE`: A tree ensemble model in the universal data type `TEModel`. 
+
 """
 function optimize_with_lazy_constraints!(opt_model::JuMP.Model, TE::TEModel)
 
@@ -123,11 +155,13 @@ function optimize_with_lazy_constraints!(opt_model::JuMP.Model, TE::TEModel)
     if solver_name(opt_model) == "Gurobi"
         set_attribute(opt_model, "LazyConstraints", 1)
         set_attribute(opt_model, Gurobi.CallbackFunction(), split_constraint_callback_gurobi)
-    elseif solver_name(opt_model) == "GLPK"
-        set_attribute(opt_model, MOI.LazyConstraintCallback(), split_constraint_callback)
     else
-        println("SOLVER NOT SUPPORTED FOR LAZY CONSTRAINTS.")
-        return
+        try
+            set_attribute(opt_model, MOI.LazyConstraintCallback(), split_constraint_callback) 
+        catch
+            println("SOLVER NOT SUPPORTED FOR LAZY CONSTRAINTS.")
+            return
+        end
     end
 
     optimize!(opt_model)

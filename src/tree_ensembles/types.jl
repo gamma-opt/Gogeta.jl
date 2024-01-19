@@ -101,7 +101,15 @@ function extract_evotrees_info(evo_model; tree_limit=length(evo_model.trees))
 end
 
 """
+```julia
+function init_TEModel!(TE::TEModel)
+```
+
 Precompute child leaves which are needed for generating the split constraints.
+Changes `child_leaves` field of the `TEModel`.
+
+# Arguments
+- `TE`: Struct of type `TEModel` containing information about the tree ensemble.
 """
 function init_TEModel!(TE::TEModel)
 

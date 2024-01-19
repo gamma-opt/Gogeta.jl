@@ -6,8 +6,17 @@ evo_model = EvoTrees.load("tree_ensembles/paraboloid.bson");
 
 universal_tree_model = extract_evotrees_info(evo_model)
 
-solution_lazy, objective_value_lazy, jump_model_lazy = TE_to_MIP(universal_tree_model, GLPK.Optimizer(); objective=MIN_SENSE, create_initial = false)
-solution_all, objective_value_all, jump_model_all = TE_to_MIP(universal_tree_model, GLPK.Optimizer(); objective=MIN_SENSE, create_initial = true)
+jump_model_lazy = TE_to_MIP(universal_tree_model, GLPK.Optimizer(), MIN_SENSE)
+optimize_with_lazy_constraints!(jump_model_lazy, universal_tree_model)
+
+jump_model_all = TE_to_MIP(universal_tree_model, GLPK.Optimizer(), MIN_SENSE)
+optimize_with_initial_constraints!(jump_model_all, universal_tree_model)
+
+solution_lazy = get_solution(jump_model_lazy, universal_tree_model)
+solution_all = get_solution(jump_model_all, universal_tree_model)
+
+objective_value_lazy = objective_value(jump_model_lazy)
+objective_value_all = objective_value(jump_model_all)
 
 # These values have been obtained using exhaustive bruteforce search.
 # This is the true global minimum of the tree ensemble.

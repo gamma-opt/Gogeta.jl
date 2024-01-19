@@ -43,7 +43,7 @@ Creates human-readable array `solution` where upper and lower bounds for each in
 get_solution(n_feats, model, n_splits, splits_ordered)
 ```
 
-Finds the upper and lower bounds for each input variable are given for the optimal solution.
+Finds the upper and lower bounds for each input variable given the optimal solution.
 
 Return the bounds in an array for each feature.
 
@@ -54,28 +54,28 @@ Return the bounds in an array for each feature.
 - `splits_ordered`: Ordered list of the splitpoints for each variable.
 
 """
-function get_solution(n_feats, model, n_splits, splits_ordered)
+function get_solution(model::JuMP.Model, TE::TEModel)
 
-    smallest_splitpoint = Array{Int64}(undef, n_feats)
+    smallest_splitpoint = Array{Int64}(undef, TE.n_feats)
 
-    [smallest_splitpoint[feat] = n_splits[feat] + 1 for feat in 1:n_feats]
+    [smallest_splitpoint[feat] = TE.n_splits[feat] + 1 for feat in 1:TE.n_feats]
     for ele in eachindex(model[:x])
         if round(value(model[:x][ele])) == 1 && ele[2] < smallest_splitpoint[ele[1]]
             smallest_splitpoint[ele[1]] = ele[2]
         end
     end
 
-    solution = Array{Vector}(undef, n_feats)
-    for feat in 1:n_feats
+    solution = Array{Vector}(undef, TE.n_feats)
+    for feat in 1:TE.n_feats
 
         solution[feat] = [-Inf64; Inf64]
 
-        if smallest_splitpoint[feat] <= n_splits[feat]
-            solution[feat][2] = splits_ordered[feat][smallest_splitpoint[feat]]
+        if smallest_splitpoint[feat] <= TE.n_splits[feat]
+            solution[feat][2] = TE.splits_ordered[feat][smallest_splitpoint[feat]]
         end
 
         if smallest_splitpoint[feat] > 1
-            solution[feat][1] = splits_ordered[feat][smallest_splitpoint[feat] - 1]
+            solution[feat][1] = TE.splits_ordered[feat][smallest_splitpoint[feat] - 1]
         end
     end
 

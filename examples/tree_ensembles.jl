@@ -26,6 +26,7 @@ r2_score_test = 1 - sum((y_test .- pred_test).^2) / sum((y_test .- mean(y_test))
 
 using JuMP
 using Gurobi
+using GLPK
 using Gogeta
 
 # Extract data from EvoTrees model
@@ -34,5 +35,30 @@ universal_tree_model = extract_evotrees_info(evo_model);
 
 # Create JuMP model and solve the tree ensemble optimization problem (input that minimizes output)
 
-solution, objective_value, jump_model = tree_model_to_MIP(universal_tree_model; objective=MIN_SENSE, create_initial = false);
-solution_init, objective_value_init, jump_model_init = tree_model_to_MIP(universal_tree_model; objective=MIN_SENSE, create_initial = true);
+const ENV = Gurobi.Env();
+
+opt_model = TE_to_MIP(universal_tree_model, Gurobi.Optimizer(ENV), MIN_SENSE);
+set_attribute(opt_model, "OutputFlag", 0) # JuMP or solver-specific attributes can be changed
+
+# Let's solve it first without lazy constraints
+optimize_with_lazy_constraints!(opt_model, universal_tree_model)
+
+# Show results
+get_solution(opt_model, universal_tree_model)
+objective_value(opt_model)
+
+# Then without lazy constraints
+opt_model = TE_to_MIP(universal_tree_model, Gurobi.Optimizer(ENV), MIN_SENSE);
+optimize_with_initial_constraints!(opt_model, universal_tree_model)
+
+# Show results
+get_solution(opt_model, universal_tree_model)
+objective_value(opt_model)
+
+# Let's use a different solver
+opt_model = TE_to_MIP(universal_tree_model, GLPK.Optimizer(), MIN_SENSE);
+optimize_with_lazy_constraints!(opt_model, universal_tree_model)
+
+# Show results
+get_solution(opt_model, universal_tree_model)
+objective_value(opt_model)

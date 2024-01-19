@@ -1,6 +1,6 @@
 """
 ```julia
-children(id, leaf_dict, max)
+function children(id::Int, leaf_dict::Dict, max::Int)
 ```
 
 Finds the leaf indices of the children leaves of node `id` in a binary tree.
@@ -13,9 +13,9 @@ Returns an array of the leaf indices.
 - `max`: Biggest possible node id in the tree. Used to terminate the search.
 
 """
-function children(id, leaf_dict, max)
+function children(id::Int, leaf_dict::Dict, max::Int)
 
-    result::Vector{Int64} = []
+    result::Vector{Int} = []
 
     function inner(num)
         if num <= max
@@ -35,47 +35,41 @@ function children(id, leaf_dict, max)
 end
 
 """
-Creates human-readable array `solution` where upper and lower bounds for each input variable are given.
-"""
-
-"""
 ```julia
-get_solution(n_feats, model, n_splits, splits_ordered)
+function get_solution(model::JuMP.Model, TE::TEModel)
 ```
 
-Finds the upper and lower bounds for each input variable are given for the optimal solution.
+Finds the upper and lower bounds for each input variable given the optimized model.
 
-Return the bounds in an array for each feature.
+Returns the bounds for each feature in an array.
 
 # Arguments
-- `n_feats`: Number of features (input variables) in the model.
 - `model`: The optimized JuMP model.
-- `n_splits`: Number of splits for each variable.
-- `splits_ordered`: Ordered list of the splitpoints for each variable.
+- `TE`: Struct of type `TEModel` containing information about the tree ensemble.
 
 """
-function get_solution(n_feats, model, n_splits, splits_ordered)
+function get_solution(model::JuMP.Model, TE::TEModel)
 
-    smallest_splitpoint = Array{Int64}(undef, n_feats)
+    smallest_splitpoint = Array{Int64}(undef, TE.n_feats)
 
-    [smallest_splitpoint[feat] = n_splits[feat] + 1 for feat in 1:n_feats]
+    [smallest_splitpoint[feat] = TE.n_splits[feat] + 1 for feat in 1:TE.n_feats]
     for ele in eachindex(model[:x])
         if round(value(model[:x][ele])) == 1 && ele[2] < smallest_splitpoint[ele[1]]
             smallest_splitpoint[ele[1]] = ele[2]
         end
     end
 
-    solution = Array{Vector}(undef, n_feats)
-    for feat in 1:n_feats
+    solution = Array{Vector}(undef, TE.n_feats)
+    for feat in 1:TE.n_feats
 
         solution[feat] = [-Inf64; Inf64]
 
-        if smallest_splitpoint[feat] <= n_splits[feat]
-            solution[feat][2] = splits_ordered[feat][smallest_splitpoint[feat]]
+        if smallest_splitpoint[feat] <= TE.n_splits[feat]
+            solution[feat][2] = TE.splits_ordered[feat][smallest_splitpoint[feat]]
         end
 
         if smallest_splitpoint[feat] > 1
-            solution[feat][1] = splits_ordered[feat][smallest_splitpoint[feat] - 1]
+            solution[feat][1] = TE.splits_ordered[feat][smallest_splitpoint[feat] - 1]
         end
     end
 

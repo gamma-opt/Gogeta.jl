@@ -1,7 +1,5 @@
 module Gogeta
 
-#include the files for neural networks functions and export the functions
-
 include("neural_networks/JuMP_model.jl")
 export create_JuMP_model, evaluate!
 
@@ -14,14 +12,13 @@ export bound_tightening,
     bound_tightening_workers,
     bound_tightening_2workers
 
-#include the files for tree tree_ensembles functions and export the functions
-include("tree_ensembles/util.jl")
-
-include("tree_ensembles/tree_model_to_MIP.jl")
-export tree_model_to_MIP
-
 include("tree_ensembles/types.jl")
-export TEModel,
-    extract_evotrees_info
+export TEModel, extract_evotrees_info
+
+include("tree_ensembles/util.jl")
+export get_solution
+
+include("tree_ensembles/TE_to_MIP.jl")
+export TE_to_MIP, optimize_with_initial_constraints!, optimize_with_lazy_constraints!
 
 end

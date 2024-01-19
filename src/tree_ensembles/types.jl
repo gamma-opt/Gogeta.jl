@@ -29,6 +29,7 @@ struct TEModel
     n_splits::Array{Int64}
     predictions::Array{Array}
     split_nodes::Array{Array}
+    child_leaves::Array{Array}
 end
 
 """
@@ -95,6 +96,34 @@ function extract_evotrees_info(evo_model; tree_limit=length(evo_model.trees))
     split_nodes = Array{Array}(undef, n_trees)
     [split_nodes[tree] = evo_model.trees[tree].split for tree in 1:n_trees]
 
-    return TEModel(n_trees, n_feats, n_leaves, leaves, splits, splits_ordered, n_splits, predictions, split_nodes)
+    return TEModel(n_trees, n_feats, n_leaves, leaves, splits, splits_ordered, n_splits, predictions, split_nodes, Array{Array}(undef, n_trees))
 
+end
+
+"""
+```julia
+function init_TEModel!(TE::TEModel)
+```
+
+Precompute child leaves which are needed for generating the split constraints.
+Changes `child_leaves` field of the `TEModel`.
+
+# Arguments
+- `TE`: Struct of type `TEModel` containing information about the tree ensemble.
+"""
+function init_TEModel!(TE::TEModel)
+
+    leaf_dict = Array{Dict}(undef, TE.n_trees)
+    [leaf_dict[tree] = Dict([(TE.leaves[tree][leaf], leaf) for leaf in eachindex(TE.leaves[tree])]) for tree in 1:TE.n_trees]
+
+    # pre-compute all children for all active nodes of all trees
+    for tree in 1:TE.n_trees
+        
+        nodes_with_split = findall(split -> split == true, TE.split_nodes[tree])
+        TE.child_leaves[tree] = Array{Any}(undef, maximum(TE.leaves[tree]))
+
+        for node in [nodes_with_split; TE.leaves[tree]]
+            TE.child_leaves[tree][node] = children(node, leaf_dict[tree], last(TE.leaves[tree]))
+        end
+    end
 end

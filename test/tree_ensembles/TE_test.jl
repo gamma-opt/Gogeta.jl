@@ -2,9 +2,13 @@ using EvoTrees
 using JuMP
 using GLPK
 
+@info "Loading a trained tree ensemble model."
+
 evo_model = EvoTrees.load("tree_ensembles/paraboloid.bson");
 
 universal_tree_model = extract_evotrees_info(evo_model)
+
+@info "Creating a JuMP model and optimizing it."
 
 jump_model_lazy = TE_to_MIP(universal_tree_model, GLPK.Optimizer(), MIN_SENSE)
 optimize_with_lazy_constraints!(jump_model_lazy, universal_tree_model)
@@ -22,6 +26,8 @@ objective_value_all = objective_value(jump_model_all)
 # This is the true global minimum of the tree ensemble.
 minimum_value = -0.0008044997f0;
 minimum = [ -0.0373748243818212, -0.042113434576107486,  0.009143172249250781];
+
+@info "Comparing obtained optimal solutions to the true minimum of the tree ensemble."
 
 @test solution_lazy ≈ solution_all
 @test objective_value_all ≈ objective_value_lazy

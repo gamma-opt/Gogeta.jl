@@ -40,7 +40,7 @@ const ENV = Gurobi.Env();
 opt_model = TE_to_MIP(universal_tree_model, Gurobi.Optimizer(ENV), MIN_SENSE);
 set_attribute(opt_model, "OutputFlag", 0) # JuMP or solver-specific attributes can be changed
 
-# Let's solve it first without lazy constraints
+# Let's solve it first with lazy constraints
 optimize_with_lazy_constraints!(opt_model, universal_tree_model)
 
 # Show results

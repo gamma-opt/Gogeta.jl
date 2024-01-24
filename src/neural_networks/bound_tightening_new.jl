@@ -5,15 +5,25 @@ using Gurobi
 
 BSON.@load string(@__DIR__)*"/NN_paraboloid.bson" model
 
-init_ub = [1.0f0, 1.0f0]
-init_lb = [-1.0f0, -1.0f0]
+init_ub = [1.0, 1.0]
+init_lb = [-1.0, -1.0]
 
-jump_model, bounds_x, bounds_s = bound_tightening(model, init_ub, init_lb)
-bounds_x
-bounds_s
-objective_function(jump_model)
+model = Chain(
+    Dense(2 => 30, relu),
+    Dense(30 => 50, relu),
+    Dense(50 => 1, relu)
+) 
 
-function bound_tightening(NN_model::Flux.Chain, init_ub::Vector{Float32}, init_lb::Vector{Float32})
+@time jump_model, bounds_x, bounds_s = bound_tightening(model, init_ub, init_lb)
+
+data = rand(Float32, (2, 1000)) .- 0.5f0
+
+x_train = data[:, 1:750]
+y_train = [sum(x_train[:, col].^2) for col in 1:750]
+
+vec(model(x_train)) ≈ [forward_pass!(jump_model, x_train[:, i])[1] for i in 1:750]
+
+function bound_tightening(NN_model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vector{Float64})
 
     K = length(NN_model) # number of layers (input layer not included)
     W = [Flux.params(NN_model)[2*k-1] for k in 1:K]
@@ -40,6 +50,8 @@ function bound_tightening(NN_model::Flux.Chain, init_ub::Vector{Float32}, init_l
     bounds_s = Vector{Vector}(undef, K)
     
     for layer in 1:K # hidden layers to output layer - second layer and up
+
+        println("LAYER $layer")
     
         ub_x = Vector{Float32}(undef, length(neurons(layer)))
         ub_s = Vector{Float32}(undef, length(neurons(layer)))
@@ -47,6 +59,8 @@ function bound_tightening(NN_model::Flux.Chain, init_ub::Vector{Float32}, init_l
         # TODO: For parallelization the model must be copied for each neuron in a new layer to prevent data races
     
         for neuron in 1:neuron_count[layer]
+
+            print("#")
     
             @constraint(jump_model, x[layer, neuron] >= 0)
             @constraint(jump_model, s[layer, neuron] >= 0)
@@ -65,6 +79,8 @@ function bound_tightening(NN_model::Flux.Chain, init_ub::Vector{Float32}, init_l
             optimize!(jump_model)
             ub_s[neuron] = objective_value(jump_model)
         end
+
+        println()
         
         bounds_x[layer] = ub_x
         bounds_s[layer] = ub_s
@@ -74,4 +90,15 @@ function bound_tightening(NN_model::Flux.Chain, init_ub::Vector{Float32}, init_l
     end
 
     return jump_model, bounds_x, bounds_s
+end
+
+function forward_pass!(jump_model::JuMP.Model, input::Vector{Float32})
+    @assert length(input) == length(jump_model[:x][0, :]) "Incorrect input length."
+
+    [fix(jump_model[:x][0, i], input[i], force=true) for i in eachindex(input)]
+    optimize!(jump_model)
+
+    (last_layer, outputs) = maximum(keys(jump_model[:x].data))
+    result = value.(jump_model[:x][last_layer, :])
+    return [result[i] for i in 1:outputs]
 end

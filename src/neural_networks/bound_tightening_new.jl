@@ -3,8 +3,9 @@ using Flux
 using JuMP
 using Gurobi
 using SharedArrays
+using Distributed
 
-function NN_to_MIP(NN_model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vector{Float64}, environment; tighten_bounds=true)
+function NN_to_MIP(NN_model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vector{Float64}; tighten_bounds=true, distributed=false)
 
     K = length(NN_model) # number of layers (input layer not included)
     W = [Flux.params(NN_model)[2*k-1] for k in 1:K]
@@ -18,7 +19,7 @@ function NN_to_MIP(NN_model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vect
     
     # build model up to second layer
     jump_model = Model()
-    set_optimizer(jump_model, () -> Gurobi.Optimizer(environment))
+    set_optimizer(jump_model, () -> Gurobi.Optimizer(ENV[myid()]))
     set_silent(jump_model)
     
     @variable(jump_model, x[layer = 0:K, neurons(layer)])
@@ -38,8 +39,16 @@ function NN_to_MIP(NN_model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vect
 
         # TODO: For parallelization the model must be copied for each neuron in a new layer to prevent data races
 
-        @distributed for neuron in 1:neuron_count[layer]
-            if tighten_bounds ub_x[neuron], ub_s[neuron] = calculate_bounds(jump_model, layer, neuron, W, b, neurons) end
+        if tighten_bounds
+            if distributed
+                @sync @distributed for neuron in 1:neuron_count[layer]
+                    ub_x[neuron], ub_s[neuron] = calculate_bounds_copy(jump_model, layer, neuron, W, b, neurons)
+                end
+            else
+                for neuron in 1:neuron_count[layer]
+                    ub_x[neuron], ub_s[neuron] = calculate_bounds(jump_model, layer, neuron, W, b, neurons)
+                end
+            end
         end
 
         for neuron in 1:neuron_count[layer]
@@ -103,10 +112,10 @@ function calculate_bounds(model::JuMP.Model, layer, neuron, W, b, neurons)
     return ub_x, ub_s
 end
 
-function calculate_bounds_copy(input_model::JuMP.Model, layer, neuron, W, b, neurons, environment)
+function calculate_bounds_copy(input_model::JuMP.Model, layer, neuron, W, b, neurons)
 
     model = copy(input_model)
-    set_optimizer(model, () -> Gurobi.Optimizer(environment))
+    set_optimizer(model, () -> Gurobi.Optimizer(ENV[myid()]))
     set_silent(model)
 
     x = model[:x]

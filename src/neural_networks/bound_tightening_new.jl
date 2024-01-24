@@ -3,27 +3,7 @@ using Flux
 using JuMP
 using Gurobi
 
-BSON.@load string(@__DIR__)*"/NN_paraboloid.bson" model
-
-init_ub = [1.0, 1.0]
-init_lb = [-1.0, -1.0]
-
-model = Chain(
-    Dense(2 => 30, relu),
-    Dense(30 => 50, relu),
-    Dense(50 => 1, relu)
-) 
-
-@time jump_model, bounds_x, bounds_s = bound_tightening(model, init_ub, init_lb)
-
-data = rand(Float32, (2, 1000)) .- 0.5f0
-
-x_train = data[:, 1:750]
-y_train = [sum(x_train[:, col].^2) for col in 1:750]
-
-vec(model(x_train)) ≈ [forward_pass!(jump_model, x_train[:, i])[1] for i in 1:750]
-
-function bound_tightening(NN_model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vector{Float64})
+function NN_to_MIP(NN_model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vector{Float64}, environment; tighten_bounds=true)
 
     K = length(NN_model) # number of layers (input layer not included)
     W = [Flux.params(NN_model)[2*k-1] for k in 1:K]
@@ -36,7 +16,8 @@ function bound_tightening(NN_model::Flux.Chain, init_ub::Vector{Float64}, init_l
     @assert input_length == length(init_ub) == length(init_lb) "Initial bounds arrays must be the same length as the input layer"
     
     # build model up to second layer
-    jump_model = direct_model(Gurobi.Optimizer())
+    jump_model = Model()
+    set_optimizer(jump_model, () -> Gurobi.Optimizer(environment))
     set_silent(jump_model)
     
     @variable(jump_model, x[layer = 0:K, neurons(layer)])
@@ -50,37 +31,28 @@ function bound_tightening(NN_model::Flux.Chain, init_ub::Vector{Float64}, init_l
     bounds_s = Vector{Vector}(undef, K)
     
     for layer in 1:K # hidden layers to output layer - second layer and up
-
-        println("LAYER $layer")
     
-        ub_x = Vector{Float32}(undef, length(neurons(layer)))
-        ub_s = Vector{Float32}(undef, length(neurons(layer)))
+        ub_x = fill(1000.0, length(neurons(layer)))
+        ub_s = fill(1000.0, length(neurons(layer)))
     
         # TODO: For parallelization the model must be copied for each neuron in a new layer to prevent data races
-    
+
+        for neuron in 1:neuron_count[layer]
+            if tighten_bounds ub_x[neuron], ub_s[neuron] = calculate_bounds(jump_model, layer, neuron, W, b, neurons) end
+        end 
+
         for neuron in 1:neuron_count[layer]
 
-            print("#")
-    
             @constraint(jump_model, x[layer, neuron] >= 0)
             @constraint(jump_model, s[layer, neuron] >= 0)
             set_binary(z[layer, neuron])
-    
+
             @constraint(jump_model, z[layer, neuron] --> {x[layer, neuron] <= 0})
             @constraint(jump_model, !z[layer, neuron] --> {s[layer, neuron] <= 0})
-    
-            @constraint(jump_model, x[layer, neuron] - s[layer, neuron] == b[layer][neuron] + sum(W[layer][neuron, i] * x[layer-1, i] for i in neurons(layer-1)))
-    
-            @objective(jump_model, Max, x[layer, neuron])
-            optimize!(jump_model)
-            ub_x[neuron] = objective_value(jump_model)
-    
-            @objective(jump_model, Max, s[layer, neuron])
-            optimize!(jump_model)
-            ub_s[neuron] = objective_value(jump_model)
-        end
 
-        println()
+            @constraint(jump_model, x[layer, neuron] - s[layer, neuron] == b[layer][neuron] + sum(W[layer][neuron, i] * x[layer-1, i] for i in neurons(layer-1)))
+
+        end
         
         bounds_x[layer] = ub_x
         bounds_s[layer] = ub_s
@@ -89,7 +61,75 @@ function bound_tightening(NN_model::Flux.Chain, init_ub::Vector{Float64}, init_l
         @constraint(jump_model, [neuron = neurons(layer)], s[layer, neuron] <= ub_s[neuron])
     end
 
-    return jump_model, bounds_x, bounds_s
+    return jump_model, bounds_x, bounds_s, opt_time
+end
+
+function calculate_bounds(model::JuMP.Model, layer, neuron, W, b, neurons)
+
+    x = model[:x]
+    s = model[:s]
+    z = model[:z]
+    
+    @constraint(model, x_con, x[layer, neuron] >= 0)
+    @constraint(model, s_con, s[layer, neuron] >= 0)
+    set_binary(z[layer, neuron])
+
+    @constraint(model, zx_con, z[layer, neuron] --> {x[layer, neuron] <= 0})
+    @constraint(model, zs_con, !z[layer, neuron] --> {s[layer, neuron] <= 0})
+
+    @constraint(model, w_con, x[layer, neuron] - s[layer, neuron] == b[layer][neuron] + sum(W[layer][neuron, i] * x[layer-1, i] for i in neurons(layer-1)))
+
+    @objective(model, Max, x[layer, neuron])
+    optimize!(model)
+    ub_x = objective_value(model)
+
+    @objective(model, Max, s[layer, neuron])
+    optimize!(model)
+    ub_s = objective_value(model)
+
+    delete(model, x_con)
+    delete(model, s_con)
+    delete(model, zx_con)
+    delete(model, zs_con)
+    delete(model, w_con)
+    unregister(model, :x_con)
+    unregister(model, :s_con)
+    unregister(model, :zx_con)
+    unregister(model, :zs_con)
+    unregister(model, :w_con)
+    unset_binary(z[layer, neuron])
+
+    return ub_x, ub_s
+end
+
+function calculate_bounds_copy(input_model::JuMP.Model, layer, neuron, W, b, neurons, environment)
+
+    model = copy(input_model)
+    set_optimizer(model, () -> Gurobi.Optimizer(environment))
+    set_silent(model)
+
+    x = model[:x]
+    s = model[:s]
+    z = model[:z]
+    
+    @constraint(model, x[layer, neuron] >= 0)
+    @constraint(model, s[layer, neuron] >= 0)
+    set_binary(z[layer, neuron])
+
+    @constraint(model, z[layer, neuron] --> {x[layer, neuron] <= 0})
+    @constraint(model, !z[layer, neuron] --> {s[layer, neuron] <= 0})
+
+    @constraint(model, x[layer, neuron] - s[layer, neuron] == b[layer][neuron] + sum(W[layer][neuron, i] * x[layer-1, i] for i in neurons(layer-1)))
+
+    @objective(model, Max, x[layer, neuron])
+    optimize!(model)
+    ub_x = objective_value(model)
+
+    @objective(model, Max, s[layer, neuron])
+    optimize!(model)
+    ub_s = objective_value(model)
+
+    return ub_x, ub_s
 end
 
 function forward_pass!(jump_model::JuMP.Model, input::Vector{Float32})

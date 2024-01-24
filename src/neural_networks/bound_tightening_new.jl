@@ -2,6 +2,7 @@ using BSON
 using Flux
 using JuMP
 using Gurobi
+using SharedArrays
 
 function NN_to_MIP(NN_model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vector{Float64}, environment; tighten_bounds=true)
 
@@ -32,14 +33,14 @@ function NN_to_MIP(NN_model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vect
     
     for layer in 1:K # hidden layers to output layer - second layer and up
     
-        ub_x = fill(1000.0, length(neurons(layer)))
-        ub_s = fill(1000.0, length(neurons(layer)))
-    
+        ub_x = fill(1000.0, length(neurons(layer))) |> SharedArray
+        ub_s = fill(1000.0, length(neurons(layer))) |> SharedArray
+
         # TODO: For parallelization the model must be copied for each neuron in a new layer to prevent data races
 
-        for neuron in 1:neuron_count[layer]
+        @distributed for neuron in 1:neuron_count[layer]
             if tighten_bounds ub_x[neuron], ub_s[neuron] = calculate_bounds(jump_model, layer, neuron, W, b, neurons) end
-        end 
+        end
 
         for neuron in 1:neuron_count[layer]
 
@@ -61,7 +62,7 @@ function NN_to_MIP(NN_model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vect
         @constraint(jump_model, [neuron = neurons(layer)], s[layer, neuron] <= ub_s[neuron])
     end
 
-    return jump_model, bounds_x, bounds_s, opt_time
+    return jump_model, bounds_x, bounds_s
 end
 
 function calculate_bounds(model::JuMP.Model, layer, neuron, W, b, neurons)

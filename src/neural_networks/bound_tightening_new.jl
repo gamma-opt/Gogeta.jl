@@ -21,6 +21,7 @@ function NN_to_MIP(NN_model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vect
     jump_model = Model()
     set_optimizer(jump_model, () -> Gurobi.Optimizer(ENV[myid()]))
     set_silent(jump_model)
+    set_attribute(jump_model, "TimeLimit", 0.1)
     
     @variable(jump_model, x[layer = 0:K, neurons(layer)])
     @variable(jump_model, s[layer = 0:K, neurons(layer)])
@@ -39,6 +40,8 @@ function NN_to_MIP(NN_model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vect
 
         # TODO: For parallelization the model must be copied for each neuron in a new layer to prevent data races
 
+        println("\nLAYER $layer")
+
         if tighten_bounds
             if distributed
                 @sync @distributed for neuron in 1:neuron_count[layer]
@@ -46,6 +49,7 @@ function NN_to_MIP(NN_model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vect
                 end
             else
                 for neuron in 1:neuron_count[layer]
+                    print("$neuron ")
                     ub_x[neuron], ub_s[neuron] = calculate_bounds(jump_model, layer, neuron, W, b, neurons)
                 end
             end
@@ -91,11 +95,13 @@ function calculate_bounds(model::JuMP.Model, layer, neuron, W, b, neurons)
 
     @objective(model, Max, x[layer, neuron])
     optimize!(model)
-    ub_x = objective_value(model)
+    @assert primal_status(model) == MOI.FEASIBLE_POINT "No solution found in time limit."
+    ub_x = objective_bound(model)
 
     @objective(model, Max, s[layer, neuron])
     optimize!(model)
-    ub_s = objective_value(model)
+    @assert primal_status(model) == MOI.FEASIBLE_POINT "No solution found in time limit."
+    ub_s = objective_bound(model)
 
     delete(model, x_con)
     delete(model, s_con)
@@ -133,11 +139,13 @@ function calculate_bounds_copy(input_model::JuMP.Model, layer, neuron, W, b, neu
 
     @objective(model, Max, x[layer, neuron])
     optimize!(model)
-    ub_x = objective_value(model)
+    @assert primal_status(model) == MOI.FEASIBLE_POINT "No solution found in time limit."
+    ub_x = objective_bound(model)
 
     @objective(model, Max, s[layer, neuron])
     optimize!(model)
-    ub_s = objective_value(model)
+    @assert primal_status(model) == MOI.FEASIBLE_POINT "No solution found in time limit."
+    ub_s = objective_bound(model)
 
     return ub_x, ub_s
 end

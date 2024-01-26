@@ -1,9 +1,13 @@
 include("bound_tightening_serra.jl")
 ENV = Gurobi.Env();
 
-BSON.@load string(@__DIR__)*"/NN_paraboloid.bson" model
-BSON.@load string(@__DIR__)*"/NN_medium.bson" model
-BSON.@load string(@__DIR__)*"/NN_large.bson" model
+model = Chain(
+    Dense(2 => 10, relu),
+    Dense(10 => 30, relu),
+    Dense(30 => 30, relu),
+    Dense(30 => 10, relu),
+    Dense(10 => 1)
+)
 
 init_ub = [1.0, 1.0]
 init_lb = [-1.0, -1.0]

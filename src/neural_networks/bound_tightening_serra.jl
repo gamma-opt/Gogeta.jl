@@ -6,6 +6,9 @@ using Gurobi
 function NN_to_MIP(NN_model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vector{Float64}; tighten_bounds=false)
 
     K = length(NN_model) # number of layers (input layer not included)
+    @assert reduce(&, [NN_model[i].σ == relu for i in 1:K-1]) "Neural network must use the relu activation function."
+    @assert NN_model[K].σ == identity "Neural network must use the identity function for the output layer."
+
     W = [Flux.params(NN_model)[2*k-1] for k in 1:K]
     b = [Flux.params(NN_model)[2*k] for k in 1:K]
     
@@ -19,11 +22,11 @@ function NN_to_MIP(NN_model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vect
     jump_model = Model()
     set_optimizer(jump_model, () -> Gurobi.Optimizer(ENV))
     set_silent(jump_model)
-    set_attribute(jump_model, "TimeLimit", 0.25)
+    #set_attribute(jump_model, "TimeLimit", 0.25)
     
     @variable(jump_model, x[layer = 0:K, neurons(layer)])
-    @variable(jump_model, s[layer = 0:K, neurons(layer)])
-    @variable(jump_model, z[layer = 0:K, neurons(layer)])
+    @variable(jump_model, s[layer = 0:K-1, neurons(layer)])
+    @variable(jump_model, z[layer = 0:K-1, neurons(layer)])
     
     @constraint(jump_model, [j = 1:input_length], x[0, j] <= init_ub[j])
     @constraint(jump_model, [j = 1:input_length], x[0, j] >= init_lb[j])
@@ -31,13 +34,16 @@ function NN_to_MIP(NN_model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vect
     bounds_x = Vector{Vector}(undef, K)
     bounds_s = Vector{Vector}(undef, K)
     
-    for layer in 1:K # hidden layers to output layer - second layer and up
+    for layer in 1:K-1 # hidden layers
     
         ub_x = fill(1000.0, length(neurons(layer)))
         ub_s = fill(1000.0, length(neurons(layer)))
 
+        println("\nLAYER $layer")
+
         if tighten_bounds
             for neuron in 1:neuron_count[layer]
+                print("$neuron ")
                 ub_x[neuron], ub_s[neuron] = calculate_bounds(jump_model, layer, neuron, W, b, neurons)
             end
         end
@@ -58,6 +64,12 @@ function NN_to_MIP(NN_model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vect
         bounds_x[layer] = ub_x
         bounds_s[layer] = ub_s
     end
+
+    # output layer
+    bounds = [calculate_bounds(jump_model, K, neuron, W, b, neurons) for neuron in neurons(K)]
+    bounds_x[K] = map(pair -> pair[1], bounds)
+    bounds_s[K] = map(pair -> pair[2], bounds)
+    @constraint(jump_model, [neuron in 1:neuron_count[K]], x[K, neuron] == b[K][neuron] + sum(W[K][neuron, i] * x[K-1, i] for i in neurons(K-1)))
 
     return jump_model, bounds_x, bounds_s
 end

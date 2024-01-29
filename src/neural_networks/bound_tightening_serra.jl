@@ -28,19 +28,19 @@ function NN_to_MIP(NN_model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vect
     @constraint(jump_model, [j = 1:input_length], x[0, j] <= init_ub[j])
     @constraint(jump_model, [j = 1:input_length], x[0, j] >= init_lb[j])
     
-    bounds_x = Vector{Vector}(undef, K-1)
-    bounds_s = Vector{Vector}(undef, K-1)
+    bounds_U = Vector{Vector}(undef, K-1)
+    bounds_L = Vector{Vector}(undef, K-1)
     
     for layer in 1:K-1 # hidden layers
     
-        ub_x = fill(big_M, length(neurons(layer)))
-        ub_s = fill(big_M, length(neurons(layer)))
+        bounds_U[layer] = fill(big_M, length(neurons(layer)))
+        bounds_L[layer] = fill(big_M, length(neurons(layer)))
 
         println("\nLAYER $layer")
 
         if tighten_bounds
-            bounds = map(neuron -> calculate_bounds(copy_model(jump_model), layer, neuron, W, b, neurons), neurons(layer))
-            ub_x, ub_s = [bound[1] for bound in bounds], [bound[2] for bound in bounds]
+            bounds = pmap(neuron -> calculate_bounds(copy_model(jump_model), layer, neuron, W, b, neurons), neurons(layer))
+            bounds_U[layer], bounds_L[layer] = [bound[1] for bound in bounds], [bound[2] for bound in bounds]
         end
 
         for neuron in 1:neuron_count[layer]
@@ -49,21 +49,18 @@ function NN_to_MIP(NN_model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vect
             @constraint(jump_model, s[layer, neuron] >= 0)
             set_binary(z[layer, neuron])
 
-            @constraint(jump_model, x[layer, neuron] <= ub_x[neuron] * (1 - z[layer, neuron]))
-            @constraint(jump_model, s[layer, neuron] <= ub_s[neuron] * z[layer, neuron])
+            @constraint(jump_model, x[layer, neuron] <= bounds_U[layer][neuron] * (1 - z[layer, neuron]))
+            @constraint(jump_model, s[layer, neuron] <= bounds_L[layer][neuron] * z[layer, neuron])
 
             @constraint(jump_model, x[layer, neuron] - s[layer, neuron] == b[layer][neuron] + sum(W[layer][neuron, i] * x[layer-1, i] for i in neurons(layer-1)))
 
         end
-        
-        bounds_x[layer] = ub_x
-        bounds_s[layer] = ub_s
     end
 
     # output layer
     @constraint(jump_model, [neuron in 1:neuron_count[K]], x[K, neuron] == b[K][neuron] + sum(W[K][neuron, i] * x[K-1, i] for i in neurons(K-1)))
 
-    return jump_model, bounds_x, bounds_s
+    return jump_model, bounds_U, bounds_L
 end
 
 function forward_pass!(jump_model::JuMP.Model, input::Vector{Float32})

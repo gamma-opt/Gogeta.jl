@@ -12,7 +12,7 @@ addprocs(7)
 @everywhere GUROBI_ENV = [Gurobi.Env() for i in 1:nprocs()];
 @everywhere SILENT = true;
 @everywhere LIMIT = 0;
-@everywhere RELAX = false;
+@everywhere RELAX = true;
 @everywhere THREADS = 0;
 
 using Random
@@ -21,7 +21,7 @@ Random.seed!(1234);
 model = Chain(
     Dense(2 => 10, relu),
     Dense(10 => 30, relu),
-    #Dense(30 => 30, relu),
+    Dense(30 => 30, relu),
     Dense(30 => 20, relu),
     Dense(20 => 5, relu),
     Dense(5 => 1)

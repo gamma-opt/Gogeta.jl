@@ -114,7 +114,12 @@ function find_lp_bounds(n_neurons, parent_dir)
     U_bounds = Float64[-0.5, 0.5, [1000000 for _ in 3:n_neurons_initial]...]
     L_bounds = Float64[-1.5, -0.5, [-1000000 for _ in 3:n_neurons_initial]...]
 
-    best_LP_U_bounds, best_LP_L_bounds = bound_tightening(model, U_bounds, L_bounds, false, true, gurobi_env)
+    #best_LP_U_bounds, best_LP_L_bounds = bound_tightening(model, U_bounds, L_bounds, false, true, gurobi_env)
+    _, upper_bounds, lower_bounds = NN_to_MIP(model, [-0.5, 0.5], [-1.0, -1.0]; tighten_bounds=true);
+
+    # TODO add initial bounds to the beginning and the last layer bounds
+    best_LP_U_bounds = collect(Iterators.flatten(upper_bounds))
+    best_LP_L_bounds = collect(Iterators.flatten(lower_bounds))
 
     npzwrite(joinpath(subdir_path, "upper_lp.npy"), best_LP_U_bounds)
     npzwrite(joinpath(subdir_path, "lower_lp.npy"), best_LP_L_bounds)

@@ -1,18 +1,24 @@
 using JuMP
 using Gurobi
 
-function copy_model(input_model)
+const GUROBI_ENV = Ref{Gurobi.Env}()
+
+function __init__()
+    const GUROBI_ENV[] = Gurobi.Env()
+end
+
+function copy_model(input_model, solver_params)
     model = copy(input_model)
-    set_solver_params!(model)
+    set_solver_params!(model, solver_params)
     return model
 end
 
-function set_solver_params!(model)
-    set_optimizer(model, () -> Gurobi.Optimizer(GUROBI_ENV[myid()]))
-    SILENT && set_silent(model)
-    THREADS != 0 && set_attribute(model, "Threads", THREADS)
-    RELAX && relax_integrality(model)
-    LIMIT != 0 && set_attribute(model, "TimeLimit", LIMIT)
+function set_solver_params!(model, params)
+    set_optimizer(model, () -> Gurobi.Optimizer(GUROBI_ENV[]))
+    params.silent && set_silent(model)
+    params.threads != 0 && set_attribute(model, "Threads", params.threads)
+    params.relax && relax_integrality(model)
+    params.time_limit != 0 && set_attribute(model, "TimeLimit", params.time_limit)
 end
 
 function calculate_bounds(model::JuMP.Model, layer, neuron, W, b, neurons)

@@ -2,7 +2,14 @@ using Flux
 using JuMP
 using Distributed
 
-function NN_to_MIP(NN_model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vector{Float64}; tighten_bounds=false, big_M=1000.0)
+struct SolverParams
+    silent::Bool
+    threads::Int
+    relax::Bool
+    time_limit::Float64
+end
+
+function NN_to_MIP(NN_model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vector{Float64}, solver_params::SolverParams; tighten_bounds::Bool=false, big_M::Float64=1000.0)
 
     K = length(NN_model) # number of layers (input layer not included)
     @assert reduce(&, [NN_model[i].σ == relu for i in 1:K-1]) "Neural network must use the relu activation function."
@@ -16,10 +23,10 @@ function NN_to_MIP(NN_model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vect
     neurons(layer) = layer == 0 ? [i for i in 1:input_length] : [i for i in 1:neuron_count[layer]]
     
     @assert input_length == length(init_ub) == length(init_lb) "Initial bounds arrays must be the same length as the input layer"
-    
+
     # build model up to second layer
     jump_model = Model()
-    set_solver_params!(jump_model)
+    set_solver_params!(jump_model, solver_params)
     
     @variable(jump_model, x[layer = 0:K, neurons(layer)])
     @variable(jump_model, s[layer = 0:K-1, neurons(layer)])
@@ -39,7 +46,7 @@ function NN_to_MIP(NN_model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vect
         println("\nLAYER $layer")
 
         if tighten_bounds
-            bounds = pmap(neuron -> calculate_bounds(copy_model(jump_model), layer, neuron, W, b, neurons), neurons(layer))
+            bounds = pmap(neuron -> calculate_bounds(copy_model(jump_model, solver_params), layer, neuron, W, b, neurons), neurons(layer))
             bounds_U[layer], bounds_L[layer] = [bound[1] for bound in bounds], [bound[2] for bound in bounds]
         end
 

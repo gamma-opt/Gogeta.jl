@@ -5,6 +5,8 @@ y_train = [sum(x_train[:, col].^2) for col in 1:750];
 using Distributed
 using Flux
 using Random
+using Revise
+using Gogeta
 
 addprocs(7)
 
@@ -22,7 +24,18 @@ begin
     )
 end
 
-solver_params = SolverParams(true, 0, true, 0)
+begin
+    Random.seed!(1234);
+
+    model = Chain(
+        Dense(2 => 10, relu),
+        Dense(10 => 20, relu),
+        Dense(20 => 5, relu),
+        Dense(5 => 1)
+    )
+end
+
+solver_params = SolverParams(true, 0, false, 0)
 
 @time jump_model, upper_bounds, lower_bounds = NN_to_MIP(model, [1.0, 1.0], [-1.0, -1.0], solver_params; tighten_bounds=true);
 @time jump_model_relax, upper_bounds_relax, lower_bounds_relax = NN_to_MIP(model, [1.0, 1.0], [-1.0, -1.0], solver_params; tighten_bounds=true);

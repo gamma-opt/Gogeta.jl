@@ -46,8 +46,12 @@ function NN_to_MIP(NN_model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vect
         println("\nLAYER $layer")
 
         if tighten_bounds
-            bounds = pmap(neuron -> calculate_bounds(copy_model(jump_model, solver_params), layer, neuron, W, b, neurons), neurons(layer))
-            bounds_U[layer], bounds_L[layer] = [bound[1] for bound in bounds], [bound[2] for bound in bounds]
+            bounds = if nprocs() > 1
+                    pmap(neuron -> calculate_bounds(copy_model(jump_model, solver_params), layer, neuron, W, b, neurons), neurons(layer))
+                else
+                    map(neuron -> calculate_bounds(jump_model, layer, neuron, W, b, neurons), neurons(layer))
+                end
+            bounds_U[layer], bounds_L[layer] = [bound[1] > big_M ? big_M : bound[1] for bound in bounds], [bound[2] > big_M ? big_M : bound[2] for bound in bounds]
         end
 
         for neuron in 1:neuron_count[layer]

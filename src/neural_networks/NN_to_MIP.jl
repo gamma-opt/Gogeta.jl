@@ -2,7 +2,7 @@ using Flux
 using JuMP
 using Distributed
 
-struct SolverParams
+@kwdef struct SolverParams
     silent::Bool
     threads::Int
     relax::Bool
@@ -35,10 +35,10 @@ function NN_to_MIP(NN_model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vect
     @constraint(jump_model, [j = 1:input_length], x[0, j] <= init_ub[j])
     @constraint(jump_model, [j = 1:input_length], x[0, j] >= init_lb[j])
     
-    bounds_U = Vector{Vector}(undef, K-1)
-    bounds_L = Vector{Vector}(undef, K-1)
+    bounds_U = Vector{Vector}(undef, K)
+    bounds_L = Vector{Vector}(undef, K)
     
-    for layer in 1:K-1 # hidden layers
+    for layer in 1:K # hidden layers and output
     
         bounds_U[layer] = fill(big_M, length(neurons(layer)))
         bounds_L[layer] = fill(big_M, length(neurons(layer)))
@@ -52,6 +52,10 @@ function NN_to_MIP(NN_model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vect
                     map(neuron -> calculate_bounds(jump_model, layer, neuron, W, b, neurons), neurons(layer))
                 end
             bounds_U[layer], bounds_L[layer] = [bound[1] > big_M ? big_M : bound[1] for bound in bounds], [bound[2] > big_M ? big_M : bound[2] for bound in bounds]
+        end
+
+        if layer == K # output bounds calculated but no unnecessary constraints added
+            break
         end
 
         for neuron in 1:neuron_count[layer]

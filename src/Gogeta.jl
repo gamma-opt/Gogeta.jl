@@ -5,6 +5,9 @@ export NN_to_MIP, forward_pass!, SolverParams
 
 include("neural_networks/bounds.jl")
 
+include("neural_networks/compress.jl")
+export compress
+
 include("tree_ensembles/types.jl")
 export TEModel, extract_evotrees_info
 

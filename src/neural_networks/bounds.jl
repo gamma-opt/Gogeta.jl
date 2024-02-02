@@ -48,3 +48,70 @@ function calculate_bounds(model::JuMP.Model, layer, neuron, W, b, neurons)
 
     return upper_bound, lower_bound
 end
+
+function calculate_bounds_fast(model::JuMP.Model, layer, neuron, W, b, neurons)
+
+    upper_exists::Bool = true
+    lower_exists::Bool = true
+
+    function bounds_callback(cb_data, cb_where::Cint)
+
+        # Only run at integer solutions
+        if cb_where == GRB_CB_MIPSOL
+
+            objbound = Ref{Cdouble}()
+            objval = Ref{Cdouble}()
+            GRBcbget(cb_data, cb_where, GRB_CB_MIPSOL_OBJBND, objbound)
+            GRBcbget(cb_data, cb_where, GRB_CB_MIPSOL_OBJ, objval)
+
+            if objective_sense(model) == MAX_SENSE
+
+                if objval[] > 0
+                    upper_exists = true
+                    GRBterminate(backend(model))
+                end
+
+                if objbound[] <= 0
+                    upper_exists = false
+                    GRBterminate(backend(model))
+                end
+
+            elseif objective_sense(model) == MIN_SENSE
+
+                if objval[] < 0
+                    lower_exists = true
+                    GRBterminate(backend(model))
+                end
+    
+                if objbound[] >= 0
+                    lower_exists = false
+                    GRBterminate(backend(model))
+                end
+            end
+        end
+
+    end
+
+    @objective(model, Max, b[layer][neuron] + sum(W[layer][neuron, i] * model[:x][layer-1, i] for i in neurons(layer-1)))
+
+    set_attribute(model, "LazyConstraints", 1)
+    set_attribute(model, Gurobi.CallbackFunction(), bounds_callback)
+
+    optimize!(model)
+    if objective_value(model) <= 0 upper_exists = false end
+
+    set_objective_sense(model, MIN_SENSE)
+    optimize!(model)
+    if objective_value(model) >= 0 lower_exists = false end
+
+    status = if upper_exists == false
+        "stabily inactive"
+    elseif lower_exists == false
+        "stabily active"
+    else
+        "normal"
+    end
+    println("Neuron: $neuron, $status")
+
+    return upper_exists, lower_exists
+end

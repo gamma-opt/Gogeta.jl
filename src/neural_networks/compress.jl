@@ -14,7 +14,7 @@ function compress(model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vector{F
 
     input_length = Int((length(W[1]) / length(b[1])))
     neuron_count = [length(b[k]) for k in eachindex(b)]
-    neurons(layer) = layer == 0 ? [i for i in 1:input_length] : [i for i in 1:neuron_count[layer]]
+    neurons(layer) = layer == 0 ? [i for i in 1:input_length] : [i for i in 1:length(b[layer])]
 
     @assert input_length == length(init_ub) == length(init_lb) "Initial bounds arrays must be the same length as the input layer"
 
@@ -31,18 +31,12 @@ function compress(model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vector{F
     
     @constraint(jump_model, [j = 1:input_length], x[0, j] <= init_ub[j])
     @constraint(jump_model, [j = 1:input_length], x[0, j] >= init_lb[j])
-    
-    bounds_U = Vector{Vector}(undef, K)
-    bounds_L = Vector{Vector}(undef, K)
 
     removed_neurons = Vector{Vector}(undef, K-1)
 
     for layer in 1:K-1 # hidden layers
 
-        println("LAYER: $layer")
-
-        bounds_U[layer] = fill(big_M, length(neurons(layer)))
-        bounds_L[layer] = fill(-big_M, length(neurons(layer)))
+        println("\nLAYER: $layer")
 
         bounds = map(neuron -> calculate_bounds_fast(jump_model, layer, neuron, W, b, neurons), neurons(layer))
 
@@ -65,8 +59,10 @@ function compress(model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vector{F
 
                     end
 
-                    W[layer] = W[layer][setdiff(neurons(layer), neuron), :]
-                    b[layer] = b[layer][setdiff(neurons(layer), neuron)]
+                    # TODO neurons() function has to be changed as the layers are pruned
+
+                    # W[layer] = W[layer][setdiff(neurons(layer), neuron), :]
+                    # b[layer] = b[layer][setdiff(neurons(layer), neuron)]
                     push!(removed_neurons[layer], neuron)
                 end
 
@@ -76,15 +72,15 @@ function compress(model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vector{F
                     push!(stable_units, neuron)
                 else
                     alpha = W[layer][collect(stable_units), :]' \ W[layer][neuron, :]
-                    @assert dot(alpha, W[layer][collect(stable_units), :]) == W[layer][neuron, :] "Alpha calculation not working."
+                    @assert dot(alpha, W[layer][collect(stable_units), :]') == W[layer][neuron, :] "Alpha calculation not working."
 
                     for neuron_next in neurons(layer+1)
                         W[layer+1][neuron_next, collect(stable_units)] .+= sum(W[layer+1][neuron_next, neuron] * alpha)
                         b[layer+1][neuron_next] += W[layer+1][neuron_next, neuron] * (b[layer][neuron] + dot(b[layer][collect(stable_units)], alpha))
                     end
 
-                    W[layer] = W[layer][setdiff(neurons(layer), neuron), :]
-                    b[layer] = b[layer][setdiff(neurons(layer), neuron)]
+                    # W[layer] = W[layer][setdiff(neurons(layer), neuron), :]
+                    # b[layer] = b[layer][setdiff(neurons(layer), neuron)]
                     push!(removed_neurons[layer], neuron)
                 end
             else
@@ -93,10 +89,9 @@ function compress(model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vector{F
 
         end
 
-        # TODO neurons() function has to be changed as the layers are pruned
-
         if unstable_units == false # all units in the layer are stable
             println("Fully stable layer")
+            # TODO implement folding code
         end
 
         for neuron in 1:(neuron_count[layer] - length(removed_neurons[layer]))
@@ -104,8 +99,8 @@ function compress(model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vector{F
             @constraint(jump_model, s[layer, neuron] >= 0)
             set_binary(z[layer, neuron])
 
-            @constraint(jump_model, x[layer, neuron] <= bounds_U[layer][neuron] * (1 - z[layer, neuron]))
-            @constraint(jump_model, s[layer, neuron] <= -bounds_L[layer][neuron] * z[layer, neuron])
+            @constraint(jump_model, x[layer, neuron] <= big_M * (1 - z[layer, neuron]))
+            @constraint(jump_model, s[layer, neuron] <= big_M * z[layer, neuron])
 
             @constraint(jump_model, x[layer, neuron] - s[layer, neuron] == b[layer][neuron] + sum(W[layer][neuron, i] * x[layer-1, i] for i in neurons(layer-1)))
         end
@@ -114,6 +109,6 @@ function compress(model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vector{F
 
     @constraint(jump_model, [neuron in 1:neuron_count[K]], x[K, neuron] == b[K][neuron] + sum(W[K][neuron, i] * x[K-1, i] for i in neurons(K-1)))
 
-    return jump_model, bounds_U, bounds_L, removed_neurons
+    return jump_model, removed_neurons
 
 end

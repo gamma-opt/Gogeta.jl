@@ -39,7 +39,8 @@ begin
 end
 
 solver_params = SolverParams(silent=true, threads=0, relax=false, time_limit=0)
-@time jump, U, L, removed = compress(model, [1.0, 1.0], [-1.0, -1.0], solver_params);
+
+@time jump, removed = compress(model, [1.0, 1.0], [-1.0, -1.0], solver_params);
 vec(model(x_train)) ≈ [forward_pass!(jump, x_train[:, i])[1] for i in 1:750]
 
 @time _, U_full, L_full = NN_to_MIP(model, [1.0, 1.0], [-1.0, -1.0], solver_params; tighten_bounds=true);

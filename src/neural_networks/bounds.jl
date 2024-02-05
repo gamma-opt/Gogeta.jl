@@ -51,9 +51,6 @@ end
 
 function calculate_bounds_fast(model::JuMP.Model, layer, neuron, W, b, neurons)
 
-    upper_exists::Bool = true
-    lower_exists::Bool = true
-
     function bounds_callback(cb_data, cb_where::Cint)
 
         # Only run at integer solutions
@@ -67,24 +64,20 @@ function calculate_bounds_fast(model::JuMP.Model, layer, neuron, W, b, neurons)
             if objective_sense(model) == MAX_SENSE
 
                 if objval[] > 0
-                    upper_exists = true
                     GRBterminate(backend(model))
                 end
 
                 if objbound[] <= 0
-                    upper_exists = false
                     GRBterminate(backend(model))
                 end
 
             elseif objective_sense(model) == MIN_SENSE
 
                 if objval[] < 0
-                    lower_exists = true
                     GRBterminate(backend(model))
                 end
     
                 if objbound[] >= 0
-                    lower_exists = false
                     GRBterminate(backend(model))
                 end
             end
@@ -98,20 +91,20 @@ function calculate_bounds_fast(model::JuMP.Model, layer, neuron, W, b, neurons)
     set_attribute(model, Gurobi.CallbackFunction(), bounds_callback)
 
     optimize!(model)
-    if objective_value(model) <= 0 upper_exists = false end
+    upper = objective_bound(model)
 
     set_objective_sense(model, MIN_SENSE)
     optimize!(model)
-    if objective_value(model) >= 0 lower_exists = false end
+    lower = objective_bound(model)
 
-    status = if upper_exists == false
+    status = if upper <= 0
         "stabily inactive"
-    elseif lower_exists == false
+    elseif lower >= 0
         "stabily active"
     else
         "normal"
     end
     println("Neuron: $neuron, $status")
 
-    return upper_exists, lower_exists
+    return upper, lower
 end

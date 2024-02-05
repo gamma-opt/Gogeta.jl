@@ -40,12 +40,14 @@ end
 
 solver_params = SolverParams(silent=true, threads=0, relax=false, time_limit=0)
 
-@time jump, removed = compress(model, [1.0, 1.0], [-1.0, -1.0], solver_params);
+@time jump, removed, compressed, U_comp, L_comp = compress(model, [1.0, 1.0], [-1.0, -1.0], solver_params);
+
 vec(model(x_train)) ≈ [forward_pass!(jump, x_train[:, i])[1] for i in 1:750]
+compressed(x_train) ≈ model(x_train)
 
 @time _, U_full, L_full = NN_to_MIP(model, [1.0, 1.0], [-1.0, -1.0], solver_params; tighten_bounds=true);
 
 using Plots
 
-plot(collect(Iterators.flatten(U[1:end-1])))
+plot(collect(Iterators.flatten(U_comp[1:end-1])))
 plot!(collect(Iterators.flatten(U_full[1:end-1])))

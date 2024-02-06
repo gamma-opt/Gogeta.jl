@@ -38,6 +38,8 @@ function compress(model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vector{F
     bounds_U = Vector{Vector}(undef, K)
     bounds_L = Vector{Vector}(undef, K)
 
+    layer_removed = false
+
     for layer in 1:K-1 # hidden layers
 
         println("\nLAYER: $layer")
@@ -45,7 +47,7 @@ function compress(model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vector{F
         bounds_U[layer] = fill(big_M, length(neurons(layer)))
         bounds_L[layer] = fill(big_M, length(neurons(layer)))
 
-        bounds = map(neuron -> calculate_bounds_fast(jump_model, layer, neuron, W, b, neurons), neurons(layer))
+        bounds = map(neuron -> calculate_bounds_fast(jump_model, layer, neuron, W, b, neurons, layer_removed), neurons(layer))
         bounds_U[layer], bounds_L[layer] = [bound[1] > big_M ? big_M : bound[1] for bound in bounds], [bound[2] > big_M ? big_M : bound[2] for bound in bounds]
         println()
 
@@ -103,7 +105,24 @@ function compress(model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vector{F
             println("Fully stable layer")
 
             if length(stable_units) > 0
-                # TODO implement folding code
+
+                W_bar = Matrix{eltype(W[1][1])}(undef, neuron_count[layer-1], neuron_count[layer+1])
+                b_bar = Vector{eltype(b[1][1])}(undef, neuron_count[layer+1])
+
+                for neuron_next in neurons(layer+1)
+
+                    b_bar[neuron_next] = b[layer+1][neuron_next] + sum([W[layer+1][neuron_next, k] * b[layer][k] for k in collect(stable_units)])
+
+                    for neuron_previous in neurons(layer-1)
+                        W_bar[neuron_next, neuron_previous] = sum([W[layer+1][neuron_next, k] * W[layer][k, neuron_previous] for k in collect(stable_units)])
+                    end
+                end
+
+                W[layer+1] = W_bar
+                b[layer+1] = b_bar
+
+                layer_removed = true
+                push!(removed_neurons[layer], neurons(layer)...)
             else
                 output = model((init_ub + init_lb) ./ 2)
                 println("WHOLE NETWORK IS CONSTANT WITH OUTPUT: $output")
@@ -111,7 +130,7 @@ function compress(model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vector{F
             end
         end
 
-        println("Removed $(length(removed_neurons[layer])) neurons")
+        println("Removed $(length(removed_neurons[layer]))/$(neuron_count[layer]) neurons")
 
         for neuron in neurons(layer)
             @constraint(jump_model, x[layer, neuron] >= 0)
@@ -121,18 +140,23 @@ function compress(model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vector{F
             @constraint(jump_model, x[layer, neuron] <= bounds_U[layer][neuron] * (1 - z[layer, neuron]))
             @constraint(jump_model, s[layer, neuron] <= -bounds_L[layer][neuron] * z[layer, neuron])
 
-            @constraint(jump_model, x[layer, neuron] - s[layer, neuron] == b[layer][neuron] + sum(W[layer][neuron, i] * x[layer-1, i] for i in neurons(layer-1)))
+            @constraint(jump_model, x[layer, neuron] - s[layer, neuron] == b[layer][neuron] + sum(W[layer][neuron, i] * x[layer-1-layer_removed, i] for i in neurons(layer-1-layer_removed)))
+        end
+
+        if length(neurons(layer)) > 0
+            layer_removed = false
         end
 
     end
 
     # output layer
-    @constraint(jump_model, [neuron in neurons(K)], x[K, neuron] == b[K][neuron] + sum(W[K][neuron, i] * x[K-1, i] for i in neurons(K-1)))
+    @constraint(jump_model, [neuron in neurons(K)], x[K, neuron] == b[K][neuron] + sum(W[K][neuron, i] * x[K-1-layer_removed, i] for i in neurons(K-1-layer_removed)))
 
     # build compressed model
     new_layers = [];
-    for layer in 1:K
-        if layer != K
+    layers = findall(count -> count > 0, [neurons(l) for l in 1:K]) # exclude layers with no neurons
+    for layer in layers
+        if layer != last(layers)
             W[layer] = W[layer][setdiff(1:size(W[layer])[1], removed_neurons[layer]), setdiff(1:size(W[layer])[2], layer == 1 ? [] : removed_neurons[layer-1])]
             b[layer] = b[layer][setdiff(1:length(b[layer]), removed_neurons[layer])]
 

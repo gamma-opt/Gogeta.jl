@@ -49,7 +49,7 @@ function calculate_bounds(model::JuMP.Model, layer, neuron, W, b, neurons)
     return upper_bound, lower_bound
 end
 
-function calculate_bounds_fast(model::JuMP.Model, layer, neuron, W, b, neurons, layer_removed)
+function calculate_bounds_fast(model::JuMP.Model, layer, neuron, W, b, neurons, layers_removed)
 
     function bounds_callback(cb_data, cb_where::Cint)
 
@@ -85,7 +85,7 @@ function calculate_bounds_fast(model::JuMP.Model, layer, neuron, W, b, neurons, 
 
     end
 
-    @objective(model, Max, b[layer][neuron] + sum(W[layer][neuron, i] * model[:x][layer-1-layer_removed, i] for i in neurons(layer-1-layer_removed)))
+    @objective(model, Max, b[layer][neuron] + sum(W[layer][neuron, i] * model[:x][layer-1-layers_removed, i] for i in neurons(layer-1-layers_removed)))
 
     set_attribute(model, "LazyConstraints", 1)
     set_attribute(model, Gurobi.CallbackFunction(), bounds_callback)

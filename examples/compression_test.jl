@@ -49,5 +49,35 @@ compressed(x_train) ≈ model(x_train)
 
 using Plots
 
+x = LinRange(-1.5, -0.5, 100)
+y = LinRange(-0.5, 0.5, 100)
+
+contourf(x, y, (x, y) -> model(hcat(x, y)')[], c=cgrad(:viridis), lw=0)
+contourf(x, y, (x, y) -> compressed(hcat(x, y)')[], c=cgrad(:viridis), lw=0)
+
+contourf(x, y, (x, y) -> forward_pass!(jump_model, vec(hcat(x, y)) .|> Float32)[], c=cgrad(:viridis), lw=0)
+contourf(x, y, (x, y) -> forward_pass!(jump, vec(hcat(x, y)) .|> Float32)[], c=cgrad(:viridis), lw=0)
+
 plot(collect(Iterators.flatten(U_comp[1:end-1])))
 plot!(collect(Iterators.flatten(U_full[1:end-1])))
+
+subdir_path = joinpath(parent_dir, subdirs[1])
+model = load_model(n_neurons, subdir_path)
+
+solver_params = SolverParams(silent=true, threads=0, relax=false, time_limit=0)
+@time jump, removed, compressed, U_comp, L_comp = compress(model, [-0.5, 0.5], [-1.5, -0.5], solver_params; big_M=1_000_000.0);
+
+U_full, L_full = get_bounds(subdir_path)
+
+@time _, removed, compressed, U_comp, L_comp = compress(model, [-0.5, 0.5], [-1.5, -0.5], U_full, -L_full);
+contourf(x, y, (x, y) -> compressed(hcat(x, y)')[], c=cgrad(:viridis), lw=0)
+
+x1 = rand(Float32, 10) .- 1.5
+x2 = rand(Float32, 10) .- 0.5
+x = hcat(x1, x2)'
+
+vec(model(x)) ≈ [forward_pass!(jump, x[:, i] .|> Float32) for i in 1:size(x)[2]]
+vec(compressed(x)) ≈ [forward_pass!(jump, x[:, i] .|> Float32)[] for i in 1:size(x)[2]]
+compressed(x) ≈ model(x)
+
+@time jump_model, U_full, L_full = NN_to_MIP(model, [-0.5, 0.5], [-1.5, -0.5], solver_params; tighten_bounds=true, big_M=100_000.0);

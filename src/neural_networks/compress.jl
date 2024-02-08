@@ -195,9 +195,11 @@ function compress(model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vector{F
     neuron_count = [length(b[k]) for k in eachindex(b)]
     neurons(layer) = layer == 0 ? [i for i in 1:input_length] : [i for i in setdiff(1:neuron_count[layer], removed_neurons[layer])]
 
-    layers_removed = 0 # how many strictly preceding layers removed at current loop iteration 
+    layers_removed = 0 # how many strictly preceding layers have been removed at current loop iteration 
 
     for layer in 1:K-1 # hidden layers
+
+        println("\nLAYER $layer")
 
         stable_units = Set{Int}() # indices of stable neurons
         unstable_units = false
@@ -266,7 +268,7 @@ function compress(model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vector{F
             else
                 output = model((init_ub + init_lb) ./ 2)
                 println("WHOLE NETWORK IS CONSTANT WITH OUTPUT: $output")
-                return
+                return output
             end
         end
 
@@ -274,12 +276,9 @@ function compress(model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vector{F
 
         if length(neurons(layer)) > 0
             layers_removed = 0
-        end
+        end 
 
     end
-
-    println(length.([neurons(l) for l in 0:K]))
-    println([neurons(l) for l in 0:K])
 
     # build compressed model
     new_layers = [];

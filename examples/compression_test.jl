@@ -67,9 +67,34 @@ model = load_model(n_neurons, subdir_path)
 solver_params = SolverParams(silent=true, threads=0, relax=false, time_limit=0)
 @time jump, removed, compressed, U_comp, L_comp = compress(model, [-0.5, 0.5], [-1.5, -0.5], solver_params; big_M=1_000_000.0);
 
-U_full, L_full = get_bounds(subdir_path)
+U_data, L_data = get_bounds(subdir_path)
+U_data = U_data[3:end]
+L_data = L_data[3:end]
 
-@time _, removed, compressed, U_comp, L_comp = compress(model, [-0.5, 0.5], [-1.5, -0.5], U_full, -L_full);
+"""
+"""
+
+b = [Flux.params(model)[2*k] for k in 1:length(model)]
+neuron_count = [length(b[k]) for k in eachindex(b)]
+
+U_full = Vector{Vector}(undef, length(model))
+L_full = Vector{Vector}(undef, length(model))
+
+[U_full[layer] = Vector{Float64}(undef, neuron_count[layer]) for layer in 1:length(model)]
+[L_full[layer] = Vector{Float64}(undef, neuron_count[layer]) for layer in 1:length(model)]
+
+for layer in 1:length(model)
+    for neuron in 1:neuron_count[layer]
+        U_full[layer][neuron] = U_data[neuron + (layer == 1 ? 0 : cumsum(neuron_count)[layer-1])]
+        L_full[layer][neuron] = L_data[neuron + (layer == 1 ? 0 : cumsum(neuron_count)[layer-1])]
+    end
+end
+
+collect(Iterators.flatten(U_full)) == U_data
+collect(Iterators.flatten(L_full)) == L_data
+
+@time _, removed, compressed, U_comp, L_comp = compress(model, [-0.5, 0.5], [-1.5, -0.5], U_full, L_full);
+contourf(x, y, (x, y) -> model(hcat(x, y)')[], c=cgrad(:viridis), lw=0)
 contourf(x, y, (x, y) -> compressed(hcat(x, y)')[], c=cgrad(:viridis), lw=0)
 
 x1 = rand(Float32, 10) .- 1.5

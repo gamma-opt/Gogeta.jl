@@ -1,5 +1,3 @@
-using EvoTrees
-
 """
 Universal datatype for storing information about a Tree Ensemble Model.
 This is the datatype that is used when creating the integer optimization problem from a tree ensemble.

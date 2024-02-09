@@ -26,8 +26,8 @@ x = transpose(hcat(x1, x2)) .|> Float32;
 
 solver_params = SolverParams(solver="GLPK", silent=true, threads=0, relax=false, time_limit=0);
 
-# compress with compress fast
-@time compression_results = compress_and_tighten(model, init_U, init_L, solver_params);
+# compress with simultaneous bound tightening
+@time compression_results = compress(model, init_U, init_L; params=solver_params);
 jump_model, compressed_model, removed_neurons, bounds_U, bounds_L = compression_results;
 
 # test that jump model and compressed model produce same results as original
@@ -39,17 +39,16 @@ jump_model, compressed_model, removed_neurons, bounds_U, bounds_L = compression_
 # test that created jump model is equal to the original
 @test vec(model(x)) ≈ [forward_pass!(nn_jump, x[:, i])[] for i in 1:size(x)[2]]
 
-# test compression with precomputed bounds
-@time res = compress(model, init_U, init_L, U_correct, L_correct);
+# compress with precomputed bounds
+@time res = compress(model, init_U, init_L; bounds_U=U_correct, bounds_L=L_correct);
 compressed, removed = res;
 
 @test compressed(x) ≈ model(x)
+@test removed ≈ removed_neurons
 
-removed
-removed_neurons
-compressed
-compressed_model
-@test compressed_model(x) ≈ compressed(x)
+"""
+VISUALIZATION
+"""
 
 # compare bounds with/without fast compression
 U_data = collect(Iterators.flatten(bounds_U));

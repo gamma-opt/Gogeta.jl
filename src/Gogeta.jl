@@ -1,12 +1,22 @@
 module Gogeta
 
+using Flux
+using JuMP
+using LinearAlgebra: rank, dot
+using Gurobi
+using GLPK
+using Distributed
+using EvoTrees
+
+const GUROBI_ENV = Ref{Gurobi.Env}()
+
 include("neural_networks/NN_to_MIP.jl")
 export NN_to_MIP, forward_pass!, SolverParams
 
 include("neural_networks/bounds.jl")
 
 include("neural_networks/compress.jl")
-export compress, compress_and_tighten
+export compress
 
 include("tree_ensembles/types.jl")
 export TEModel, extract_evotrees_info

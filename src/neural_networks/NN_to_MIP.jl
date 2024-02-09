@@ -1,7 +1,3 @@
-using Flux
-using JuMP
-using Distributed
-
 @kwdef struct SolverParams
     solver::String
     silent::Bool

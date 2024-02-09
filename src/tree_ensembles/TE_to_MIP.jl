@@ -1,5 +1,3 @@
-using JuMP
-
 """
 ```julia
 function TE_to_MIP(TE::TEModel, optimizer, objective)

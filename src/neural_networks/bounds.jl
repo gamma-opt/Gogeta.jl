@@ -1,8 +1,3 @@
-using JuMP
-using Gurobi
-using GLPK
-
-const GUROBI_ENV = Ref{Gurobi.Env}()
 global const BIG_M = Ref{Float64}(1.0e10)
 
 function __init__()

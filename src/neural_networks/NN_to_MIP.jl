@@ -3,6 +3,7 @@ using JuMP
 using Distributed
 
 @kwdef struct SolverParams
+    solver::String
     silent::Bool
     threads::Int
     relax::Bool
@@ -39,19 +40,19 @@ function NN_to_MIP(NN_model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vect
     bounds_L = Vector{Vector}(undef, K)
     
     for layer in 1:K # hidden layers and output
-    
-        bounds_U[layer] = Vector{Float64}(undef, length(neurons(layer)))
-        bounds_L[layer] = Vector{Float64}(undef, length(neurons(layer)))
 
         println("\nLAYER $layer")
 
         if tighten_bounds
-            bounds = if nprocs() > 1
-                    pmap(neuron -> calculate_bounds(copy_model(jump_model, solver_params), layer, neuron, W, b, neurons), neurons(layer))
-                else
-                    map(neuron -> calculate_bounds(jump_model, layer, neuron, W, b, neurons), neurons(layer))
-                end
+            bounds =    if nprocs() > 1
+                            pmap(neuron -> calculate_bounds(copy_model(jump_model, solver_params), layer, neuron, W, b, neurons), neurons(layer))
+                        else
+                            map(neuron -> calculate_bounds(jump_model, layer, neuron, W, b, neurons), neurons(layer))
+                        end
             bounds_U[layer], bounds_L[layer] = [bound[1] for bound in bounds], [bound[2] for bound in bounds]
+        else
+            bounds_U[layer] = fill(BIG_M[], length(neurons(layer)))
+            bounds_L[layer] = fill(-BIG_M[], length(neurons(layer)))
         end
 
         if layer == K # output bounds calculated but no unnecessary constraints added
@@ -79,12 +80,17 @@ function NN_to_MIP(NN_model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vect
 end
 
 function forward_pass!(jump_model::JuMP.Model, input)
-    @assert length(input) == length(jump_model[:x][0, :]) "Incorrect input length."
+    
+    try
+        @assert length(input) == length(jump_model[:x][0, :]) "Incorrect input length."
+        [fix(jump_model[:x][0, i], input[i], force=true) for i in eachindex(input)]
+        optimize!(jump_model)
+        (last_layer, outputs) = maximum(keys(jump_model[:x].data))
+        result = value.(jump_model[:x][last_layer, :])
+        return [result[i] for i in 1:outputs]
+    catch e
+        println("Input outside of input bounds or incorrectly constructed model.")
+        return [nothing]
+    end
 
-    [fix(jump_model[:x][0, i], input[i], force=true) for i in eachindex(input)]
-    optimize!(jump_model)
-
-    (last_layer, outputs) = maximum(keys(jump_model[:x].data))
-    result = value.(jump_model[:x][last_layer, :])
-    return [result[i] for i in 1:outputs]
 end

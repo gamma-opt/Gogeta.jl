@@ -2,7 +2,7 @@ using Flux
 using JuMP
 using LinearAlgebra: rank, dot
 
-function compress_fast(model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vector{Float64}, params)
+function compress_and_tighten(model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vector{Float64}, params)
 
     K = length(model)
 
@@ -20,11 +20,8 @@ function compress_fast(model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vec
     neurons(layer) = layer == 0 ? [i for i in 1:input_length] : [i for i in setdiff(1:neuron_count[layer], removed_neurons[layer])]
 
     # build JuMP model
-    jump_model = direct_model(Gurobi.Optimizer())
-    params.silent && set_silent(jump_model)
-    params.threads != 0 && set_attribute(jump_model, "Threads", params.threads)
-    params.relax && relax_integrality(jump_model)
-    params.time_limit != 0 && set_attribute(jump_model, "TimeLimit", params.time_limit)
+    jump_model = Model()
+    set_solver_params!(jump_model, params)
     
     @variable(jump_model, x[layer = 0:K, neurons(layer)])
     @variable(jump_model, s[layer = 1:K-1, neurons(layer)])
@@ -38,15 +35,16 @@ function compress_fast(model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vec
 
     layers_removed = 0 # how many strictly preceding layers have been removed at current loop iteration 
 
-    for layer in 1:K-1 # hidden layers
+    for layer in 1:K # hidden layers and bounds for output layer
 
         println("\nLAYER $layer")
 
-        bounds_U[layer] = Vector{Float64}(undef, length(neurons(layer)))
-        bounds_L[layer] = Vector{Float64}(undef, length(neurons(layer)))
-
-        bounds = map(neuron -> calculate_bounds_fast(jump_model, layer, neuron, W, b, neurons, layers_removed), neurons(layer))
+        bounds = map(neuron -> calculate_bounds(jump_model, layer, neuron, W, b, neurons; layers_removed), neurons(layer))
         bounds_U[layer], bounds_L[layer] = [bound[1] for bound in bounds], [bound[2] for bound in bounds]
+
+        if layer == K
+            break
+        end
 
         stable_units = Set{Int}() # indices of stable neurons
         unstable_units = false
@@ -157,8 +155,8 @@ function compress_fast(model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vec
     end
 
     new_model = Flux.Chain(new_layers...)
-
-    return jump_model, removed_neurons, new_model, bounds_U, bounds_L
+    
+    return jump_model, new_model, removed_neurons, bounds_U, bounds_L
 
 end
 
@@ -281,6 +279,6 @@ function compress(model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vector{F
 
     new_model = Flux.Chain(new_layers...)
 
-    return nothing, removed_neurons, new_model, bounds_U, bounds_L
+    return new_model, removed_neurons
 
 end

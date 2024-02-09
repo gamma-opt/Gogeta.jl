@@ -9,7 +9,7 @@ using Distributed
     time_limit::Float64
 end
 
-function NN_to_MIP(NN_model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vector{Float64}, solver_params::SolverParams; tighten_bounds::Bool=false, big_M::Float64=1000.0)
+function NN_to_MIP(NN_model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vector{Float64}, solver_params::SolverParams; tighten_bounds::Bool=false)
 
     K = length(NN_model) # number of layers (input layer not included)
     @assert reduce(&, [NN_model[i].σ == relu for i in 1:K-1]) "Neural network must use the relu activation function."
@@ -29,8 +29,8 @@ function NN_to_MIP(NN_model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vect
     set_solver_params!(jump_model, solver_params)
     
     @variable(jump_model, x[layer = 0:K, neurons(layer)])
-    @variable(jump_model, s[layer = 0:K-1, neurons(layer)])
-    @variable(jump_model, z[layer = 0:K-1, neurons(layer)])
+    @variable(jump_model, s[layer = 1:K-1, neurons(layer)])
+    @variable(jump_model, z[layer = 1:K-1, neurons(layer)])
     
     @constraint(jump_model, [j = 1:input_length], x[0, j] <= init_ub[j])
     @constraint(jump_model, [j = 1:input_length], x[0, j] >= init_lb[j])
@@ -40,8 +40,8 @@ function NN_to_MIP(NN_model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vect
     
     for layer in 1:K # hidden layers and output
     
-        bounds_U[layer] = fill(big_M, length(neurons(layer)))
-        bounds_L[layer] = fill(big_M, length(neurons(layer)))
+        bounds_U[layer] = Vector{Float64}(undef, length(neurons(layer)))
+        bounds_L[layer] = Vector{Float64}(undef, length(neurons(layer)))
 
         println("\nLAYER $layer")
 
@@ -51,7 +51,7 @@ function NN_to_MIP(NN_model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vect
                 else
                     map(neuron -> calculate_bounds(jump_model, layer, neuron, W, b, neurons), neurons(layer))
                 end
-            bounds_U[layer], bounds_L[layer] = [bound[1] > big_M ? big_M : bound[1] for bound in bounds], [bound[2] > big_M ? big_M : bound[2] for bound in bounds]
+            bounds_U[layer], bounds_L[layer] = [bound[1] for bound in bounds], [bound[2] for bound in bounds]
         end
 
         if layer == K # output bounds calculated but no unnecessary constraints added
@@ -65,7 +65,7 @@ function NN_to_MIP(NN_model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vect
             set_binary(z[layer, neuron])
 
             @constraint(jump_model, x[layer, neuron] <= bounds_U[layer][neuron] * (1 - z[layer, neuron]))
-            @constraint(jump_model, s[layer, neuron] <= bounds_L[layer][neuron] * z[layer, neuron])
+            @constraint(jump_model, s[layer, neuron] <= -bounds_L[layer][neuron] * z[layer, neuron])
 
             @constraint(jump_model, x[layer, neuron] - s[layer, neuron] == b[layer][neuron] + sum(W[layer][neuron, i] * x[layer-1, i] for i in neurons(layer-1)))
 
@@ -78,7 +78,7 @@ function NN_to_MIP(NN_model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vect
     return jump_model, bounds_U, bounds_L
 end
 
-function forward_pass!(jump_model::JuMP.Model, input::Vector{Float32})
+function forward_pass!(jump_model::JuMP.Model, input)
     @assert length(input) == length(jump_model[:x][0, :]) "Incorrect input length."
 
     [fix(jump_model[:x][0, i], input[i], force=true) for i in eachindex(input)]

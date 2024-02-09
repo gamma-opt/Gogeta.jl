@@ -39,9 +39,9 @@ function calculate_bounds(model::JuMP.Model, layer, neuron, W, b, neurons)
     optimize!(model)
  
     lower_bound = if termination_status(model) == OPTIMAL
-        max(-objective_value(model), 0.0)
+        min(objective_value(model), 0.0)
     else
-        max(-objective_bound(model), 0.0)
+        min(objective_bound(model), 0.0)
     end
 
     println("Neuron: $neuron")
@@ -63,21 +63,29 @@ function calculate_bounds_fast(model::JuMP.Model, layer, neuron, W, b, neurons, 
 
             if objective_sense(model) == MAX_SENSE
 
+                println("UPPER: Bound: $(objbound[]), objective: $(objval[])")
+
                 if objval[] > 0
+                    println("UPPER positive: $(objbound[])")
                     GRBterminate(backend(model))
                 end
-
+                
                 if objbound[] <= 0
+                    println("UPPER negative: $(objbound[])")
                     GRBterminate(backend(model))
                 end
 
             elseif objective_sense(model) == MIN_SENSE
 
+                println("LOWER: Bound: $(objbound[]), objective: $(objval[])")
+
                 if objval[] < 0
+                    println("LOWER negative: $(objbound[])")
                     GRBterminate(backend(model))
                 end
-    
+                
                 if objbound[] >= 0
+                    println("LOWER positive: $(objbound[])")
                     GRBterminate(backend(model))
                 end
             end
@@ -87,15 +95,15 @@ function calculate_bounds_fast(model::JuMP.Model, layer, neuron, W, b, neurons, 
 
     @objective(model, Max, b[layer][neuron] + sum(W[layer][neuron, i] * model[:x][layer-1-layers_removed, i] for i in neurons(layer-1-layers_removed)))
 
-    set_attribute(model, "LazyConstraints", 1)
-    set_attribute(model, Gurobi.CallbackFunction(), bounds_callback)
+    #set_attribute(model, "LazyConstraints", 1)
+    #set_attribute(model, Gurobi.CallbackFunction(), bounds_callback)
 
     optimize!(model)
-    upper = objective_bound(model)
+    upper = max(objective_bound(model), 0.0)
 
     set_objective_sense(model, MIN_SENSE)
     optimize!(model)
-    lower = objective_bound(model)
+    lower = min(objective_bound(model), 0.0)
 
     status = if upper <= 0
         "stabily inactive"
@@ -104,7 +112,7 @@ function calculate_bounds_fast(model::JuMP.Model, layer, neuron, W, b, neurons, 
     else
         "normal"
     end
-    println("Neuron: $neuron, $status")
+    println("Neuron: $neuron, $status, bounds: [$lower, $upper]")
 
     return upper, lower
 end

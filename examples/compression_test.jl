@@ -94,8 +94,25 @@ collect(Iterators.flatten(U_full)) == U_data
 collect(Iterators.flatten(L_full)) == L_data
 
 @time _, removed, compressed, U_comp, L_comp = compress(model, [-0.5, 0.5], [-1.5, -0.5], U_full, L_full);
+
+solver_params = SolverParams(silent=true, threads=0, relax=false, time_limit=0)
+
+@time compression_results = compress_fast(model, [-0.5, 0.5], [-1.5, -0.5], solver_params);
+jump_model, removed_neurons, compressed_model, bounds_U, bounds_L = compression_results;
+
+@time bound_results = NN_to_MIP(model, [-0.5, 0.5], [-1.5, -0.5], solver_params; tighten_bounds=true, big_M=100_000.0);
+
+bound_results[3]
+
+@time bound_compression = compress(model, [-0.5, 0.5], [-1.5, -0.5], bounds_U, bounds_L);
+
+@time bound_results = NN_to_MIP(compressed_model, [-0.5, 0.5], [-1.5, -0.5], solver_params; tighten_bounds=true, big_M=100_000.0);
+
+bound_results[1]
+
+contourf(x, y, (x, y) -> forward_pass!(jump_model, vec(hcat(x, y)) .|> Float32)[], c=cgrad(:viridis), lw=0)
 contourf(x, y, (x, y) -> model(hcat(x, y)')[], c=cgrad(:viridis), lw=0)
-contourf(x, y, (x, y) -> compressed(hcat(x, y)')[], c=cgrad(:viridis), lw=0)
+contourf(x, y, (x, y) -> compressed_model(hcat(x, y)')[], c=cgrad(:viridis), lw=0)
 
 x1 = rand(Float32, 10) .- 1.5
 x2 = rand(Float32, 10) .- 0.5

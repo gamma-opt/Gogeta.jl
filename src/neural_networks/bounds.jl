@@ -1,9 +1,3 @@
-global const BIG_M = Ref{Float64}(1.0e10)
-
-function __init__()
-    const GUROBI_ENV[] = Gurobi.Env()
-end
-
 function copy_model(input_model, solver_params)
     model = copy(input_model)
     set_solver_params!(model, solver_params)
@@ -18,9 +12,8 @@ function set_solver_params!(model, params)
     elseif params.solver == "GLPK"
         set_optimizer(model, () -> GLPK.Optimizer())
         params.time_limit != 0 && set_attribute(model, "tm_lim", params.time_limit)
-        global BIG_M[] = 1_000.0 # GLPK cannot handle big-M constraints with large values
     else
-        error("Solver has to be \"Gurobi\"/\"GLPK\"")
+        error("Solver has to be \"Gurobi\" or \"GLPK\"")
     end
     
     params.silent && set_silent(model)
@@ -34,21 +27,24 @@ function calculate_bounds(model::JuMP.Model, layer, neuron, W, b, neurons; layer
     optimize!(model)
     
     upper_bound = if termination_status(model) == OPTIMAL
-        max(objective_value(model), 0.0)
+        objective_value(model)
     else
         @warn "Layer $layer, neuron $neuron could not be solved to optimality."
-        max(objective_bound(model), 0.0)
+        objective_bound(model)
     end
 
     set_objective_sense(model, MIN_SENSE)
     optimize!(model)
  
     lower_bound = if termination_status(model) == OPTIMAL
-        min(objective_value(model), 0.0)
+        objective_value(model)
     else
         @warn "Layer $layer, neuron $neuron could not be solved to optimality."
-        min(objective_bound(model), 0.0)
+        objective_bound(model)
     end
+
+    if upper_bound > 1_000 @warn "Upper bound is very loose: $upper_bound, problem might become infeasible." end
+    if lower_bound < -1_000 @warn "Lower bound is very loose: $lower_bound, problem might become infeasible." end
 
     println("Neuron: $neuron")
 

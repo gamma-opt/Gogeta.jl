@@ -47,8 +47,13 @@ function NN_to_MIP(NN_model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vect
                         end
             bounds_U[layer], bounds_L[layer] = [bound[1] for bound in bounds], [bound[2] for bound in bounds]
         else
-            bounds_U[layer] = fill(BIG_M[], length(neurons(layer)))
-            bounds_L[layer] = fill(-BIG_M[], length(neurons(layer)))
+            if layer == 1
+                bounds_U[layer] = [sum(max(W[layer][neuron, previous] * init_ub[previous], W[layer][neuron, previous] * init_lb[previous]) for previous in neurons(layer-1)) + b[layer][neuron] for neuron in neurons(layer)]
+                bounds_L[layer] = [sum(min(W[layer][neuron, previous] * init_ub[previous], W[layer][neuron, previous] * init_lb[previous]) for previous in neurons(layer-1)) + b[layer][neuron] for neuron in neurons(layer)]
+            else
+                bounds_U[layer] = [sum(max(W[layer][neuron, previous] * max(0, bounds_U[layer-1][previous]), W[layer][neuron, previous] * max(0, bounds_L[layer-1][previous])) for previous in neurons(layer-1)) + b[layer][neuron] for neuron in neurons(layer)]
+                bounds_L[layer] = [sum(min(W[layer][neuron, previous] * max(0, bounds_U[layer-1][previous]), W[layer][neuron, previous] * max(0, bounds_L[layer-1][previous])) for previous in neurons(layer-1)) + b[layer][neuron] for neuron in neurons(layer)]
+            end
         end
 
         if layer == K # output bounds calculated but no unnecessary constraints added
@@ -61,8 +66,8 @@ function NN_to_MIP(NN_model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vect
             @constraint(jump_model, s[layer, neuron] >= 0)
             set_binary(z[layer, neuron])
 
-            @constraint(jump_model, x[layer, neuron] <= bounds_U[layer][neuron] * (1 - z[layer, neuron]))
-            @constraint(jump_model, s[layer, neuron] <= -bounds_L[layer][neuron] * z[layer, neuron])
+            @constraint(jump_model, x[layer, neuron] <= max(0, bounds_U[layer][neuron]) * (1 - z[layer, neuron]))
+            @constraint(jump_model, s[layer, neuron] <= max(0, -bounds_L[layer][neuron]) * z[layer, neuron])
 
             @constraint(jump_model, x[layer, neuron] - s[layer, neuron] == b[layer][neuron] + sum(W[layer][neuron, i] * x[layer-1, i] for i in neurons(layer-1)))
 

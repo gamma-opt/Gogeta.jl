@@ -46,6 +46,12 @@ compressed, removed = res;
 @test compressed(x) ≈ model(x)
 @test removed ≈ removed_neurons
 
+# test jump model without bound tightening
+@time nn_loose, U_loose, L_loose = NN_to_MIP(model, init_U, init_L, solver_params; tighten_bounds=false);
+
+# test that created jump model is equal to the original
+@test vec(model(x)) ≈ [forward_pass!(nn_loose, x[:, i])[] for i in 1:size(x)[2]]
+
 """
 VISUALIZATION
 """
@@ -63,11 +69,12 @@ plot!(U_true)
 plot!(L_data)
 plot!(L_true)
 
-# test jump model without bound tightening
-@time nn_jump, U_correct, L_correct = NN_to_MIP(model, init_U, init_L, solver_params; tighten_bounds=false);
-# test that created jump model is equal to the original
-@test vec(model(x)) ≈ [forward_pass!(nn_jump, x[:, i])[] for i in 1:size(x)[2]]
-plot(vec(model(x)) - [forward_pass!(nn_jump, x[:, i])[] for i in 1:size(x)[2]])
+# compare bounds with/without loose tightening
+plot(collect(Iterators.flatten(U_correct)))
+plot!(collect(Iterators.flatten(U_loose)))
+
+plot!(collect(Iterators.flatten(L_correct)))
+plot!(collect(Iterators.flatten(L_loose)))
 
 # contour plot the model
 x_range = LinRange{Float32}(init_L[1], init_U[1], 100);

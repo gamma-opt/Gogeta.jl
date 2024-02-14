@@ -57,17 +57,11 @@ VISUALIZATION
 """
 
 # compare bounds with/without fast compression
-U_data = collect(Iterators.flatten(bounds_U));
-U_true = collect(Iterators.flatten(U_correct));
+plot(collect(Iterators.flatten(bounds_U)))
+plot!(collect(Iterators.flatten(U_correct)))
 
-L_data = collect(Iterators.flatten(bounds_L));
-L_true = collect(Iterators.flatten(L_correct));
-
-plot(U_data)
-plot!(U_true)
-
-plot!(L_data)
-plot!(L_true)
+plot!(collect(Iterators.flatten(bounds_L)))
+plot!(collect(Iterators.flatten(L_correct)))
 
 # compare bounds with/without loose tightening
 plot(collect(Iterators.flatten(U_correct)))

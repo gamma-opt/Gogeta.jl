@@ -25,10 +25,11 @@ solver_params = SolverParams(solver="Gurobi", silent=true, threads=0, relax=fals
 # test that created jump model is equal to the original (0.1% tolerance)
 @test isapprox(vec(model(x)), [forward_pass!(nn_loose, x[:, i])[] for i in 1:size(x)[2]]; rtol=0.001)
 
-plot([forward_pass!(nn_loose, x[:, i])[] for i in 1:size(x)[2]] - vec(model(x)))
-plot!(vec(model(x)))
-
-plot(relu.(collect(Iterators.flatten(U_loose))[1:end-1]) .+ 0.01)#, yscale=:log10)
+plot(relu.(collect(Iterators.flatten(U_loose))[1:end-1]) .+ 0.01, 
+    yscale=:log10, 
+    yticks=([1, 100, 500, 1000, 2000], string.([1, 100, 500, 1000, 2000])), 
+    legend=false
+)
 
 U_data, L_data = get_bounds("/Users/eetureijonen/Desktop/GAMMA-OPT/Gogeta.jl/src/neural_networks/compression/layer_weights/model_Adadelta_0.001_0.001_0");
 U_data = U_data[3:end];
@@ -68,3 +69,10 @@ compressed, removed = res;
 
 # test that compressed model is same as the original
 @test compressed(x) ≈ model(x)
+
+# contour plot the model
+x_range = LinRange{Float32}(init_L[1], init_U[1], 100);
+y_range = LinRange{Float32}(init_L[2], init_U[2], 100);
+
+contourf(x_range, y_range, (x, y) -> model(hcat(x, y)')[], c=cgrad(:viridis), lw=0)
+contourf(x_range, y_range, (x, y) -> compressed(hcat(x, y)')[], c=cgrad(:viridis), lw=0)

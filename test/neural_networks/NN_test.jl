@@ -34,6 +34,19 @@ jump_model, compressed_model, removed_neurons, bounds_U, bounds_L = compress(mod
 @info "Creating a JuMP model from the neural network with bound tightening but without compression."
 nn_jump, U_correct, L_correct = NN_to_MIP(model, init_U, init_L, solver_params; tighten_bounds="standard");
 
+@info "Creating bound tightened JuMP model with output bounds present."
+@time jump_nor, U_nor, L_nor = NN_to_MIP(model, init_U, init_L, solver_params; tighten_bounds="output", out_ub=[-0.2], out_lb=[-0.4]);
+
+@info "Testing that the output tightened model is the same in the areas it's defined in."
+@test all(map(input -> begin
+    test = forward_pass!(jump_nor, input)
+    if test[] !== nothing
+        test[] ≈ model(input)[]
+    else
+        true
+    end
+end, eachcol(x)))
+
 @info "Testing that the created JuMP model is equal to the original neural network."
 @test vec(model(x)) ≈ [forward_pass!(nn_jump, x[:, i])[] for i in 1:size(x)[2]]
 

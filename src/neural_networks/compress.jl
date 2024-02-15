@@ -1,29 +1,28 @@
 """
-    function NN_to_MIP(NN_model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vector{Float64}, solver_params::SolverParams; tighten_bounds::String="fast", bounds_U=nothing, bounds_L=nothing, out_ub=nothing, out_lb=nothing)
+    function compress(model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vector{Float64}; params=nothing, bounds_U=nothing, bounds_L=nothing, tighten_bounds="fast")
 
-Creates a mixed-integer optimization problem from a ReLU-activated neural network.
+Creates a new neural network model by identifying stabily active and inactive neurons and removing them.
 
-Returns a JuMP model containing the MIP formulation as well as the upper and lower activation bounds for each neuron.
+Can be called with precomputed bounds.
+Returns the compressed neural network as a `Flux.Chain` and the indices of the removed neurons in this case.
 
-The MIP can be created with initial bounds (optional arguments), or the bounds can be calculated as the model is created in either "fast" or "standard" mode.
-If output bounds are to be considered during the tightening, they have to be provided as optional arguments and `tighten_bounds` must be set to "output".
+Can also be called without the bounds to invoke bound tightening ("standard" or "fast" mode). In this case solver parameters have to be provided.
+Return the resulting JuMP model, the compressed neural network, the removed neurons and the computed bounds.
 
 # Arguments
 - `NN_model`: neural network as a `Flux.Chain`
 - `init_ub`: upper bounds for the input layer
 - `init_lb`: lower bounds for the input layer
-- `solver_params`: parameters for the JuMP model solver
 
 # Optional arguments
-- `tighten_bounds`: "fast", "standard" or "output"
+- `params`: parameters for the JuMP model solver
+- `tighten_bounds`: "fast" or "standard"
 - `bounds_U`: upper bounds for the hidden and output layers
 - `bounds_L`: lower bounds for the hidden and output layers
-- `out_ub`: upper bounds for the output layer
-- `out_lb`: lower bounds for the output layer
 
 # Examples
 ```julia
-julia> nn_jump, U, L = NN_to_MIP(model, init_U, init_L, solver_params; tighten_bounds="standard");
+julia> jump_model, compressed_model, removed_neurons, bounds_U, bounds_L = compress(model, init_U, init_L; params=solver_params, tighten_bounds="standard");
 ```
 """
 function compress(model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vector{Float64}; params=nothing, bounds_U=nothing, bounds_L=nothing, tighten_bounds="fast")

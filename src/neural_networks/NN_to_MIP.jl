@@ -141,10 +141,15 @@ function NN_to_MIP(NN_model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vect
     if tighten_bounds == "output"
         @assert length(out_lb) == length(out_ub) == neuron_count[K] "Incorrect length of output bounds array."
 
+        println("Starting bound tightening based on output bounds as well as input bounds.")
+
         @constraint(jump_model, [neuron in 1:neuron_count[K]], x[K, neuron] >= out_lb[neuron])
         @constraint(jump_model, [neuron in 1:neuron_count[K]], x[K, neuron] <= out_ub[neuron])
 
-        for layer in 1:K-1, neuron in neuron_count[layer]
+        for layer in 1:K-1
+
+            println("\nLAYER $layer")
+
             bounds = if nprocs() > 1
                 pmap(neuron -> calculate_bounds(copy_model(jump_model, solver_params), layer, neuron, W, b, neurons), neurons(layer))
             else
@@ -155,10 +160,15 @@ function NN_to_MIP(NN_model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vect
             bounds_U[layer] = min.(bounds_U[layer], [bound[1] for bound in bounds])
             bounds_L[layer] = max.(bounds_L[layer], [bound[2] for bound in bounds])
 
-            @constraint(jump_model, x[layer, neuron] <= max(0, bounds_U[layer][neuron]) * (1 - z[layer, neuron]))
-            @constraint(jump_model, s[layer, neuron] <= max(0, -bounds_L[layer][neuron]) * z[layer, neuron])
+            for neuron in neuron_count[layer]
+                @constraint(jump_model, x[layer, neuron] <= max(0, bounds_U[layer][neuron]) * (1 - z[layer, neuron]))
+                @constraint(jump_model, s[layer, neuron] <= max(0, -bounds_L[layer][neuron]) * z[layer, neuron])
+            end
 
         end
+
+        bounds_U[K] = out_ub
+        bounds_L[K] = out_lb
     end
 
     println("Model creation complete.")

@@ -46,7 +46,7 @@ function calculate_bounds(model::JuMP.Model, layer, neuron, W, b, neurons; layer
     if upper_bound > 1_000 @warn "Upper bound is very loose: $upper_bound, problem might become infeasible." end
     if lower_bound < -1_000 @warn "Lower bound is very loose: $lower_bound, problem might become infeasible." end
 
-    println("Neuron: $neuron")
+    println("Neuron: $neuron [$lower_bound, $upper_bound]")
 
     return upper_bound, lower_bound
 end

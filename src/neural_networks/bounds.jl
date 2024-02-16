@@ -11,7 +11,7 @@ function set_solver_params!(model, params)
         params.threads != 0 && set_attribute(model, "Threads", params.threads)
     elseif params.solver == "GLPK"
         set_optimizer(model, () -> GLPK.Optimizer())
-        params.time_limit != 0 && set_attribute(model, "tm_lim", params.time_limit)
+        params.time_limit != 0 && set_attribute(model, "tm_lim", params.time_limit * 1_000)
     else
         error("Solver has to be \"Gurobi\" or \"GLPK\"")
     end

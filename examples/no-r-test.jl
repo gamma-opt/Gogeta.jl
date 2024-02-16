@@ -28,6 +28,8 @@ solver_params = SolverParams(solver="Gurobi", silent=true, threads=0, relax=fals
 @time jump_standard, U_standard, L_standard = NN_to_MIP(model, init_U, init_L, solver_params; tighten_bounds="standard");
 @time jump_fast, U_fast, L_fast = NN_to_MIP(model, init_U, init_L, solver_params; tighten_bounds="fast");
 
+@btime [forward_pass!(jump_nor, input)[] for input in eachcol(x)];
+
 # Plot the differences
 plot(collect(Iterators.flatten(U_standard)))
 plot!(collect(Iterators.flatten(U_nor)))

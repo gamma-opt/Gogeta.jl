@@ -87,12 +87,12 @@ function NN_to_MIP(NN_model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vect
         bounds_U = Vector{Vector}(undef, K)
         bounds_L = Vector{Vector}(undef, K)
     end
-
+    
     ucons = Vector{Vector{ConstraintRef}}(undef, K)
     lcons = Vector{Vector{ConstraintRef}}(undef, K)
 
-    [ucons[layer] = ConstraintRef[] for layer in 1:K]
-    [lcons[layer] = ConstraintRef[] for layer in 1:K]
+    [ucons[layer] = Vector{ConstraintRef}(undef, neuron_count[layer]) for layer in 1:K]
+    [lcons[layer] = Vector{ConstraintRef}(undef, neuron_count[layer]) for layer in 1:K]
     
     for layer in 1:K # hidden layers and output
 
@@ -132,9 +132,9 @@ function NN_to_MIP(NN_model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vect
             @constraint(jump_model, s[layer, neuron] >= 0)
             set_binary(z[layer, neuron])
 
-            push!(ucons[layer], @constraint(jump_model, x[layer, neuron] <= max(0, bounds_U[layer][neuron]) * (1 - z[layer, neuron])))
-            push!(lcons[layer], @constraint(jump_model, s[layer, neuron] <= max(0, -bounds_L[layer][neuron]) * z[layer, neuron]))
-
+            ucons[layer][neuron] = @constraint(jump_model, x[layer, neuron] <= max(0, bounds_U[layer][neuron]) * (1 - z[layer, neuron]))
+            lcons[layer][neuron] = @constraint(jump_model, s[layer, neuron] <= max(0, -bounds_L[layer][neuron]) * z[layer, neuron])
+            
             @constraint(jump_model, x[layer, neuron] - s[layer, neuron] == b[layer][neuron] + sum(W[layer][neuron, i] * x[layer-1, i] for i in neurons(layer-1)))
 
         end

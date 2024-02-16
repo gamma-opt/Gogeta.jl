@@ -73,5 +73,5 @@ In this case, using the LRR bounds is enough to achieve most of the compression 
 - tighter bounds should only be calculated if necessary (e.g. problem cannot be solved quickly enough with loose bounds or the compression has to be maximal)
 
 *Grimstad and Andresson:*
-- integer problems formulated from small to medium NN models (1-3 hidden layers, width of layers >50) are quite fast to solve even with loose bounds
+- integer problems formulated from small to medium NN models (1-3 hidden layers, width of layers <50) are quite fast to solve even with loose bounds
     - solving the bounds and then solving the problem itself might be slower than just solving the problem with loose bounds

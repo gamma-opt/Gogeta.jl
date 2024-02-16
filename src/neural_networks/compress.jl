@@ -7,7 +7,7 @@ Can be called with precomputed bounds.
 Returns the compressed neural network as a `Flux.Chain` and the indices of the removed neurons in this case.
 
 Can also be called without the bounds to invoke bound tightening ("standard" or "fast" mode). In this case solver parameters have to be provided.
-Return the resulting JuMP model, the compressed neural network, the removed neurons and the computed bounds.
+Returns the resulting JuMP model, the compressed neural network, the removed neurons and the computed bounds.
 
 # Arguments
 - `NN_model`: neural network as a `Flux.Chain`

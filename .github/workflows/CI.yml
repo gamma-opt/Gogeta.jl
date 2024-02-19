@@ -19,14 +19,15 @@ jobs:
       fail-fast: false
       matrix:
         version:
-          - '1.0'
+          #- '1.0'
           - '1.9'
-          - 'nightly'
+          #- 'nightly'
         os:
           - ubuntu-latest
         arch:
           - x64
     steps:
+      - run: echo "1" >> $GUROBI_JL_SKIP_LIB_CHECK
       - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v1
         with:

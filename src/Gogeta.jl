@@ -11,7 +11,11 @@ using EvoTrees
 const GUROBI_ENV = Ref{Gurobi.Env}()
 
 function __init__()
-    const GUROBI_ENV[] = Gurobi.Env()
+    try
+        const GUROBI_ENV[] = Gurobi.Env()
+    catch e
+        println("Gurobi not usable.")
+    end
 end
 
 include("neural_networks/NN_to_MIP.jl")

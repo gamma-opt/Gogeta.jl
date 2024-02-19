@@ -27,7 +27,8 @@ jobs:
         arch:
           - x64
     steps:
-      - run: echo "1" >> $GUROBI_JL_SKIP_LIB_CHECK
+      - name: Set GUROBI_JL_SKIP_LIB_CHECK
+        run: echo "GUROBI_JL_SKIP_LIB_CHECK=1" >> $GITHUB_ENV
       - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v1
         with:

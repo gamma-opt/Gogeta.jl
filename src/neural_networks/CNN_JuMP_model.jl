@@ -2,7 +2,7 @@ using Flux, JuMP, Gurobi
 using Flux: params
 
 """
-create_CNN_JuMP_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64, Int64}, L_bounds::Vector{Array{Float32}}, U_bounds::Vector{Array{Float32}})
+    create_CNN_JuMP_model(CNN::Chain, data_shape::Tuple{Int64, Int64, Int64, Int64}, L_bounds::Vector{Array{Float32}}, U_bounds::Vector{Array{Float32}})
 
 Converts a CNN with ReLU activation functions to a 0-1 MILP JuMP model. The ReLU CNN is assumed to be a Flux.Chain.
 The activation function must be "relu" in all hidden (Conv and Dense) layers and "identity" in the output layer.

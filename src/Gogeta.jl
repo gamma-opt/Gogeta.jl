@@ -1,16 +1,32 @@
 module Gogeta
 
-include("neural_networks/JuMP_model.jl")
-export create_JuMP_model, evaluate!
+using Flux
+using JuMP
+using LinearAlgebra: rank, dot
+using Gurobi
+using GLPK
+using Distributed
+using EvoTrees
 
-include("neural_networks/CNN_JuMP_model.jl")
-export create_CNN_JuMP_model, evaluate_CNN!
+const GUROBI_ENV = Ref{Gurobi.Env}()
 
-include("neural_networks/bound_tightening.jl")
-export bound_tightening,
-    bound_tightening_threads,
-    bound_tightening_workers,
-    bound_tightening_2workers
+function __init__()
+    try
+        const GUROBI_ENV[] = Gurobi.Env()
+    catch e
+        println("Gurobi not usable.")
+    end
+end
+
+include("neural_networks/NN_to_MIP.jl")
+export NN_to_MIP, forward_pass!, SolverParams
+
+include("neural_networks/bounds.jl")
+
+include("neural_networks/compression.jl")
+
+include("neural_networks/compress.jl")
+export compress
 
 include("tree_ensembles/types.jl")
 export TEModel, extract_evotrees_info

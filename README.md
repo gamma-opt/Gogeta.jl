@@ -2,6 +2,7 @@
 
 [![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://gamma-opt.github.io/Gogeta.jl/stable/)
 [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://gamma-opt.github.io/Gogeta.jl/dev/)
+![Runtests](https://github.com/gamma-opt/Gogeta.jl/workflows/CI/badge.svg)
 
 This package enables representing machine-learning models with mathematical programming, more specifically as mixed-integer optimization problems.
 

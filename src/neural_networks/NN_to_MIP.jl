@@ -53,6 +53,8 @@ julia> nn_jump, U, L = NN_to_MIP(model, init_U, init_L, solver_params; tighten_b
 """
 function NN_to_MIP(NN_model::Flux.Chain, init_ub::Vector{Float64}, init_lb::Vector{Float64}, solver_params::SolverParams; tighten_bounds::String="fast", bounds_U=nothing, bounds_L=nothing, out_ub=nothing, out_lb=nothing)
 
+    # println("HEHELEOOELOOOOO")
+
     println("Creating a JuMP model from a Flux.Chain neural network...")
 
     bounds_precomputed = (bounds_U !== nothing) && (bounds_L !== nothing)

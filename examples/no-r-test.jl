@@ -1,6 +1,7 @@
+using Revise
+using Gogeta
 using Flux
 using Random
-using Gogeta
 using Plots
 
 begin

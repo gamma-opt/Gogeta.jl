@@ -25,17 +25,17 @@ x = transpose(hcat(x1, x2)) .|> Float32;
 solver_params = SolverParams(solver="GLPK", silent=true, threads=0, relax=false, time_limit=1.0);
 
 @info "Compressing the neural network with simultaneous bound tightening."
-jump_model, compressed_model, removed_neurons, bounds_U, bounds_L = compress(model, init_U, init_L; params=solver_params, tighten_bounds="standard");
+@time jump_model, compressed_model, removed_neurons, bounds_U, bounds_L = compress_with_bound_tightening(model, init_U, init_L,solver_params; bound_tightening="standard");
 
 @info "Testing that the compressed model and the corresponding JuMP model are equal to the original neural network."
 @test vec(model(x)) ≈ [forward_pass!(jump_model, input)[] for input in eachcol(x)]
 @test compressed_model(x) ≈ model(x)
 
 @info "Creating a JuMP model from the neural network with bound tightening but without compression."
-nn_jump, U_correct, L_correct = NN_to_MIP(model, init_U, init_L, solver_params; tighten_bounds="standard");
+@time nn_jump, U_correct, L_correct = NN_to_MIP_with_bound_tightening(model, init_U, init_L, solver_params; bound_tightening="standard");
 
 @info "Creating bound tightened JuMP model with output bounds present."
-jump_nor, U_nor, L_nor = NN_to_MIP(model, init_U, init_L, solver_params; tighten_bounds="output", out_ub=[-0.2], out_lb=[-0.4]);
+@time jump_nor, U_nor, L_nor = NN_to_MIP_with_bound_tightening(model, init_U, init_L, solver_params; bound_tightening="output", U_out=[-0.2], L_out=[-0.4]);
 
 @info "Testing that the output tightened model is the same in the areas it's defined in."
 @test all(map(input -> begin
@@ -51,7 +51,7 @@ end, eachcol(x)))
 @test vec(model(x)) ≈ [forward_pass!(nn_jump, input)[] for input in eachcol(x)]
 
 @info "Compressing with the precomputed bounds."
-compressed, removed = compress(model, init_U, init_L; bounds_U=U_correct, bounds_L=L_correct);
+compressed, removed = compress_with_precomputed(model, init_U, init_L, U_correct, L_correct);
 
 @info "Testing that this compression result is equal to the original."
 @test compressed(x) ≈ model(x)
@@ -60,13 +60,13 @@ compressed, removed = compress(model, init_U, init_L; bounds_U=U_correct, bounds
 @test removed == removed_neurons
 
 @info "Creating a JuMP model of the network with loose bound tightening."
-nn_loose, U_loose, L_loose = NN_to_MIP(model, init_U, init_L, solver_params; tighten_bounds="fast");
+nn_loose, U_loose, L_loose = NN_to_MIP_with_bound_tightening(model, init_U, init_L, solver_params; bound_tightening="fast");
 
 @info "Testing that the loose JuMP model is equal to the original neural network."
 @test vec(model(x)) ≈ [forward_pass!(nn_loose, input)[] for input in eachcol(x)]
 
 @info "Compressing with the precomputed loose bounds."
-compressed_loose, removed_loose = compress(model, init_U, init_L; bounds_U=U_loose, bounds_L=L_loose);
+compressed_loose, removed_loose = compress_with_precomputed(model, init_U, init_L, U_loose, L_loose);
 
 @info "Testing that this loose compression result is equal to the original neural network."
 @test compressed_loose(x) ≈ model(x)

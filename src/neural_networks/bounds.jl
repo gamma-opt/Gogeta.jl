@@ -5,6 +5,10 @@ function copy_model(input_model, solver_params)
 end
 
 function set_solver_params!(model, params)
+    
+    params.silent && set_silent(model)
+    params.relax && relax_integrality(model)
+    
     if params.solver == "Gurobi"
         set_optimizer(model, () -> Gurobi.Optimizer(GUROBI_ENV[]))
         params.time_limit != 0 && set_attribute(model, "TimeLimit", params.time_limit)
@@ -12,13 +16,12 @@ function set_solver_params!(model, params)
     elseif params.solver == "GLPK"
         set_optimizer(model, () -> GLPK.Optimizer())
         params.time_limit != 0 && set_attribute(model, "tm_lim", params.time_limit * 1_000)
+    elseif params.solver == "HiGHS"
+        set_optimizer(model, () -> HiGHS.Optimizer())
+        params.time_limit != 0 && set_attribute(model, "time_limit", params.time_limit)
     else
-        error("Solver has to be \"Gurobi\" or \"GLPK\"")
+        error("Solver has to be \"Gurobi\", \"GLPK\" or \"HiGHS\".")
     end
-    
-    params.silent && set_silent(model)
-    params.relax && relax_integrality(model)
-
 end
 
 function calculate_bounds(model::JuMP.Model, layer, neuron, W, b, neurons; layers_removed=0)

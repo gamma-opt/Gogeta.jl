@@ -1,7 +1,5 @@
 """
-```julia
-function children(id::Int, leaf_dict::Dict, max::Int)
-```
+    function children(id::Int, leaf_dict::Dict, max::Int)
 
 Finds the leaf indices of the children leaves of node `id` in a binary tree.
 
@@ -35,9 +33,7 @@ function children(id::Int, leaf_dict::Dict, max::Int)
 end
 
 """
-```julia
-function get_solution(model::JuMP.Model, TE::TEModel)
-```
+    function get_solution(model::JuMP.Model, TE::TEModel)
 
 Finds the upper and lower bounds for each input variable given the optimized model.
 
@@ -46,7 +42,6 @@ Returns the bounds for each feature in an array.
 # Arguments
 - `model`: The optimized JuMP model.
 - `TE`: Struct of type `TEModel` containing information about the tree ensemble.
-
 """
 function get_solution(model::JuMP.Model, TE::TEModel)
 

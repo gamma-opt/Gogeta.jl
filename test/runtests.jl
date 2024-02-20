@@ -10,6 +10,13 @@ using Test
     # tests for neural networks
     include("neural_networks/NN_test.jl")
     
+    println("\n\n####################")
+    println("Neural network parallel tests")
+    println("####################\n\n")
+    
+    # tests for neural networks
+    include("neural_networks/NN_parallel_test.jl")
+    
     println("\n\n###################")
     println("Tree ensemble tests")
     println("###################\n\n")

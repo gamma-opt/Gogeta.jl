@@ -1,3 +1,8 @@
+"""
+    function prune!(W, b, removed_neurons, layers_removed, neuron_count, layer, bounds_U, bounds_L)
+
+Removes stabily active or inactive neurons in a network by updating the weights and the biases and the removed neurons list accordingly.
+"""
 function prune!(W, b, removed_neurons, layers_removed, neuron_count, layer, bounds_U, bounds_L)
 
     stable_units = Set{Int}() # indices of stable neurons
@@ -74,6 +79,11 @@ function prune!(W, b, removed_neurons, layers_removed, neuron_count, layer, boun
     return layers_removed
 end
 
+"""
+    function build_model!(W, b, K, neurons)
+
+Builds a new `Flux.Chain` model from the given weights and biases.
+"""
 function build_model!(W, b, K, neurons)
 
     new_layers = [];

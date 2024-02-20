@@ -1,9 +1,19 @@
+"""
+    function copy_model(input_model, solver_params)
+
+Copies a JuMP model. Solver has to be specified for each new copy. Used for parallelization.
+"""
 function copy_model(input_model, solver_params)
     model = copy(input_model)
     set_solver_params!(model, solver_params)
     return model
 end
 
+"""
+    function set_solver_params!(model, params)
+
+Set the parameters of a JuMP model. Solver and its parameters have to be specified for each new model copy. Used for parallelization.
+"""
 function set_solver_params!(model, params)
     
     params.silent && set_silent(model)
@@ -24,6 +34,11 @@ function set_solver_params!(model, params)
     end
 end
 
+"""
+    function calculate_bounds(model::JuMP.Model, layer, neuron, W, b, neurons; layers_removed=0)
+
+Calculates the upper and lower activation bounds for a neuron in a ReLU-activated neural network.
+"""
 function calculate_bounds(model::JuMP.Model, layer, neuron, W, b, neurons; layers_removed=0)
 
     @objective(model, Max, b[layer][neuron] + sum(W[layer][neuron, i] * model[:x][layer-1-layers_removed, i] for i in neurons(layer-1-layers_removed)))

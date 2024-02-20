@@ -1,3 +1,11 @@
+"""
+    function formulate_and_compress(NN_model::Flux.Chain, U_in, L_in; U_bounds=nothing, L_bounds=nothing, U_out=nothing, L_out=nothing, solver_params=nothing, bound_tightening="fast", compress=false, silent=false)
+
+Creates a mixed-integer optimization problem from a `Flux.Chain` model.
+
+The parameters are used to specify what kind of bound tightening and compression will be used.
+
+"""
 function formulate_and_compress(NN_model::Flux.Chain, U_in, L_in; U_bounds=nothing, L_bounds=nothing, U_out=nothing, L_out=nothing, solver_params=nothing, bound_tightening="fast", compress=false, silent=false)
 
     oldstdout = stdout

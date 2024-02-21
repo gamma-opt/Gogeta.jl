@@ -5,6 +5,7 @@ using JuMP
 using LinearAlgebra: rank, dot
 using Gurobi
 using GLPK
+using HiGHS
 using Distributed
 using EvoTrees
 
@@ -14,19 +15,18 @@ function __init__()
     try
         const GUROBI_ENV[] = Gurobi.Env()
     catch e
-        println("Gurobi not usable.")
+        println(e)
+        @warn "Gurobi is not able to be used."
     end
 end
 
-include("neural_networks/NN_to_MIP.jl")
-export NN_to_MIP, forward_pass!, SolverParams
-
 include("neural_networks/bounds.jl")
+include("neural_networks/prune.jl")
+include("neural_networks/NN_to_MIP.jl")
 
-include("neural_networks/compression.jl")
-
-include("neural_networks/compress.jl")
-export compress
+include("neural_networks/interface.jl")
+export NN_to_MIP_with_precomputed, NN_to_MIP_with_bound_tightening, compress_with_precomputed, compress_with_bound_tightening
+export forward_pass!, SolverParams
 
 include("tree_ensembles/types.jl")
 export TEModel, extract_evotrees_info

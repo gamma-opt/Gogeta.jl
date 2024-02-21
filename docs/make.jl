@@ -1,18 +1,19 @@
-using Gogeta
 using Documenter
+using Gogeta
 
 makedocs(
     modules=[Gogeta],
-    authors="Nikita Belyak <nikita.belyak1994@gmail.com> and contributors",
+    authors="Eetu Reijonen",
     sitename="Gogeta.jl",
     format= Documenter.HTML(),
     pages=[
-        "Home" => "index.md",
+        "Introduction" => "index.md",
+        "Public API" => "api.md",
         "Reference" => "reference.md",
     ],
 )
 
 deploydocs(;
     repo="github.com/gamma-opt/Gogeta.jl.git",
-    devbranch="main",
+    devbranch="main"
 )

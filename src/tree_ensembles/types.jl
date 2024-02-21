@@ -1,4 +1,6 @@
 """
+    struct TEModel
+
 Universal datatype for storing information about a Tree Ensemble Model.
 This is the datatype that is used when creating the integer optimization problem from a tree ensemble.
 
@@ -31,9 +33,7 @@ struct TEModel
 end
 
 """
-```julia
-extract_evotrees_info(evo_model; tree_limit=length(evo_model.trees))
-```
+    extract_evotrees_info(evo_model; tree_limit=length(evo_model.trees))
 
 Gets the data required for constructing the corresponding MIP from an [EvoTrees](https://github.com/Evovest/EvoTrees.jl) model `evo_model`. 
 Returns a custom datatype `TEModel` which contains the necessary information.
@@ -99,15 +99,10 @@ function extract_evotrees_info(evo_model; tree_limit=length(evo_model.trees))
 end
 
 """
-```julia
-function init_TEModel!(TE::TEModel)
-```
+    function init_TEModel!(TE::TEModel)
 
 Precompute child leaves which are needed for generating the split constraints.
 Changes `child_leaves` field of the `TEModel`.
-
-# Arguments
-- `TE`: Struct of type `TEModel` containing information about the tree ensemble.
 """
 function init_TEModel!(TE::TEModel)
 

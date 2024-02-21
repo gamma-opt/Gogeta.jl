@@ -1,7 +1,5 @@
 """
-```julia
-function TE_to_MIP(TE::TEModel, optimizer, objective)
-```
+    function TE_to_MIP(TE::TEModel, optimizer, objective)
 
 Creates a JuMP model `opt_model` based on the given tree ensemble.
 Returns `opt_model`.
@@ -37,9 +35,7 @@ function TE_to_MIP(TE::TEModel, optimizer, objective)
 end
 
 """
-```julia
-function optimize_with_initial_constraints!(opt_model::JuMP.Model, TE::TEModel)
-```
+    function optimize_with_initial_constraints!(opt_model::JuMP.Model, TE::TEModel)
 
 Adds all split constraints to the formulation and then solves the MIP.
 
@@ -68,9 +64,7 @@ function optimize_with_initial_constraints!(opt_model::JuMP.Model, TE::TEModel)
 end
 
 """
-```julia
-function optimize_with_lazy_constraints!(opt_model::JuMP.Model, TE::TEModel)
-```
+    function optimize_with_lazy_constraints!(opt_model::JuMP.Model, TE::TEModel)
 
 Solves the optimization model by utilizing lazy constraints.
 This means that the split constraints are added one-by-one for each tree.

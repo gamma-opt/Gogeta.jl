@@ -11,7 +11,7 @@ Parameters to be used by the solver.
 - `time_limit`: time limit for each optimization in the model
 
 # Examples
-```julia
+```julia-repl
 julia> solver_params = SolverParams(solver="Gurobi", silent=true, threads=0, relax=false, time_limit=0);
 ```
 """

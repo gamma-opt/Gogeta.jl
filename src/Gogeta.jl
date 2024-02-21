@@ -15,6 +15,7 @@ function __init__()
     try
         const GUROBI_ENV[] = Gurobi.Env()
     catch e
+        println(e)
         @warn "Gurobi is not able to be used."
     end
 end

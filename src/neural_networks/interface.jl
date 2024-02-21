@@ -38,7 +38,7 @@ function forward_pass!(jump_model::JuMP.Model, input)
         result = value.(jump_model[:x][last_layer, :])
         return [result[i] for i in 1:outputs]
     catch e
-        println("Input outside of input bounds or incorrectly constructed model.")
+        @warn "Input outside of input bounds or incorrectly constructed model."
         return [nothing]
     end
 

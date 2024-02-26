@@ -35,18 +35,20 @@ outputs = [CNN_model[1:2](input)[:, :, i, 1] for i in 1:size(CNN_model[1:2](inpu
 display.(heatmap.(outputs, background=false, legend=false, color = :inferno, aspect_ratio=:equal, axis=([], false)));
 
 # create jump model from cnn
-jump = create_model(CNN_model)
+jump = Model(Gurobi.Optimizer)
+set_silent(jump)
+create_model!(jump, CNN_model)
 
 # Test that jump model produces same outputs for all layers as the CNN
-all([CNN_model[1](input)[:, :, i, 1] ≈ image_pass!(jump, input, i, 1) for i in 1:10])
-all([CNN_model[1:2](input)[:, :, i, 1] ≈ image_pass!(jump, input, i, 2) for i in 1:10])
-vec(CNN_model[1:3](input)) ≈ image_pass!(jump, input, 0, 3)
-vec(CNN_model[1:4](input)) ≈ image_pass!(jump, input, 0, 4)
-vec(CNN_model[1:5](input)) ≈ image_pass!(jump, input, 0, 5)
+CNN_model[1](input)[:, :, :, 1] ≈ image_pass!(jump, input, 1)
+CNN_model[1:2](input)[:, :, :, 1] ≈ image_pass!(jump, input, 2)
+vec(CNN_model[1:3](input)) ≈ image_pass!(jump, input, 3)
+vec(CNN_model[1:4](input)) ≈ image_pass!(jump, input, 4)
+vec(CNN_model[1:5](input)) ≈ image_pass!(jump, input, 5)
 
 # Plot true model maxpool fifth channel
 heatmap(CNN_model[1:2](input)[:, :, 5, 1], background=false, legend=false, color=:inferno, aspect_ratio=:equal, axis=([], false))
 
 # Plot jump model maxpool fifth channel
-heatmap(image_pass!(jump, input, 5, 2), background=false, legend=false, color=:inferno, aspect_ratio=:equal, axis=([], false))
+heatmap(image_pass!(jump, input, 2)[:, :, 5], background=false, legend=false, color=:inferno, aspect_ratio=:equal, axis=([], false))
 

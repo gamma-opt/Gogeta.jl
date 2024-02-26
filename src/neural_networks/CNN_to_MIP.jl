@@ -2,14 +2,16 @@ using Flux
 using Plots
 using JuMP
 using Gurobi
+using Random
 
 include("CNN_convert.jl")
 
+Random.seed!(1234)
 CNN_model = Flux.Chain(
     Conv((3,3), 1 => 10, relu),
     MaxPool((3,3)),
     Flux.flatten,
-    Dense(640 => 100, relu),
+    Dense(2560 => 100, relu),
     Dense(100 => 1)
 )
 
@@ -39,6 +41,8 @@ jump = create_model(CNN_model)
 all([CNN_model[1](input)[:, :, i, 1] ≈ image_pass!(jump, input, i, 1) for i in 1:10])
 all([CNN_model[1:2](input)[:, :, i, 1] ≈ image_pass!(jump, input, i, 2) for i in 1:10])
 vec(CNN_model[1:3](input)) ≈ image_pass!(jump, input, 0, 3)
+vec(CNN_model[1:4](input)) ≈ image_pass!(jump, input, 0, 4)
+vec(CNN_model[1:5](input)) ≈ image_pass!(jump, input, 0, 5)
 
 # Plot true model maxpool fifth channel
 heatmap(CNN_model[1:2](input)[:, :, 5, 1], background=false, legend=false, color=:inferno, aspect_ratio=:equal, axis=([], false))

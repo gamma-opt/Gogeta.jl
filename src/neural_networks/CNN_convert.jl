@@ -1,32 +1,27 @@
-@kwdef struct CNNStructure
-end
+function create_model!(jump_model, CNN_model, input; big_M=1000.0)
 
-function create_model!(jump_model, CNN_model; big_M=1000.0)
+    cnnstruct = get_structure(CNN_model, input)
 
-    channels = Dict(0 => 1, 1 => 10, 2 => 10)
-    dims = Dict(0 => (50, 50), 1 => (48, 48), 2 => (16, 16))
-
-    dense_lengths = Dict(0 => 2560, 1 => 100, 2 => 1)
-
-    conv_inds = [1]
-    maxpool_inds = [2]
-    flatten_ind = [3]
-    dense_inds = [4, 5]
-
-    n_conv_or_pool = length(conv_inds) + length(maxpool_inds)
-    n_dense = length(dense_inds)
+    channels = cnnstruct.channels
+    dims = cnnstruct.dims
+    dense_lengths = cnnstruct.dense_lengths
+    conv_inds = cnnstruct.conv_inds
+    maxpool_inds = cnnstruct.maxpool_inds
+    flatten_ind = cnnstruct.flatten_ind
+    dense_inds  = cnnstruct.dense_inds
     
-    # 2-dimensional layers
-    @variable(jump_model, c[layer=0:n_conv_or_pool, 1:dims[layer][1], 1:dims[layer][1], 1:channels[layer]] >= 0) # input is always between 0 and 1
-    @variable(jump_model, cs[layer=1:n_conv_or_pool, 1:dims[layer][1], 1:dims[layer][2], 1:channels[layer]] >= 0) # TODO correct index sets
-    @variable(jump_model, cz[layer=1:n_conv_or_pool, 1:dims[layer][1], 1:dims[layer][2], 1:channels[layer]], Bin)
+    # 2d layers
+    @variable(jump_model, c[layer=union(0, conv_inds, maxpool_inds), 1:dims[layer][1], 1:dims[layer][2], 1:channels[layer]] >= 0) # input is always between 0 and 1
+    @variable(jump_model, cs[layer=conv_inds, 1:dims[layer][1], 1:dims[layer][2], 1:channels[layer]] >= 0)
+    @variable(jump_model, cz[layer=conv_inds, 1:dims[layer][1], 1:dims[layer][2], 1:channels[layer]], Bin)
 
     # dense layers
-    @variable(jump_model, x[layer=0:n_dense, 1:dense_lengths[layer]])
-    @variable(jump_model, s[layer=1:n_dense-1, 1:dense_lengths[layer]] >= 0)
-    @variable(jump_model, z[layer=1:n_dense-1, 1:dense_lengths[layer]], Bin)
+    @variable(jump_model, x[layer=union(flatten_ind, dense_inds), 1:dense_lengths[layer]])
+    @variable(jump_model, s[layer=dense_inds[1:end-1], 1:dense_lengths[layer]] >= 0)
+    @variable(jump_model, z[layer=dense_inds[1:end-1], 1:dense_lengths[layer]], Bin)
 
     for (index, layer_data) in enumerate(CNN_model)
+
         if layer_data isa Conv
             println("Layer $index is convolutional")
             println("Filters: $(size(Flux.params(layer_data)[1]))")
@@ -82,7 +77,7 @@ function create_model!(jump_model, CNN_model; big_M=1000.0)
             println("Size of input: $(size(CNN_model[1:index-1](input)))")
             println("Size of output: $(size(CNN_model[1:index](input)))")
 
-            @constraint(jump_model, [channel in 1:channels[index-1], row in 1:dims[index-1][1], col in 1:dims[index-1][2]], x[0, row + (col-1)*dims[index-1][2] + (channel-1)*prod(dims[index-1])] == c[index-1, row, col, channel])
+            @constraint(jump_model, [channel in 1:channels[index-1], row in 1:dims[index-1][1], col in 1:dims[index-1][2]], x[flatten_ind, row + (col-1)*dims[index-1][2] + (channel-1)*prod(dims[index-1])] == c[index-1, row, col, channel])
 
         elseif layer_data isa Dense
             println("Layer $index is dense")
@@ -91,35 +86,22 @@ function create_model!(jump_model, CNN_model; big_M=1000.0)
 
             weights = Flux.params(layer_data)[1]
             biases = Flux.params(layer_data)[2]
-            dense_index = index-3
 
             n_neurons = length(biases)
-            n_previous = length(x[dense_index-1, :])
+            n_previous = length(x[index-1, :])
 
             if layer_data.σ == relu
                 for neuron in 1:n_neurons
-                    @constraint(jump_model, x[dense_index, neuron] >= 0)
-                    @constraint(jump_model, x[dense_index, neuron] <= big_M * (1 - z[dense_index, neuron]))
-                    @constraint(jump_model, s[dense_index, neuron] <= big_M * z[dense_index, neuron])
-                    @constraint(jump_model, x[dense_index, neuron] - s[dense_index, neuron] == biases[neuron] + sum(weights[neuron, i] * x[dense_index-1, i] for i in 1:n_previous))
+                    @constraint(jump_model, x[index, neuron] >= 0)
+                    @constraint(jump_model, x[index, neuron] <= big_M * (1 - z[index, neuron]))
+                    @constraint(jump_model, s[index, neuron] <= big_M * z[index, neuron])
+                    @constraint(jump_model, x[index, neuron] - s[index, neuron] == biases[neuron] + sum(weights[neuron, i] * x[index-1, i] for i in 1:n_previous))
                 end
             elseif layer_data.σ == identity
-                @constraint(jump_model, [neuron in 1:n_neurons], x[dense_index, neuron] == biases[neuron] + sum(weights[neuron, i] * x[dense_index-1, i] for i in 1:n_previous))
+                @constraint(jump_model, [neuron in 1:n_neurons], x[index, neuron] == biases[neuron] + sum(weights[neuron, i] * x[index-1, i] for i in 1:n_previous))
             end
         end
 
         println()
-    end
-end
-
-function image_pass!(jump_model, input, layer)
-    [fix(jump_model[:c][0, x, y, channel], input[x, y, channel, 1], force=true) for x in 1:50, y in 1:50, channel in 1:1]
-    optimize!(jump_model)
-
-    if layer == 1 return [value(jump_model[:c][1, x, y, channel]) for x in 1:48, y in 1:48, channel in 1:10]
-    elseif layer == 2 return [value(jump_model[:c][2, x, y, channel]) for x in 1:16, y in 1:16, channel in 1:10]
-    elseif layer == 3 return [value(jump_model[:x][0, n]) for n in 1:2560]
-    elseif layer == 4 return [value(jump_model[:x][1, n]) for n in 1:100]
-    elseif layer == 5 return [value(jump_model[:x][2, n]) for n in 1:1]
     end
 end

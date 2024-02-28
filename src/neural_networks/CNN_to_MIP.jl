@@ -14,14 +14,15 @@ downscaled_image = imresize(image, (70, 50));
 
 input = reshape(Float32.(channelview(Gray.(downscaled_image))), 70, 50, 1, 1);
 input = input[end:-1:1, :, :, :];
-size(CNN_model[1:3](input))
+size(CNN_model[1:4](input))
 
 Random.seed!(1234)
 CNN_model = Flux.Chain(
-    Conv((3,3), 1 => 10, relu),
-    MaxPool((3,3)),
+    Conv((4,3), 1 => 10, relu),
+    MeanPool((5,3)),
+    MaxPool((3,4)),
     Flux.flatten,
-    Dense(3520 => 100, relu),
+    Dense(160 => 100, relu),
     Dense(100 => 1)
 )
 
@@ -32,8 +33,12 @@ heatmap(input[:, :, 1, 1], background=false, legend=false, color=:inferno, aspec
 outputs = [CNN_model[1](input)[:, :, i, 1] for i in 1:size(CNN_model[1:2](input))[3]];
 display.(heatmap.(outputs, background=false, legend=false, color = :inferno, aspect_ratio=:equal, axis=([], false)));
 
-# maxpool outputs
+# avgpool outputs
 outputs = [CNN_model[1:2](input)[:, :, i, 1] for i in 1:size(CNN_model[1:2](input))[3]];
+display.(heatmap.(outputs, background=false, legend=false, color = :inferno, aspect_ratio=:equal, axis=([], false)));
+
+# maxpool
+outputs = [CNN_model[1:3](input)[:, :, i, 1] for i in 1:size(CNN_model[1:2](input))[3]];
 display.(heatmap.(outputs, background=false, legend=false, color = :inferno, aspect_ratio=:equal, axis=([], false)));
 
 # create jump model from cnn
@@ -45,9 +50,10 @@ create_model!(jump, CNN_model, input)
 cnns = get_structure(CNN_model, input);
 @time CNN_model[1](input)[:, :, :, 1] ≈ image_pass!(jump, input, cnns, 1)
 @time CNN_model[1:2](input)[:, :, :, 1] ≈ image_pass!(jump, input, cnns, 2)
-@time vec(CNN_model[1:3](input)) ≈ image_pass!(jump, input, cnns, 3)
+@time CNN_model[1:3](input)[:, :, :, 1] ≈ image_pass!(jump, input, cnns, 3)
 @time vec(CNN_model[1:4](input)) ≈ image_pass!(jump, input, cnns, 4)
 @time vec(CNN_model[1:5](input)) ≈ image_pass!(jump, input, cnns, 5)
+@time vec(CNN_model[1:6](input)) ≈ image_pass!(jump, input, cnns, 6)
 
 # Plot true model maxpool fifth channel
 heatmap(CNN_model[1:2](input)[:, :, 5, 1], background=false, legend=false, color=:inferno, aspect_ratio=:equal, axis=([], false))

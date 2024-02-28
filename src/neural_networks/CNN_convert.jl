@@ -7,11 +7,12 @@ function create_model!(jump_model, CNN_model, input; big_M=1000.0)
     dense_lengths = cnnstruct.dense_lengths
     conv_inds = cnnstruct.conv_inds
     maxpool_inds = cnnstruct.maxpool_inds
+    meanpool_inds = cnnstruct.meanpool_inds
     flatten_ind = cnnstruct.flatten_ind
     dense_inds  = cnnstruct.dense_inds
     
     # 2d layers
-    @variable(jump_model, c[layer=union(0, conv_inds, maxpool_inds), 1:dims[layer][1], 1:dims[layer][2], 1:channels[layer]] >= 0) # input is always between 0 and 1
+    @variable(jump_model, c[layer=union(0, conv_inds, maxpool_inds, meanpool_inds), 1:dims[layer][1], 1:dims[layer][2], 1:channels[layer]] >= 0) # input is always between 0 and 1
     @variable(jump_model, cs[layer=conv_inds, 1:dims[layer][1], 1:dims[layer][2], 1:channels[layer]] >= 0)
     @variable(jump_model, cz[layer=conv_inds, 1:dims[layer][1], 1:dims[layer][2], 1:channels[layer]], Bin)
 
@@ -29,15 +30,15 @@ function create_model!(jump_model, CNN_model, input; big_M=1000.0)
 
             f_height, f_width = size(filters[1, 1])
 
-            for row in 1:dims[layer_index][1], col in 1:dims[layer_index][2] # TODO think about the indexing
+            for row in 1:dims[layer_index][1], col in 1:dims[layer_index][2]
 
                 # TODO include pad and stride
 
                 for out_channel in 1:channels[layer_index]
 
-                    # previous_pixel = if haskey(c, (layer_index-1, row, col, in_channel)) c[layer_index-1, row+i, col+j, in_channel] else 0 end
+                    # prev_layer_pixel = if haskey(c, (layer_index-1, row+i, col+j, in_channel)) c[layer_index-1, row+i, col+j, in_channel] else 0 end # zero padding
 
-                    convolution = @expression(jump_model, sum([filters[in_channel, out_channel][f_height-i, f_width-j] * c[layer_index-1, row+i, col+j, in_channel] for i in 0:f_height-1, j in 0:f_width-1, in_channel in 1:channels[layer_index-1]])) # TODO think about this calculation
+                    convolution = @expression(jump_model, sum([filters[in_channel, out_channel][f_height-i, f_width-j] * c[layer_index-1, row+i, col+j, in_channel] for i in 0:f_height-1, j in 0:f_width-1, in_channel in 1:channels[layer_index-1]]))
                     
                     @constraint(jump_model, c[layer_index, row, col, out_channel] - cs[layer_index, row, col, out_channel] == convolution + biases[out_channel])
                     @constraint(jump_model, c[layer_index, row, col, out_channel] <= big_M * (1-cz[layer_index, row, col, out_channel]))
@@ -56,7 +57,7 @@ function create_model!(jump_model, CNN_model, input; big_M=1000.0)
                 
                 for channel in 1:channels[layer_index-1]
                     
-                    @constraint(jump_model, [i in 1:p_height, j in 1:p_width], c[layer_index, row, col, channel] >= c[layer_index-1, (row-1)*p_height + i, (col-1)*p_width + j, channel])  # TODO think about this calculation
+                    @constraint(jump_model, [i in 1:p_height, j in 1:p_width], c[layer_index, row, col, channel] >= c[layer_index-1, (row-1)*p_height + i, (col-1)*p_width + j, channel])
                     
                     pz = @variable(jump_model, [1:p_height, 1:p_width], Bin)
                     @constraint(jump_model, sum([pz[i, j] for i in 1:p_height, j in 1:p_width]) == 1)
@@ -65,9 +66,22 @@ function create_model!(jump_model, CNN_model, input; big_M=1000.0)
                 end
             end
 
+        elseif layer_index in meanpool_inds
+
+            p_height = layer_data.k[1]
+            p_width = layer_data.k[2]
+
+            for row in 1:dims[layer_index][1], col in 1:dims[layer_index][2]
+
+                # TODO include pad and stride
+                
+                for channel in 1:channels[layer_index-1]
+                    @constraint(jump_model, c[layer_index, row, col, channel] == 1/(p_height*p_width) * sum(c[layer_index-1, (row-1)*p_height + i, (col-1)*p_width + j, channel] for i in 1:p_height, j in 1:p_width))
+                end
+            end
+
         elseif layer_index == flatten_ind
 
-            # break
             @constraint(jump_model, [channel in 1:channels[layer_index-1], row in dims[layer_index-1][1]:-1:1, col in 1:dims[layer_index-1][2]], x[flatten_ind, row + (col-1)*dims[layer_index-1][1] + (channel-1)*prod(dims[layer_index-1])] == c[layer_index-1, row, col, channel])
 
         elseif layer_index in dense_inds

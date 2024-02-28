@@ -67,3 +67,11 @@ function image_pass!(jump_model, input, cnnstruct, layer)
         return [value(jump_model[:x][layer, neuron]) for neuron in 1:cnnstruct.dense_lengths[layer]]
     end
 end
+
+function image_pass!(jump_model, input)
+    [fix(jump_model[:c][0, row, col, channel], input[row, col, channel, 1], force=true) for row in eachindex(input[:, 1, 1, 1]), col in eachindex(input[1, :, 1, 1]), channel in eachindex(input[1, 1, :, 1])]
+    optimize!(jump_model)
+
+    (last_layer, outputs) = maximum(keys(jump[:x].data))
+    return [value(jump_model[:x][last_layer, i]) for i in 1:outputs]
+end

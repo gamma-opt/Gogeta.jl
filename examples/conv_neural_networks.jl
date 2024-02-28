@@ -3,13 +3,11 @@ using Plots
 using JuMP
 using Gurobi
 using Random
-
-include("CNN_convert.jl")
-include("CNN_util.jl")
+using Gogeta
 
 using Images
 using FileIO
-image = load("/Users/eetureijonen/Pictures/IMG_0195.JPG");
+image = load("/Users/eetureijonen/Pictures/IMG_0195.JPG"); # swap in your own image
 downscaled_image = imresize(image, (70, 50));
 
 input = reshape(Float32.(channelview(Gray.(downscaled_image))), 70, 50, 1, 1);
@@ -54,10 +52,10 @@ display.(heatmap.(outputs, background=false, legend=false, color = :inferno, asp
 # create jump model from cnn
 jump = Model(Gurobi.Optimizer)
 set_silent(jump)
-create_model!(jump, CNN_model, input)
+cnns = get_structure(CNN_model, input);
+create_MIP_from_CNN!(jump, CNN_model, cnns)
 
 # Test that jump model produces same outputs for all layers as the CNN
-cnns = get_structure(CNN_model, input);
 @time CNN_model[1](input)[:, :, :, 1] ≈ image_pass!(jump, input, cnns, 1)
 @time CNN_model[1:2](input)[:, :, :, 1] ≈ image_pass!(jump, input, cnns, 2)
 @time CNN_model[1:3](input)[:, :, :, 1] ≈ image_pass!(jump, input, cnns, 3)

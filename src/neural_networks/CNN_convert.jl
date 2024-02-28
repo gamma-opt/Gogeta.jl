@@ -1,6 +1,4 @@
-function create_model!(jump_model, CNN_model, input; big_M=1000.0)
-
-    cnnstruct = get_structure(CNN_model, input)
+function create_MIP_from_CNN!(jump_model::JuMP.Model, CNN_model::Flux.Chain, cnnstruct::CNNStructure)
 
     channels = cnnstruct.channels
     dims = cnnstruct.dims
@@ -20,6 +18,9 @@ function create_model!(jump_model, CNN_model, input; big_M=1000.0)
     @variable(jump_model, x[layer=union(flatten_ind, dense_inds), 1:dense_lengths[layer]])
     @variable(jump_model, s[layer=dense_inds[1:end-1], 1:dense_lengths[layer]] >= 0)
     @variable(jump_model, z[layer=dense_inds[1:end-1], 1:dense_lengths[layer]], Bin)
+
+    U_bounds_dense = Dict{Int, Vector}()
+    L_bounds_dense = Dict{Int, Vector}()
 
     pixel_or_pad(layer, row, col, channel) = if haskey(c, (layer, row, col, channel)) c[layer, row, col, channel] else 0.0 end
 
@@ -46,8 +47,8 @@ function create_model!(jump_model, CNN_model, input; big_M=1000.0)
                     )
                     
                     @constraint(jump_model, c[layer_index, row, col, out_channel] - cs[layer_index, row, col, out_channel] == convolution + biases[out_channel])
-                    @constraint(jump_model, c[layer_index, row, col, out_channel] <= big_M * (1-cz[layer_index, row, col, out_channel]))
-                    @constraint(jump_model, cs[layer_index, row, col, out_channel] <= big_M * cz[layer_index, row, col, out_channel])
+                    @constraint(jump_model, c[layer_index, row, col, out_channel] <= 1.0 * (1-cz[layer_index, row, col, out_channel]))
+                    @constraint(jump_model, cs[layer_index, row, col, out_channel] <= 1.0 * cz[layer_index, row, col, out_channel])
                 end
             end
 
@@ -67,7 +68,7 @@ function create_model!(jump_model, CNN_model, input; big_M=1000.0)
                     pz = @variable(jump_model, [1:p_height, 1:p_width], Bin)
                     @constraint(jump_model, sum([pz[i, j] for i in 1:p_height, j in 1:p_width]) == 1)
 
-                    @constraint(jump_model, [i in 1:p_height, j in 1:p_width], pz[i, j] => {c[layer_index, row, col, channel] <= pixel_or_pad(layer_index-1, pos[1]+i, pos[2]+j, channel)})
+                    @constraint(jump_model, [i in 1:p_height, j in 1:p_width], c[layer_index, row, col, channel] <= pixel_or_pad(layer_index-1, pos[1]+i, pos[2]+j, channel) + (1-pz[i, j]))
                 end
             end
 
@@ -102,11 +103,20 @@ function create_model!(jump_model, CNN_model, input; big_M=1000.0)
             n_neurons = length(biases)
             n_previous = length(x[layer_index-1, :])
 
+            # compute heuristic bounds
+            if layer_index == minimum(dense_inds)
+                U_bounds_dense[layer_index] = [sum(max(weights[neuron, previous] * 1.0, 0.0) for previous in 1:n_previous) + biases[neuron] for neuron in 1:n_neurons]
+                L_bounds_dense[layer_index] = [sum(min(weights[neuron, previous] * 1.0, 0.0) for previous in 1:n_previous) + biases[neuron] for neuron in 1:n_neurons]
+            else
+                U_bounds_dense[layer_index] = [sum(max(weights[neuron, previous] * max(0, U_bounds_dense[layer_index-1][previous]), weights[neuron, previous] * max(0, L_bounds_dense[layer_index-1][previous])) for previous in 1:n_previous) + biases[neuron] for neuron in 1:n_neurons]
+                L_bounds_dense[layer_index] = [sum(min(weights[neuron, previous] * max(0, U_bounds_dense[layer_index-1][previous]), weights[neuron, previous] * max(0, L_bounds_dense[layer_index-1][previous])) for previous in 1:n_previous) + biases[neuron] for neuron in 1:n_neurons]
+            end
+
             if layer_data.σ == relu
                 for neuron in 1:n_neurons
                     @constraint(jump_model, x[layer_index, neuron] >= 0)
-                    @constraint(jump_model, x[layer_index, neuron] <= big_M * (1 - z[layer_index, neuron]))
-                    @constraint(jump_model, s[layer_index, neuron] <= big_M * z[layer_index, neuron])
+                    @constraint(jump_model, x[layer_index, neuron] <= U_bounds_dense[layer_index][neuron] * (1 - z[layer_index, neuron]))
+                    @constraint(jump_model, s[layer_index, neuron] <= -L_bounds_dense[layer_index][neuron] * z[layer_index, neuron])
                     @constraint(jump_model, x[layer_index, neuron] - s[layer_index, neuron] == biases[neuron] + sum(weights[neuron, i] * x[layer_index-1, i] for i in 1:n_previous))
                 end
             elseif layer_data.σ == identity

@@ -14,8 +14,15 @@ using Test
     println("Neural network parallel tests")
     println("####################\n\n")
     
-    # tests for neural networks
+    # parallel tests for neural networks
     include("neural_networks/NN_parallel_test.jl")
+    
+    println("\n\n####################")
+    println("Convolutional neural network tests")
+    println("####################\n\n")
+    
+    # tests for convolutional neural networks
+    include("neural_networks/CNN_test.jl")
     
     println("\n\n###################")
     println("Tree ensemble tests")

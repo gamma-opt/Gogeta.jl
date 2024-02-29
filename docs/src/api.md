@@ -34,4 +34,18 @@ These are all of the functions and data structures that the user needs to know i
 * [`compress_with_precomputed`](@ref) - perform compression with precomputed neuron activation bounds
 
 ### Forward pass
-* [`forward_pass!`](@ref) - fixes the input variables and optimizes the model to get the ouput
+* [`forward_pass!`](@ref) - fix the input variables and optimize the model to get the output
+
+## Convolutional neural networks
+
+### Data structures
+* [`CNNStructure`](@ref) - container for the layer stucture of a convolutional neural network model
+
+### Parameter extraction
+* [`get_structure`](@ref) - get layer structure from a convolutional neural network model
+
+### MIP formulation
+* [`create_MIP_from_CNN!`](@ref) - formulate a `JuMP` model from the CNN
+
+### Forward pass
+* [`image_pass!`](@ref) - fix the input variables and optimize the model to get the ouput

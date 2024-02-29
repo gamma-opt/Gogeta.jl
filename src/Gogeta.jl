@@ -28,6 +28,12 @@ include("neural_networks/interface.jl")
 export NN_to_MIP_with_precomputed, NN_to_MIP_with_bound_tightening, compress_with_precomputed, compress_with_bound_tightening
 export forward_pass!, SolverParams
 
+include("neural_networks/CNN_util.jl")
+export CNNStructure, get_structure, image_pass!
+
+include("neural_networks/CNN_convert.jl")
+export create_MIP_from_CNN!
+
 include("tree_ensembles/types.jl")
 export TEModel, extract_evotrees_info
 

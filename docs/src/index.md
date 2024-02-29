@@ -2,7 +2,7 @@
 
 [Gogeta](https://gamma-opt.github.io/Gogeta.jl/) is a package that enables the user to formulate machine-learning models as mathematical programming problems.
 
-Currently supported models are `Flux.Chain` ReLU-activated neural networks and `EvoTrees` tree ensemble models.
+Currently supported models are `Flux.Chain` ReLU-activated neural networks (dense and convolutional) and `EvoTrees` tree ensemble models.
 
 ## Installation
 ```julia-repl
@@ -110,6 +110,48 @@ Use the `JuMP` model to calculate a forward pass through the network (input at t
 
 ```julia
 forward_pass!(jump_model, [-1.0, 0.0])
+```
+
+#### Convolutional neural networks
+
+The convolutional neural network requirements can be found in the [`create_MIP_from_CNN!`](@ref) documentation.
+
+First, create some kind of input (or load an image from your computer).
+
+```julia
+input = rand(Float32, 70, 50, 1, 1) # BW 70x50 image
+```
+
+Then, create a convolutional neural network model satisfying the requirements:
+
+```julia
+using Flux
+
+CNN_model = Flux.Chain(
+    Conv((4,3), 1 => 10, pad=(2, 1), stride=(3, 2), relu),
+    MeanPool((5,3), pad=(3, 2), stride=(2, 2)),
+    MaxPool((3,4), pad=(1, 3), stride=(3, 2)),
+    Conv((4,3), 10 => 5, pad=(2, 1), stride=(3, 2), relu),
+    MaxPool((3,4), pad=(1, 3), stride=(3, 2)),
+    Flux.flatten,
+    Dense(20 => 100, relu),
+    Dense(100 => 1)
+)
+```
+
+Then, create an empty `JuMP` model, extract the layer structure of the CNN model and finally formulate the MIP.
+
+```julia
+jump = Model(Gurobi.Optimizer)
+set_silent(jump)
+cnns = get_structure(CNN_model, input);
+create_MIP_from_CNN!(jump, CNN_model, cnns)
+```
+
+Check that the `JuMP` model produces the same outputs as the `Flux.Chain`.
+
+```julia
+vec(CNN_model(input)) ≈ image_pass!(jump, input)
 ```
 
 ## How to use?

@@ -66,9 +66,9 @@ create_MIP_from_CNN!(jump, CNN_model, cnns)
 @time vec(CNN_model[1:8](input)) ≈ image_pass!(jump, input, cnns, 8)
 @time vec(CNN_model(input)) ≈ image_pass!(jump, input)
 
-# Plot true model maxpool fifth channel
+# Plot true model meanpool fifth channel
 heatmap(CNN_model[1:2](input)[:, :, 5, 1], background=false, legend=false, color=:inferno, aspect_ratio=:equal, axis=([], false))
 
-# Plot jump model maxpool fifth channel
+# Plot jump model meanpool fifth channel
 heatmap(image_pass!(jump, input, cnns, 2)[:, :, 5], background=false, legend=false, color=:inferno, aspect_ratio=:equal, axis=([], false))
 

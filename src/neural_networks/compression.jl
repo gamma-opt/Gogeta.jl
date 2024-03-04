@@ -1,4 +1,35 @@
 """
+    function NN_compress(NN_model::Flux.Chain, U_in, L_in, U_bounds, L_bounds)
+
+Compress a neural network with precomputed bounds.
+"""
+function NN_compress(NN_model::Flux.Chain, U_in, L_in, U_bounds, L_bounds)
+
+    K = length(NN_model) # number of layers (input layer not included)
+    W = deepcopy([Flux.params(NN_model)[2*k-1] for k in 1:K])
+    b = deepcopy([Flux.params(NN_model)[2*k] for k in 1:K])
+
+    @assert all([NN_model[i].σ == relu for i in 1:K-1]) "Neural network must use the relu activation function."
+    @assert NN_model[K].σ == identity "Neural network must use the identity function for the output layer."
+    
+    removed_neurons = Vector{Vector}(undef, K)
+    [removed_neurons[layer] = Vector{Int}() for layer in 1:K]
+
+    input_length = Int((length(W[1]) / length(b[1])))
+    neuron_count = [length(b[k]) for k in eachindex(b)]
+    neurons(layer) = layer == 0 ? [i for i in 1:input_length] : [i for i in setdiff(1:neuron_count[layer], removed_neurons[layer])]
+    
+    @assert input_length == length(U_in) == length(L_in) "Initial bounds arrays must be the same length as the input layer"
+
+    for layer in 1:K-1
+        prune!(W, b, removed_neurons, layers_removed, neuron_count, layer, U_bounds, L_bounds)
+    end
+    
+    new_model = build_model!(W, b, K, neurons)
+    return new_model, removed_neurons
+end
+
+"""
     function prune!(W, b, removed_neurons, layers_removed, neuron_count, layer, bounds_U, bounds_L)
 
 Removes stabily active or inactive neurons in a network by updating the weights and the biases and the removed neurons list accordingly.

@@ -1,4 +1,51 @@
 """
+    function NN_compress(NN_model::Flux.Chain, U_in, L_in, U_bounds, L_bounds)
+
+Compresses a neural network using precomputed bounds.
+
+# Arguments
+- `NN_model`: Neural network to be compressed.
+- `U_in`: Upper bounds for the input variables.
+- `L_in`: Lower bounds for the input variables.
+- `U_bounds`: Upper bounds for the other neurons.
+- `L_bounds`: Lower bounds for the other neurons.
+
+Returns a `Flux.Chain` model of the compressed neural network.
+"""
+function NN_compress(NN_model::Flux.Chain, U_in, L_in, U_bounds, L_bounds)
+
+    K = length(NN_model) # number of layers (input layer not included)
+    W = deepcopy([Flux.params(NN_model)[2*k-1] for k in 1:K])
+    b = deepcopy([Flux.params(NN_model)[2*k] for k in 1:K])
+
+    @assert all([NN_model[i].σ == relu for i in 1:K-1]) "Neural network must use the relu activation function."
+    @assert NN_model[K].σ == identity "Neural network must use the identity function for the output layer."
+    
+    removed_neurons = Vector{Vector}(undef, K)
+    [removed_neurons[layer] = Vector{Int}() for layer in 1:K]
+
+    input_length = Int((length(W[1]) / length(b[1])))
+    neuron_count = [length(b[k]) for k in eachindex(b)]
+    neurons(layer) = layer == 0 ? [i for i in 1:input_length] : [i for i in setdiff(1:neuron_count[layer], removed_neurons[layer])]
+    
+    @assert input_length == length(U_in) == length(L_in) "Initial bounds arrays must be the same length as the input layer"
+
+    layers_removed = 0
+
+    for layer in 1:K-1
+        layers_removed = prune!(W, b, removed_neurons, layers_removed, neuron_count, layer, U_bounds, L_bounds)
+
+        if length(neurons(layer)) > 0
+            layers_removed = 0
+        end 
+
+    end
+    
+    new_model = build_model!(W, b, K, neurons)
+    return new_model, removed_neurons
+end
+
+"""
     function prune!(W, b, removed_neurons, layers_removed, neuron_count, layer, bounds_U, bounds_L)
 
 Removes stabily active or inactive neurons in a network by updating the weights and the biases and the removed neurons list accordingly.
@@ -83,6 +130,9 @@ end
     function build_model!(W, b, K, neurons)
 
 Builds a new `Flux.Chain` model from the given weights and biases.
+Modifies the `W` and `b` arrays.
+
+Returns the new `Flux.Chain` model.
 """
 function build_model!(W, b, K, neurons)
 

@@ -17,7 +17,7 @@ The convolutional neural network must follow a certain structure:
 - `cnnstruct`: holds the layer structure of the CNN
 
 """
-function create_MIP_from_CNN!(jump_model::JuMP.Model, CNN_model::Flux.Chain, cnnstruct::CNNStructure)
+function CNN_formulate!(jump_model::JuMP.Model, CNN_model::Flux.Chain, cnnstruct::CNNStructure)
 
     channels = cnnstruct.channels
     dims = cnnstruct.dims

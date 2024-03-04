@@ -1,18 +1,31 @@
 """
-    function formulate_and_compress(NN_model::Flux.Chain, U_in, L_in; U_bounds=nothing, L_bounds=nothing, U_out=nothing, L_out=nothing, solver_params=nothing, bound_tightening="fast", compress=false, silent=false)
+    function NN_formulate!(jump_model::JuMP.Model, NN_model::Flux.Chain, U_in, L_in; U_bounds=nothing, L_bounds=nothing, U_out=nothing, L_out=nothing, bound_tightening="fast", compress=false, parallel=false, silent=true)
 
 Creates a mixed-integer optimization problem from a `Flux.Chain` model.
 
 The parameters are used to specify what kind of bound tightening and compression will be used.
 
+# Arguments
+- `jump_model`: The constraints and variables will be saved to this optimization model.
+- `NN_model`: Neural network model to be formulated.
+- `U_in`: Upper bounds for the input variables.
+- `L_in`: Lower bounds for the input variables.
+
+# Optional arguments
+- `bound_tightening`: Mode selection: "fast", "standard", "output" or "precomputed"
+- `compress`: Should the model be simultaneously compressed?
+- `parallel`: Runs bound tightening in parallel. `set_solver!`-function must be defined in the global scope, see documentation or examples.
+- `U_bounds`: Upper bounds. Needed if bound_tightening="precomputed"
+- `L_bounds`: Lower bounds. Needed if bound_tightening="precomputed"
+- `U_out`: Upper bounds for the output variables. Needed if bound_tightening="output".
+- `L_out`: Lower bounds for the output variables. Needed if bound_tightening="output".
+- `silent`: Controls console ouput.
+
 """
-function formulate_and_compress(NN_model::Flux.Chain, U_in, L_in; U_bounds=nothing, L_bounds=nothing, U_out=nothing, L_out=nothing, solver_params=nothing, bound_tightening="fast", compress=false, silent=false)
+function NN_formulate!(jump_model::JuMP.Model, NN_model::Flux.Chain, U_in, L_in; bound_tightening="fast", compress=false, parallel=false, U_bounds=nothing, L_bounds=nothing, U_out=nothing, L_out=nothing, silent=true)
 
     oldstdout = stdout
     if silent redirect_stdout(devnull) end
-
-    bounds_precomputed = U_bounds !== nothing && L_bounds !== nothing
-    create_jump = compress == false || bound_tightening == "standard"
 
     if compress
         println("Starting compression...")
@@ -20,7 +33,9 @@ function formulate_and_compress(NN_model::Flux.Chain, U_in, L_in; U_bounds=nothi
         println("Creating JuMP model...")
     end
 
-    @assert bound_tightening in ("fast", "standard", "output") "Accepted bound tightening modes are: fast, standard, output."
+    @assert bound_tightening in ("precomputed", "fast", "standard", "output") "Accepted bound tightening modes are: precomputed, fast, standard, output."
+
+    if bound_tightening == "precomputed" @assert !isnothing(U_bounds) && !isnothing(L_bounds) "Precomputed bounds must be provided." end
 
     K = length(NN_model) # number of layers (input layer not included)
     W = deepcopy([Flux.params(NN_model)[2*k-1] for k in 1:K])
@@ -36,20 +51,15 @@ function formulate_and_compress(NN_model::Flux.Chain, U_in, L_in; U_bounds=nothi
     neuron_count = [length(b[k]) for k in eachindex(b)]
     neurons(layer) = layer == 0 ? [i for i in 1:input_length] : [i for i in setdiff(1:neuron_count[layer], removed_neurons[layer])]
     @assert input_length == length(U_in) == length(L_in) "Initial bounds arrays must be the same length as the input layer"
-
-    if create_jump
-        jump_model = Model()
-        set_solver_params!(jump_model, solver_params)
         
-        @variable(jump_model, x[layer = 0:K, neurons(layer)])
-        @variable(jump_model, s[layer = 1:K-1, neurons(layer)])
-        @variable(jump_model, z[layer = 1:K-1, neurons(layer)])
+    @variable(jump_model, x[layer = 0:K, neurons(layer)])
+    @variable(jump_model, s[layer = 1:K-1, neurons(layer)])
+    @variable(jump_model, z[layer = 1:K-1, neurons(layer)])
         
-        @constraint(jump_model, [j = 1:input_length], x[0, j] <= U_in[j])
-        @constraint(jump_model, [j = 1:input_length], x[0, j] >= L_in[j])
-    end
+    @constraint(jump_model, [j = 1:input_length], x[0, j] <= U_in[j])
+    @constraint(jump_model, [j = 1:input_length], x[0, j] >= L_in[j])
     
-    if bounds_precomputed == false
+    if bound_tightening != "precomputed" 
         U_bounds = Vector{Vector}(undef, K)
         L_bounds = Vector{Vector}(undef, K)
     end
@@ -67,7 +77,7 @@ function formulate_and_compress(NN_model::Flux.Chain, U_in, L_in; U_bounds=nothi
 
         println("\nLAYER $layer")
 
-        if bounds_precomputed == false
+        if bound_tightening != "precomputed"
 
             # compute loose bounds
             if layer - layers_removed == 1
@@ -80,8 +90,8 @@ function formulate_and_compress(NN_model::Flux.Chain, U_in, L_in; U_bounds=nothi
 
             # compute tighter bounds
             if bound_tightening == "standard"
-                bounds = if nprocs() > 1
-                    pmap(neuron -> calculate_bounds(copy_model(jump_model, solver_params), layer, neuron, W, b, neurons; layers_removed), neurons(layer))
+                bounds = if parallel == true # multiprocessing enabled
+                    pmap(neuron -> calculate_bounds(copy_model(jump_model), layer, neuron, W, b, neurons; layers_removed), neurons(layer))
                 else
                     map(neuron -> calculate_bounds(jump_model, layer, neuron, W, b, neurons; layers_removed), neurons(layer))
                 end
@@ -96,19 +106,19 @@ function formulate_and_compress(NN_model::Flux.Chain, U_in, L_in; U_bounds=nothi
             break
         end
 
-        if compress layers_removed = prune!(W, b, removed_neurons, layers_removed, neuron_count, layer, U_bounds, L_bounds) end
+        if compress 
+            layers_removed = prune!(W, b, removed_neurons, layers_removed, neuron_count, layer, U_bounds, L_bounds) 
+        end
 
-        if create_jump
-            for neuron in neurons(layer)
-                @constraint(jump_model, x[layer, neuron] >= 0)
-                @constraint(jump_model, s[layer, neuron] >= 0)
-                set_binary(z[layer, neuron])
+        for neuron in neurons(layer)
+            @constraint(jump_model, x[layer, neuron] >= 0)
+            @constraint(jump_model, s[layer, neuron] >= 0)
+            set_binary(z[layer, neuron])
 
-                ucons[layer][neuron] = @constraint(jump_model, x[layer, neuron] <= max(0, U_bounds[layer][neuron]) * (1 - z[layer, neuron]))
-                lcons[layer][neuron] = @constraint(jump_model, s[layer, neuron] <= max(0, -L_bounds[layer][neuron]) * z[layer, neuron])
+            ucons[layer][neuron] = @constraint(jump_model, x[layer, neuron] <= max(0, U_bounds[layer][neuron]) * (1 - z[layer, neuron]))
+            lcons[layer][neuron] = @constraint(jump_model, s[layer, neuron] <= max(0, -L_bounds[layer][neuron]) * z[layer, neuron])
 
-                @constraint(jump_model, x[layer, neuron] - s[layer, neuron] == b[layer][neuron] + sum(W[layer][neuron, i] * x[layer-1-layers_removed, i] for i in neurons(layer-1-layers_removed)))
-            end
+            @constraint(jump_model, x[layer, neuron] - s[layer, neuron] == b[layer][neuron] + sum(W[layer][neuron, i] * x[layer-1-layers_removed, i] for i in neurons(layer-1-layers_removed)))
         end
 
         if length(neurons(layer)) > 0
@@ -118,7 +128,7 @@ function formulate_and_compress(NN_model::Flux.Chain, U_in, L_in; U_bounds=nothi
     end
 
     # output layer
-    create_jump && @constraint(jump_model, [neuron in neurons(K)], x[K, neuron] == b[K][neuron] + sum(W[K][neuron, i] * x[K-1-layers_removed, i] for i in neurons(K-1-layers_removed)))
+    @constraint(jump_model, [neuron in neurons(K)], x[K, neuron] == b[K][neuron] + sum(W[K][neuron, i] * x[K-1-layers_removed, i] for i in neurons(K-1-layers_removed)))
 
     # using output bounds in bound tightening
     if bound_tightening == "output"
@@ -133,10 +143,10 @@ function formulate_and_compress(NN_model::Flux.Chain, U_in, L_in; U_bounds=nothi
 
             println("\nLAYER $layer")
 
-            bounds = if nprocs() > 1
-                pmap(neuron -> calculate_bounds(copy_model(jump_model, solver_params), layer, neuron, W, b, neurons), neurons(layer))
+            bounds = if parallel == true # multiprocessing enabled
+                pmap(neuron -> calculate_bounds(copy_model(jump_model), layer, neuron, W, b, neurons; layers_removed), neurons(layer))
             else
-                map(neuron -> calculate_bounds(jump_model, layer, neuron, W, b, neurons), neurons(layer))
+                map(neuron -> calculate_bounds(jump_model, layer, neuron, W, b, neurons; layers_removed), neurons(layer))
             end
 
             # only change if bound is improved
@@ -163,7 +173,7 @@ function formulate_and_compress(NN_model::Flux.Chain, U_in, L_in; U_bounds=nothi
     if compress
         new_model = build_model!(W, b, K, neurons)
 
-        if bounds_precomputed == false
+        if bound_tightening != "precomputed"
 
             U_compressed = [U_bounds[layer][neurons(layer)] for layer in 1:K]
             filter!(neurons -> length(neurons) != 0, U_compressed)
@@ -171,18 +181,40 @@ function formulate_and_compress(NN_model::Flux.Chain, U_in, L_in; U_bounds=nothi
             L_compressed = [L_bounds[layer][neurons(layer)] for layer in 1:K]
             filter!(neurons -> length(neurons) != 0, L_compressed)
 
-            jump_model = formulate_and_compress(new_model, U_in, L_in; U_bounds=U_compressed, L_bounds=L_compressed, solver_params, silent)
+            empty!(jump_model)
+            NN_formulate!(jump_model, new_model, U_in, L_in; U_bounds=U_compressed, L_bounds=L_compressed, bound_tightening="precomputed", silent)
 
-            return jump_model, new_model, removed_neurons, U_compressed, L_compressed
+            return new_model, removed_neurons, U_compressed, L_compressed
         else
             return new_model, removed_neurons
         end
     else
-        if bounds_precomputed
-            return jump_model
-        else
-            return jump_model, U_bounds, L_bounds
+        if bound_tightening != "precomputed"
+            return U_bounds, L_bounds
         end
+    end
+
+end
+
+"""
+    function forward_pass!(jump_model::JuMP.Model, input)
+
+Calculates the output of a JuMP model representing a neural network.
+"""
+function forward_pass!(jump_model::JuMP.Model, input)
+    
+    @assert length(input) == length(jump_model[:x][0, :]) "Incorrect input length."
+    [fix(jump_model[:x][0, i], input[i], force=true) for i in eachindex(input)]
+    
+    try
+        optimize!(jump_model)
+        (last_layer, outputs) = maximum(keys(jump_model[:x].data))
+        result = value.(jump_model[:x][last_layer, :])
+        return [result[i] for i in 1:outputs]
+    catch e
+        println("ERROR: $e")
+        @warn "Input or output outside of bounds or incorrectly constructed model."
+        return [NaN]
     end
 
 end

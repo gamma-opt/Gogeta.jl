@@ -1,5 +1,4 @@
 # Create a random sample in the domain x1, x2 in (-0.5, 0.5) of the function f(x1, x2) = x1^2 + x2^2 (circular paraboloid)
-
 data = rand(1000, 2) .- 0.5;
 
 x_train = data[1:750, :];
@@ -13,7 +12,7 @@ y_test = vec(sum(map.(x->x^2, x_test), dims=2));
 using EvoTrees
 
 config = EvoTreeRegressor(nrounds=500, max_depth=5);
-evo_model = fit_evotree(config; x_train, y_train);
+evo_model = fit_evotree(config; x_train, y_train, verbosity=0);
 
 # Use model to make predictions
 
@@ -26,39 +25,54 @@ r2_score_test = 1 - sum((y_test .- pred_test).^2) / sum((y_test .- mean(y_test))
 
 using JuMP
 using Gurobi
-using GLPK
 using Gogeta
 
 # Extract data from EvoTrees model
-
 universal_tree_model = extract_evotrees_info(evo_model);
 
 # Create JuMP model and solve the tree ensemble optimization problem (input that minimizes output)
-
 const ENV = Gurobi.Env();
+jump = Model(() -> Gurobi.Optimizer(ENV));
+set_attribute(jump, "OutputFlag", 0) # JuMP or solver-specific attributes can be changed
 
-opt_model = TE_to_MIP(universal_tree_model, Gurobi.Optimizer(ENV), MIN_SENSE);
-set_attribute(opt_model, "OutputFlag", 0) # JuMP or solver-specific attributes can be changed
+TE_formulate!(jump, universal_tree_model, MIN_SENSE);
 
-# Let's solve it first with lazy constraints
-optimize_with_lazy_constraints!(opt_model, universal_tree_model)
-
-# Show results
-get_solution(opt_model, universal_tree_model)
-objective_value(opt_model)
-
-# Then without lazy constraints
-opt_model = TE_to_MIP(universal_tree_model, Gurobi.Optimizer(ENV), MIN_SENSE);
-optimize_with_initial_constraints!(opt_model, universal_tree_model)
+# Solve first by creating all split constraints
+add_split_constraints!(jump, universal_tree_model)
+optimize!(jump)
 
 # Show results
-get_solution(opt_model, universal_tree_model)
-objective_value(opt_model)
+get_solution(jump, universal_tree_model)
+objective_value(jump)
 
-# Let's use a different solver
-opt_model = TE_to_MIP(universal_tree_model, GLPK.Optimizer(), MIN_SENSE);
-optimize_with_lazy_constraints!(opt_model, universal_tree_model)
+# Then solve with lazy constaints
+# For lazy callback, model must be direct
+jump = direct_model(Gurobi.Optimizer(ENV));
+set_silent(jump)
+
+TE_formulate!(jump, universal_tree_model, MIN_SENSE);
+
+# Define callback function. For each solver this might be slightly different.
+# See JuMP documentation or your solver's Julia interface documentation.
+# Inside the callback 'tree_callback_algorithm' must be called.
+
+function split_constraint_callback_gurobi(cb_data, cb_where::Cint)
+
+    # Only run at integer solutions
+    if cb_where != GRB_CB_MIPSOL
+        return
+    end
+
+    Gurobi.load_callback_variable_primal(cb_data, cb_where)
+    tree_callback_algorithm(cb_data, universal_tree_model, jump)
+
+end
+
+set_attribute(jump, "LazyConstraints", 1)
+set_attribute(jump, Gurobi.CallbackFunction(), split_constraint_callback_gurobi)
+
+optimize!(jump)
 
 # Show results
-get_solution(opt_model, universal_tree_model)
-objective_value(opt_model)
+get_solution(jump, universal_tree_model)
+objective_value(jump)

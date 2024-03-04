@@ -22,7 +22,7 @@ CNN_model = Flux.Chain(
 jump = Model(HiGHS.Optimizer)
 set_silent(jump)
 cnns = get_structure(CNN_model, input)
-create_MIP_from_CNN!(jump, CNN_model, cnns)
+CNN_formulate!(jump, CNN_model, cnns)
 
 @info "Testing image forward pass with some random inputs - passing test indicates that model is constructed correctly."
 
@@ -52,7 +52,7 @@ CNN_model = Flux.Chain(
 jump = Model(HiGHS.Optimizer)
 set_silent(jump)
 cnns = get_structure(CNN_model, input)
-create_MIP_from_CNN!(jump, CNN_model, cnns)
+CNN_formulate!(jump, CNN_model, cnns)
 
 @info "Testing image forward pass with some random inputs - passing test indicates that model is constructed correctly."
 

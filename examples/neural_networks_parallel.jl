@@ -14,19 +14,37 @@ begin
     )
 end
 
-# Set upper and lower input bounds
-init_U = [-0.5, 0.5];
-init_L = [-1.5, -0.5];
-
+# Create the workers
 using Distributed
 addprocs(4)
+@everywhere using Gurobi
+
+# In order to prevent Gurobi obtaining a new license for each solve
+@everywhere ENV = Ref{Gurobi.Env}()
+
+@everywhere function init_env()
+    global ENV
+    ENV[] = Gurobi.Env()
+end
+
+for worker in workers()
+    fetch(@spawnat worker init_env())
+end
+
+# Regardless of the solver, this must be defined
+@everywhere using JuMP
+
+@everywhere function set_solver!(jump)
+    set_optimizer(jump, () -> Gurobi.Optimizer(ENV[]))
+    set_silent(jump)
+end
+
+# Set upper and lower input bounds
+init_U = [1.0, 1.0];
+init_L = [-1.0, -1.0];
+
 @everywhere using Gogeta
 
-solver_params = SolverParams(solver="Gurobi", silent=true, threads=0, relax=false, time_limit=0);
-
-# Create a JuMP model from the neural network with bound tightening.
-@time nn_parallel, U_parallel, L_parallel = NN_to_MIP_with_bound_tightening(model, init_U, init_L, solver_params; bound_tightening="standard");
-
-# Bound tightening is 'automatically' run in parallel if multiple workers are recognized
-
-rmprocs(workers())
+# Create a JuMP model from the neural network with parallel bound tightening.
+jump = Model()
+@time U, L = NN_formulate!(jump, model, init_U, init_L; bound_tightening="standard", silent=false, parallel=true);

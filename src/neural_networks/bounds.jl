@@ -1,37 +1,17 @@
 """
     function copy_model(input_model, solver_params)
 
-Copies a JuMP model. Solver has to be specified for each new copy. Used for parallelization.
+Creates a copy of a JuMP model. Solver has to be specified for each new copy. Used for parallelization.
 """
-function copy_model(input_model, solver_params)
+function copy_model(input_model)
     model = copy(input_model)
-    set_solver_params!(model, solver_params)
-    return model
-end
-
-"""
-    function set_solver_params!(model, params)
-
-Set the parameters of a JuMP model. Solver and its parameters have to be specified for each new model copy. Used for parallelization.
-"""
-function set_solver_params!(model, params)
-    
-    params.silent && set_silent(model)
-    params.relax && relax_integrality(model)
-    
-    if params.solver == "Gurobi"
-        set_optimizer(model, () -> Gurobi.Optimizer(GUROBI_ENV[]))
-        params.time_limit != 0 && set_attribute(model, "TimeLimit", params.time_limit)
-        params.threads != 0 && set_attribute(model, "Threads", params.threads)
-    elseif params.solver == "GLPK"
-        set_optimizer(model, () -> GLPK.Optimizer())
-        params.time_limit != 0 && set_attribute(model, "tm_lim", params.time_limit * 1_000)
-    elseif params.solver == "HiGHS"
-        set_optimizer(model, () -> HiGHS.Optimizer())
-        params.time_limit != 0 && set_attribute(model, "time_limit", params.time_limit)
-    else
-        error("Solver has to be \"Gurobi\", \"GLPK\" or \"HiGHS\".")
+    try
+        Main.set_solver!(model)
+    catch e
+        println(e)
+        error("To use multiprocessing, 'set_solver!'-function must be correctly defined in the global scope for each worker process.")
     end
+    return model
 end
 
 """

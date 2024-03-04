@@ -45,30 +45,32 @@ set_attribute(jump_model, "TimeLimit", 10)
 # Plot compressed model - should be the same
 contourf(x_range, y_range, (x, y) -> NN_comp(hcat(x, y)')[], c=cgrad(:viridis), lw=0)
 
-"""
+# Formulate with fast/heuristic bound tightening
+jump_model = Model(Gurobi.Optimizer);
+set_silent(jump_model)
+set_attribute(jump_model, "TimeLimit", 10)
 
-# Create a JuMP model from the neural network with bound tightening but without compression
-@time nn_jump, U_correct, L_correct = NN_to_MIP_with_bound_tightening(model, init_U, init_L, solver_params; bound_tightening="standard");
-
-# Creating bound tightened JuMP model with output bounds present.
-@time jump_nor, U_nor, L_nor = NN_to_MIP_with_bound_tightening(model, init_U, init_L, solver_params; bound_tightening="output", U_out=[-0.2], L_out=[-0.4]);
-
-# Compare tightened bounds with/without output bounds consideration
-plot(collect(Iterators.flatten(U_correct)))
-plot!(collect(Iterators.flatten(U_nor)))
-
-plot!(collect(Iterators.flatten(L_correct)))
-plot!(collect(Iterators.flatten(L_nor)))
-
-# Compress with the precomputed bounds.
-@time compressed, removed = compress_with_precomputed(model, init_U, init_L, U_correct, L_correct);
-
-# Create a JuMP model of the network with fast bound tightening.
-nn_loose, U_loose, L_loose = NN_to_MIP_with_bound_tightening(model, init_U, init_L, solver_params; bound_tightening="fast");
+@time loose_U, loose_L = NN_formulate!(jump_model, NN_model, init_U, init_L; bound_tightening="fast", silent=false);
 
 # Compare fast tightened bounds with standard ones
-plot(collect(Iterators.flatten(U_correct)))
-plot!(collect(Iterators.flatten(U_loose)))
+plot(collect(Iterators.flatten(bounds_U)))
+plot!(collect(Iterators.flatten(bounds_L)))
 
-plot!(collect(Iterators.flatten(L_correct)))
-plot!(collect(Iterators.flatten(L_loose)))"""
+plot!(collect(Iterators.flatten(loose_U)))
+plot!(collect(Iterators.flatten(loose_L)))
+
+# Formulate with output bounds considered
+jump_model = Model(Gurobi.Optimizer);
+set_silent(jump_model)
+@time out_U, out_L = NN_formulate!(jump_model, NN_model, init_U, init_L; bound_tightening="output", U_out=[-0.2], L_out=[-0.4], silent=false);
+
+# Plot output bound model
+contourf(x_range, y_range, (x, y) -> forward_pass!(jump_model, [x, y])[], c=cgrad(:viridis), lw=0)
+
+# Compress with precomputed bounds
+NN_precomp, removed_precomp = NN_compress(NN_model, init_U, init_L, bounds_U, bounds_L);
+
+# Formulate with precomputed bounds
+jump_model = Model(Gurobi.Optimizer);
+set_silent(jump_model)
+@time NN_formulate!(jump_model, NN_model, init_U, init_L; bound_tightening="precomputed", U_bounds=bounds_U, L_bounds=bounds_L);

@@ -1,7 +1,7 @@
 """
     function copy_model(input_model, solver_params)
 
-Copies a JuMP model. Solver has to be specified for each new copy. Used for parallelization.
+Creates a copy of a JuMP model. Solver has to be specified for each new copy. Used for parallelization.
 """
 function copy_model(input_model)
     model = copy(input_model)

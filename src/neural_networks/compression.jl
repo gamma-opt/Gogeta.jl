@@ -1,7 +1,16 @@
 """
     function NN_compress(NN_model::Flux.Chain, U_in, L_in, U_bounds, L_bounds)
 
-Compress a neural network with precomputed bounds.
+Compresses a neural network using precomputed bounds.
+
+# Arguments
+- `NN_model`: Neural network to be compressed.
+- `U_in`: Upper bounds for the input variables.
+- `L_in`: Lower bounds for the input variables.
+- `U_bounds`: Upper bounds for the other neurons.
+- `L_bounds`: Lower bounds for the other neurons.
+
+Returns a `Flux.Chain` model of the compressed neural network.
 """
 function NN_compress(NN_model::Flux.Chain, U_in, L_in, U_bounds, L_bounds)
 
@@ -21,8 +30,15 @@ function NN_compress(NN_model::Flux.Chain, U_in, L_in, U_bounds, L_bounds)
     
     @assert input_length == length(U_in) == length(L_in) "Initial bounds arrays must be the same length as the input layer"
 
+    layers_removed = 0
+
     for layer in 1:K-1
-        prune!(W, b, removed_neurons, layers_removed, neuron_count, layer, U_bounds, L_bounds)
+        layers_removed = prune!(W, b, removed_neurons, layers_removed, neuron_count, layer, U_bounds, L_bounds)
+
+        if length(neurons(layer)) > 0
+            layers_removed = 0
+        end 
+
     end
     
     new_model = build_model!(W, b, K, neurons)
@@ -114,6 +130,9 @@ end
     function build_model!(W, b, K, neurons)
 
 Builds a new `Flux.Chain` model from the given weights and biases.
+Modifies the `W` and `b` arrays.
+
+Returns the new `Flux.Chain` model.
 """
 function build_model!(W, b, K, neurons)
 

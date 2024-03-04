@@ -1,12 +1,28 @@
 """
-    function formulate_and_compress(NN_model::Flux.Chain, U_in, L_in; U_bounds=nothing, L_bounds=nothing, U_out=nothing, L_out=nothing, solver_params=nothing, bound_tightening="fast", compress=false, silent=false)
+    function NN_formulate!(jump_model::JuMP.Model, NN_model::Flux.Chain, U_in, L_in; U_bounds=nothing, L_bounds=nothing, U_out=nothing, L_out=nothing, bound_tightening="fast", compress=false, parallel=false, silent=true)
 
 Creates a mixed-integer optimization problem from a `Flux.Chain` model.
 
 The parameters are used to specify what kind of bound tightening and compression will be used.
 
+# Arguments
+- `jump_model`: The constraints and variables will be saved to this optimization model.
+- `NN_model`: Neural network model to be formulated.
+- `U_in`: Upper bounds for the input variables.
+- `L_in`: Lower bounds for the input variables.
+
+# Optional arguments
+- `bound_tightening`: Mode selection: "fast", "standard", "output" or "precomputed"
+- `compress`: Should the model be simultaneously compressed?
+- `parallel`: Runs bound tightening in parallel. `set_solver!`-function must be defined in the global scope, see documentation or examples.
+- `U_bounds`: Upper bounds. Needed if bound_tightening="precomputed"
+- `L_bounds`: Lower bounds. Needed if bound_tightening="precomputed"
+- `U_out`: Upper bounds for the output variables. Needed if bound_tightening="output".
+- `L_out`: Lower bounds for the output variables. Needed if bound_tightening="output".
+- `silent`: Controls console ouput.
+
 """
-function NN_formulate!(jump_model::JuMP.Model, NN_model::Flux.Chain, U_in, L_in; U_bounds=nothing, L_bounds=nothing, U_out=nothing, L_out=nothing, bound_tightening="fast", compress=false, parallel=false, silent=true)
+function NN_formulate!(jump_model::JuMP.Model, NN_model::Flux.Chain, U_in, L_in; bound_tightening="fast", compress=false, parallel=false, U_bounds=nothing, L_bounds=nothing, U_out=nothing, L_out=nothing, silent=true)
 
     oldstdout = stdout
     if silent redirect_stdout(devnull) end
@@ -90,7 +106,9 @@ function NN_formulate!(jump_model::JuMP.Model, NN_model::Flux.Chain, U_in, L_in;
             break
         end
 
-        if compress layers_removed = prune!(W, b, removed_neurons, layers_removed, neuron_count, layer, U_bounds, L_bounds) end
+        if compress 
+            layers_removed = prune!(W, b, removed_neurons, layers_removed, neuron_count, layer, U_bounds, L_bounds) 
+        end
 
         for neuron in neurons(layer)
             @constraint(jump_model, x[layer, neuron] >= 0)
@@ -181,20 +199,21 @@ end
 """
     function forward_pass!(jump_model::JuMP.Model, input)
 
-Calculates the output of a neural network -representing JuMP model given some input.
+Calculates the output of a JuMP model representing a neural network.
 """
 function forward_pass!(jump_model::JuMP.Model, input)
     
+    @assert length(input) == length(jump_model[:x][0, :]) "Incorrect input length."
+
     try
-        @assert length(input) == length(jump_model[:x][0, :]) "Incorrect input length."
         [fix(jump_model[:x][0, i], input[i], force=true) for i in eachindex(input)]
         optimize!(jump_model)
         (last_layer, outputs) = maximum(keys(jump_model[:x].data))
         result = value.(jump_model[:x][last_layer, :])
         return [result[i] for i in 1:outputs]
     catch e
-        @warn "Input outside of input bounds or incorrectly constructed model."
-        return [nothing]
+        @warn "Input or ouput outside of bounds or incorrectly constructed model."
+        return [NaN]
     end
 
 end

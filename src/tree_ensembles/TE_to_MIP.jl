@@ -1,14 +1,13 @@
 """
-    function TE_to_MIP(TE::TEModel, optimizer, objective)
+    function TE_formulate!(opt_model::JuMP.Model, TE::TEModel, objective)
 
-Creates a JuMP model `opt_model` based on the given tree ensemble.
-Returns `opt_model`.
+Formulates a tree ensemble to the JuMP model `opt_model` based on the given tree ensemble `TE`.
 
-The JuMP model is created without the split constraints.
+The JuMP model is formulated without the split constraints.
 
 # Arguments
+- `opt_model`: A `JuMP` model where the formulation will be saved to.
 - `TE`: A tree ensemble model in the universal data type `TEModel`. 
-- `optimizer`: Optimizer object that will be given to the JuMP model.
 - `objective`: MIN_SENSE or MAX_SENSE.
 
 """
@@ -30,9 +29,9 @@ function TE_formulate!(opt_model::JuMP.Model, TE::TEModel, objective)
 end
 
 """
-    function optimize_with_initial_constraints!(opt_model::JuMP.Model, TE::TEModel)
+    function add_split_constraints!(opt_model::JuMP.Model, TE::TEModel)
 
-Adds all split constraints to the formulation and then solves the MIP.
+Adds all split constraints to the formulation.
 
 # Arguments
 - `opt_model`: A JuMP model containing the formulation.
@@ -57,14 +56,18 @@ function add_split_constraints!(opt_model::JuMP.Model, TE::TEModel)
 end
 
 """
-    function optimize_with_lazy_constraints!(opt_model::JuMP.Model, TE::TEModel)
+    function tree_callback_algorithm(cb_data, TE::TEModel, opt_model::JuMP.Model)
 
-Solves the optimization model by utilizing lazy constraints.
-This means that the split constraints are added one-by-one for each tree.
+The callback algorithm for tree ensemble optimization using lazy constraints.
+
+Using lazy constraints, the split constraints are added one-by-one for each tree.
+
+See examples or documentation for information on how to use lazy constraints.
 
 # Arguments
-- `opt_model`: A JuMP model containing the formulation.
+- `cb_data`: Callback data
 - `TE`: A tree ensemble model in the universal data type `TEModel`. 
+- `opt_model`: A JuMP model containing the formulation.
 
 """
 function tree_callback_algorithm(cb_data, TE::TEModel, opt_model::JuMP.Model)

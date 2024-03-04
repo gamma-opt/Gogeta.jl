@@ -53,6 +53,7 @@ set_silent(jump)
 TE_formulate!(jump, universal_tree_model, MIN_SENSE);
 
 # Define callback function. For each solver this might be slightly different.
+# See JuMP documentation or your solver's Julia interface documentation.
 # Inside the callback 'tree_callback_algorithm' must be called.
 
 function split_constraint_callback_gurobi(cb_data, cb_where::Cint)

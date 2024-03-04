@@ -204,15 +204,16 @@ Calculates the output of a JuMP model representing a neural network.
 function forward_pass!(jump_model::JuMP.Model, input)
     
     @assert length(input) == length(jump_model[:x][0, :]) "Incorrect input length."
-
+    [fix(jump_model[:x][0, i], input[i], force=true) for i in eachindex(input)]
+    
     try
-        [fix(jump_model[:x][0, i], input[i], force=true) for i in eachindex(input)]
         optimize!(jump_model)
         (last_layer, outputs) = maximum(keys(jump_model[:x].data))
         result = value.(jump_model[:x][last_layer, :])
         return [result[i] for i in 1:outputs]
     catch e
-        @warn "Input or ouput outside of bounds or incorrectly constructed model."
+        println("ERROR: $e")
+        @warn "Input or output outside of bounds or incorrectly constructed model."
         return [NaN]
     end
 

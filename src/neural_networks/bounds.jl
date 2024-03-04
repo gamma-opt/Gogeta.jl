@@ -8,7 +8,8 @@ function copy_model(input_model)
     try
         Main.set_solver!(model)
     catch e
-        error("To use multiprocessing, 'set_solver!'-function must be defined in the global scope for each worker process.")
+        println(e)
+        error("To use multiprocessing, 'set_solver!'-function must be correctly defined in the global scope for each worker process.")
     end
     return model
 end

@@ -1,6 +1,7 @@
 using EvoTrees
 using JuMP
 using GLPK
+using JuMP
 
 @info "Loading a trained tree ensemble model."
 
@@ -8,13 +9,35 @@ evo_model = EvoTrees.load("tree_ensembles/paraboloid.bson");
 
 universal_tree_model = extract_evotrees_info(evo_model)
 
-@info "Creating a JuMP model and optimizing it."
+@info "Creating JuMP models and optimizing them."
 
-jump_model_lazy = TE_to_MIP(universal_tree_model, GLPK.Optimizer(), MIN_SENSE)
-optimize_with_lazy_constraints!(jump_model_lazy, universal_tree_model)
+jump_model_lazy = direct_model(GLPK.Optimizer());
+set_silent(jump_model_lazy)
 
-jump_model_all = TE_to_MIP(universal_tree_model, GLPK.Optimizer(), MIN_SENSE)
-optimize_with_initial_constraints!(jump_model_all, universal_tree_model)
+TE_formulate!(jump_model_lazy, universal_tree_model, MIN_SENSE);
+
+function split_constraint_callback(cb_data)
+
+    status = callback_node_status(cb_data, jump_model_lazy)
+
+    # Only run at integer solutions
+    if status != MOI.CALLBACK_NODE_STATUS_INTEGER
+        return
+    end
+
+    tree_callback_algorithm(cb_data, universal_tree_model, jump_model_lazy)
+end
+set_attribute(jump_model_lazy, MOI.LazyConstraintCallback(), split_constraint_callback) 
+optimize!(jump_model_lazy)
+
+jump_model_all = direct_model(GLPK.Optimizer());
+set_silent(jump_model_all)
+
+TE_formulate!(jump_model_all, universal_tree_model, MIN_SENSE);
+add_split_constraints!(jump_model_all, universal_tree_model)
+optimize!(jump_model_all)
+
+@info "Getting solutions."
 
 solution_lazy = get_solution(jump_model_lazy, universal_tree_model)
 solution_all = get_solution(jump_model_all, universal_tree_model)

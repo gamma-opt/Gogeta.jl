@@ -23,7 +23,7 @@ include("neural_networks/CNN_to_MIP.jl")
 export CNN_formulate!
 
 # Sampling
-include("sampling/basic_sampling.jl")
+include("neural_networks/sampling.jl")
 export optimize_by_sampling!
 
 # Tree ensembles

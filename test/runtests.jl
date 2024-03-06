@@ -16,6 +16,13 @@ using Test
     
     # parallel tests for neural networks
     include("neural_networks/NN_parallel_test.jl")
+
+    println("\n\n####################")
+    println("Neural network sampling tests")
+    println("####################\n\n")
+    
+    # parallel tests for neural networks
+    include("neural_networks/NN_sampling_test.jl")
     
     println("\n\n####################")
     println("Convolutional neural network tests")

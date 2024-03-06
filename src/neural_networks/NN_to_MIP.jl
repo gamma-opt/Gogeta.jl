@@ -5,6 +5,8 @@ Creates a mixed-integer optimization problem from a `Flux.Chain` model.
 
 The parameters are used to specify what kind of bound tightening and compression will be used.
 
+A dummy objective function of 1 is added to the model. The objective is left for the user to define.
+
 # Arguments
 - `jump_model`: The constraints and variables will be saved to this optimization model.
 - `NN_model`: Neural network model to be formulated.
@@ -33,6 +35,7 @@ function NN_formulate!(jump_model::JuMP.Model, NN_model::Flux.Chain, U_in, L_in;
         println("Creating JuMP model...")
     end
 
+    empty!(jump_model)
     @assert bound_tightening in ("precomputed", "fast", "standard", "output") "Accepted bound tightening modes are: precomputed, fast, standard, output."
 
     if bound_tightening == "precomputed" @assert !isnothing(U_bounds) && !isnothing(L_bounds) "Precomputed bounds must be provided." end
@@ -167,6 +170,8 @@ function NN_formulate!(jump_model::JuMP.Model, NN_model::Flux.Chain, U_in, L_in;
         U_bounds[K] = U_out
         L_bounds[K] = L_out
     end
+
+    @objective(jump_model, Max, 1)
 
     redirect_stdout(oldstdout)
     

@@ -22,6 +22,10 @@ export CNNStructure, get_structure, image_pass!
 include("neural_networks/CNN_to_MIP.jl")
 export CNN_formulate!
 
+# Sampling
+include("neural_networks/sampling.jl")
+export optimize_by_sampling!
+
 # Tree ensembles
 
 include("tree_ensembles/types.jl")

@@ -142,6 +142,25 @@ Use the `JuMP` model to calculate a forward pass through the network (input at t
 forward_pass!(jump_model, [-1.0, 0.0])
 ```
 
+#### Sampling
+
+Instead of just solving the MIP, the neural network can be optimized (finding the output maximizing/minimizing input) by using a sampling approach.
+
+```julia
+using QuasiMonteCarlo
+
+jump_model = Model(Gurobi.Optimizer)
+set_silent(jump_model)
+NN_formulate!(jump_model, NN_model, init_U, init_L; bound_tightening="fast");
+
+# set objective function as the last layer output
+last_layer, _ = maximum(keys(jump_model[:x].data))
+@objective(jump_model, Max, jump_model[:x][last_layer, 1])
+
+samples = QuasiMonteCarlo.sample(1000, init_L, init_U, LatinHypercubeSample());
+x_opt, optimum = optimize_by_sampling!(jump_model, samples);
+```
+
 #### Convolutional neural networks
 
 The convolutional neural network requirements can be found in the [`CNN_formulate!`](@ref) documentation.

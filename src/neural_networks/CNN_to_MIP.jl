@@ -4,6 +4,8 @@
 Creates a mixed-integer optimization problem from a `Flux.Chain` convolutional neural network model.
 The optimization formulation is saved in the `JuMP.Model` given as an input.
 
+A dummy objective function of 1 is added to the model. The objective is left for the user to define.
+
 The convolutional neural network must follow a certain structure:
 - It must consist of (in order) convolutional and pooling layers, a `Flux.flatten` layer and finally dense layers
 - I.e. allowed layer types: `Conv`, `MaxPool`, `MeanPool`, `Flux.flatten`, `Dense`
@@ -18,6 +20,8 @@ The convolutional neural network must follow a certain structure:
 
 """
 function CNN_formulate!(jump_model::JuMP.Model, CNN_model::Flux.Chain, cnnstruct::CNNStructure)
+
+    empty!(jump_model)
 
     channels = cnnstruct.channels
     dims = cnnstruct.dims
@@ -143,4 +147,6 @@ function CNN_formulate!(jump_model::JuMP.Model, CNN_model::Flux.Chain, cnnstruct
             end
         end
     end
+
+    @objective(jump_model, Max, 1)
 end

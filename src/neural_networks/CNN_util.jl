@@ -86,7 +86,7 @@ function get_structure(CNN_model::Flux.Chain, input::Array{Float32, 4})
 end
 
 """
-    function image_pass!(jump_model::JuMP.Model, input::Array{FLoat32, 4}, cnnstruct::CNNStructure, layer::Int)
+    function image_pass!(jump_model::JuMP.Model, input::Array{Float32, 4}, cnnstruct::CNNStructure, layer::Int)
 
 **Debugging version**
 

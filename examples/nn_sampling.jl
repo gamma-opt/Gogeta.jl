@@ -21,10 +21,10 @@ end
 init_U = ones(dimension);
 init_L = zeros(dimension);
 
-# Formulate the MIP with optimization-based bound tightening
+# Formulate the MIP with heuristic bound tightening
 jump_model = Model(Gurobi.Optimizer)
 set_silent(jump_model)
-bounds_U, bounds_L = NN_formulate!(jump_model, NN_model, init_U, init_L; bound_tightening="fast");
+NN_formulate!(jump_model, NN_model, init_U, init_L; bound_tightening="fast");
 
 last_layer, _ = maximum(keys(jump_model[:x].data))
 @objective(jump_model, Max, jump_model[:x][last_layer, 1])
@@ -32,7 +32,7 @@ last_layer, _ = maximum(keys(jump_model[:x].data))
 samples = QuasiMonteCarlo.sample(1000, init_L, init_U, LatinHypercubeSample());
 @time x_opt, optimum = optimize_by_sampling!(jump_model, samples);
 optimum
-NN_model(x_opt)[] ≈ optimum
+NN_model(Float32.(x_opt))[] ≈ optimum
 
 @time optimize!(jump_model)
 objective_value(jump_model)

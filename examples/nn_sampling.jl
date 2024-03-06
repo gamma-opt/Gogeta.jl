@@ -3,7 +3,6 @@ using Random
 using Gogeta
 using Gurobi
 using JuMP
-using Revise
 using QuasiMonteCarlo
 
 dimension = 10

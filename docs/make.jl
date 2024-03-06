@@ -8,7 +8,9 @@ makedocs(
     format= Documenter.HTML(),
     pages=[
         "Introduction" => "index.md",
+        "Bound tightening" => "bound_tightening.md",
         "Public API" => "api.md",
+        "Literature" => "literature.md",
         "Reference" => "reference.md",
     ],
 )

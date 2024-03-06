@@ -1,7 +1,24 @@
-function optimize_by_sampling!(jump_model, sample_points; enhanced=true, exploitation_rate=0.67)
+"""
+    function optimize_by_sampling!(jump_model, sample_points; enhanced=true, exploitation_rate=0.67)
+
+Optimizes a neural network by iteratively solving the "local" optimization problem at the sample points.
+The best (optimum, extremum) solution is returned.
+
+# Arguments
+- `jump_model`: `JuMP` model containing the formulation (and desired objective function)
+- `sample_points`: A matrix where the columns are the sample inputs.
+
+# Optional arguments
+- `enhanced`: Controls whether local optimum or only local hyperplane corner is searched for.
+- `exploitation_rate`: Controls how often the algorithm performs local search versus samples a new point.
+
+"""
+function optimize_by_sampling!(jump_model::JuMP.Model, sample_points; enhanced=true, exploitation_rate=0.67)
 
     input_length = length(jump_model[:x][0, :])
     binary_vars = keys(jump_model[:z].data)
+
+    @assert size(sample_points)[1] == input_length "Samples have wrong input length."
     
     min = objective_sense(jump_model) == MIN_SENSE ? -1 : 1
 

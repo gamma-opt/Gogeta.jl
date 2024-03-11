@@ -19,7 +19,9 @@ function optimize_by_walking!(original::JuMP.Model, U_in, L_in; delta=0.0)
     
     push!(x_opt, local_search(x_tilde, original, U_in, L_in))
 
-    for _ in 1:5 # TODO time limit based termination
+    for iter in 1:5 # TODO time limit based termination
+
+        println("\nIteration: $iter")
 
         x_bar = deepcopy(x_tilde)
         z_bar = deepcopy(z_tilde)
@@ -36,6 +38,8 @@ function optimize_by_walking!(original::JuMP.Model, U_in, L_in; delta=0.0)
         unfix.(original[:x][0, :])
 
         for layer in 1:(n_layers-1) # hidden layers
+
+            println("\n--------------Layer: $layer--------------")
 
             n_neurons = first(maximum(keys(original[:x][layer, :].data)))
             neurons = Set(1:n_neurons)
@@ -57,17 +61,23 @@ function optimize_by_walking!(original::JuMP.Model, U_in, L_in; delta=0.0)
 
                 weights = ksi_ordered .+ (delta / total_prob)
 
-                deleted = sample(neurons_ordered, weights)
+                deleted = try # something wrong with this
+                    sample(neurons_ordered, weights)
+                catch e
+                    rand(neurons_ordered)
+                end
                 delete!(neurons, deleted)
 
                 if (layer, deleted) in active
-                    fix(jump_model[:z][layer, deleted], 0.0)
+                    fix(jump_model[:z][layer, deleted], 0.0; force=true)
+                    println("Fixed z[$layer, $deleted] to 0.0")
                 else
-                    fix(jump_model[:z][layer, deleted], 1.0)
+                    fix(jump_model[:z][layer, deleted], 1.0; force=true)
+                    println("Fixed z[$layer, $deleted] to 1.0")
                 end
 
                 optimize!(jump_model)
-                if termination_status(jump_model) == FEASIBLE_POINT
+                if termination_status(jump_model) != INFEASIBLE
                     x_bar = [value(jump_model[:x][0, i]) for i in 1:length(U_in)]
                     z_bar = value.(jump_model[:z])
 
@@ -78,7 +88,15 @@ function optimize_by_walking!(original::JuMP.Model, U_in, L_in; delta=0.0)
             end
         end
 
-        unfix.(jump_model[:z])
+        # reset binary variables - start all over
+        for var in jump_model[:z]
+            if is_fixed(var)
+                unfix(var)
+            end
+        end
+
+        set_binary.(jump_model[:z])
+        relax_integrality(jump_model)
 
     end
 
@@ -86,10 +104,12 @@ function optimize_by_walking!(original::JuMP.Model, U_in, L_in; delta=0.0)
 
 end
 
-function local_search(start, jump_model, U_in, L_in; epsilon=0.1)
+function local_search(start, jump_model, U_in, L_in; epsilon=0.01, show_path=false, logging=false)
 
     x0 = deepcopy(start)
     x1 = deepcopy(x0)
+
+    logging && println("\nStarting local search from: $start")
 
     path = Vector{Vector}()
 
@@ -101,9 +121,7 @@ function local_search(start, jump_model, U_in, L_in; epsilon=0.1)
 
         [fix(jump_model[:x][0, i], x0[i]) for i in eachindex(start)]
         optimize!(jump_model)
-        init_obj = objective_value(jump_model)
-
-        println("\nCurrently at: $x0 with value $init_obj")
+        x0_obj = objective_value(jump_model)
 
         # fix binary variables
         values = value.(jump_model[:z])
@@ -116,14 +134,12 @@ function local_search(start, jump_model, U_in, L_in; epsilon=0.1)
         optimize!(jump_model)
 
         x1 = [value.(jump_model[:x][0, i]) for i in 1:length(start)]
-        corner_obj = objective_value(jump_model)
+        x1_obj = objective_value(jump_model)
         push!(path, x1)
-
-        println("Corner at: $x1 with value $corner_obj")
 
         unfix.(jump_model[:z])
 
-        if corner_obj > init_obj
+        if x1_obj > x0_obj
             
             dir = x1 - x0
             x0 = x1 + epsilon*dir
@@ -133,22 +149,27 @@ function local_search(start, jump_model, U_in, L_in; epsilon=0.1)
                     x0[i] = x1[i]
                 end
             end
+
+            # check if next point is better
+            [fix(jump_model[:x][0, i], x0[i]) for i in eachindex(start)]
+            optimize!(jump_model)
+            x0_obj = objective_value(jump_model)
+
+            # unfix the input after forward pass
+            unfix.(jump_model[:x][0, :])
+            
         end
 
-        # check if next point is better
-        [fix(jump_model[:x][0, i], x0[i]) for i in eachindex(start)]
-        optimize!(jump_model)
-        new_obj = objective_value(jump_model)
-        println("New point at: $x0 with value $new_obj")
-
-        # unfix the input after forward pass
-        unfix.(jump_model[:x][0, :])
-
-        if new_obj <= (1.0 + 1e-5) * corner_obj 
+        if isapprox(x0_obj, x1_obj; atol=1e-5) || x0_obj < x1_obj # TODO what should the tolerance be
             break 
         end
     end
 
-    return x1, path
+    logging && println("Local optimum found: $x1")
+    if show_path 
+        return x1, path
+    else 
+        return x1
+    end
 
 end

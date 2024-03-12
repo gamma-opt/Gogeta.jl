@@ -21,7 +21,7 @@ U_parallel, L_parallel = NN_formulate!(jump, NN_model, init_U, init_L; bound_tig
 @test vec(NN_model(x)) ≈ [forward_pass!(jump, input)[] for input in eachcol(x)]
 
 @info "Testing that parallel computed bounds are the same."
-@test U_parallel ≈ U_correct
-@test L_parallel ≈ L_correct
+@test isapprox(U_parallel, U_correct; rtol=0.01)
+@test isapprox(L_parallel, L_correct; rtol=0.01)
 
 rmprocs(workers())

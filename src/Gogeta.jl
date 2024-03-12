@@ -28,7 +28,7 @@ export optimize_by_sampling!
 
 # Relaxing walk
 include("neural_networks/relaxing_walk.jl")
-export optimize_by_walking!, local_search
+#export optimize_by_walking!, local_search
 
 # Tree ensembles
 

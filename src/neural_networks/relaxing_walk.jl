@@ -1,10 +1,18 @@
-function optimize_by_walking!(original::JuMP.Model, U_in, L_in; delta=0.0)
+function optimize_by_walking!(original::JuMP.Model, U_in, L_in; delta=0.01, return_sampled=false, logging=true, iterations=10, samples_per_iter=5)
 
     sample(items, weights) = items[findfirst(cumsum(weights) .> rand() * sum(weights))]
+    opt_time = 0.0
+    search_time = 0.0
+    active_check_time = 0.0
+
+    x_range = LinRange{Float32}(L_in[1], U_in[1], 20)
+    y_range = LinRange{Float32}(L_in[2], U_in[2], 20)
+    plots = Vector{Any}()
 
     n_layers, _ = maximum(keys(original[:x].data))
     
     x_opt = Vector{Vector}() # list of locally optimum solutions
+    sampled_points = Vector{Vector}()
 
     # copy model
     jump_model = JuMP.copy(original)
@@ -12,23 +20,25 @@ function optimize_by_walking!(original::JuMP.Model, U_in, L_in; delta=0.0)
 
     # get LP solution
     relax_integrality(jump_model)
-    optimize!(jump_model)
+    opt_time += @elapsed optimize!(jump_model)
 
     x_tilde = [value(jump_model[:x][0, i]) for i in 1:length(U_in)]
     z_tilde = value.(jump_model[:z])
-    
+
+    push!(sampled_points, x_tilde)
     push!(x_opt, local_search(x_tilde, original, U_in, L_in))
 
-    for iter in 1:5 # TODO time limit based termination
+    for iter in 1:iterations # TODO time limit based termination
 
-        println("\nIteration: $iter")
+        logging && println("\n\nIteration: $iter")
+        sample_count = 0
 
         x_bar = deepcopy(x_tilde)
         z_bar = deepcopy(z_tilde)
 
         # determine active neurons
         [fix(original[:x][0, i], x_bar[i]) for i in eachindex(x_bar)]
-        optimize!(original)
+        active_check_time += @elapsed optimize!(original)
 
         z_values = value.(original[:z])
         binary_vars = collect(keys(original[:z].data))
@@ -39,7 +49,7 @@ function optimize_by_walking!(original::JuMP.Model, U_in, L_in; delta=0.0)
 
         for layer in 1:(n_layers-1) # hidden layers
 
-            println("\n--------------Layer: $layer--------------")
+            logging && println("\n--------------Layer: $layer--------------")
 
             n_neurons = first(maximum(keys(original[:x][layer, :].data)))
             neurons = Set(1:n_neurons)
@@ -61,32 +71,52 @@ function optimize_by_walking!(original::JuMP.Model, U_in, L_in; delta=0.0)
 
                 weights = ksi_ordered .+ (delta / total_prob)
 
-                deleted = try # something wrong with this
-                    sample(neurons_ordered, weights)
-                catch e
-                    rand(neurons_ordered)
-                end
+                deleted = sample(neurons_ordered, weights)
                 delete!(neurons, deleted)
 
                 if (layer, deleted) in active
                     fix(jump_model[:z][layer, deleted], 0.0; force=true)
-                    println("Fixed z[$layer, $deleted] to 0.0")
                 else
                     fix(jump_model[:z][layer, deleted], 1.0; force=true)
-                    println("Fixed z[$layer, $deleted] to 1.0")
                 end
 
-                optimize!(jump_model)
-                if termination_status(jump_model) != INFEASIBLE
+                # push!(plots, 
+                #     plot(x_range, y_range, (x, y) -> forward_pass!(jump_model, [x, y])[], st=:contourf, c=cgrad(:viridis, scale=:log), lw=0, colorbar=false, axis=false, size=(300, 300), framestyle=:none, margin = 0*Plots.mm)
+                # )
+                # unfix.(jump_model[:x][0, :])
+
+                @assert any(is_binary.(jump_model[:z])) == false || all(is_fixed.(jump_model[:z])) "Model must not have any integer variables."
+                opt_time += @elapsed optimize!(jump_model)
+                if termination_status(jump_model) == INFEASIBLE
+
+                    unfix(jump_model[:z][layer, deleted])
+                    set_binary(jump_model[:z][layer, deleted])
+                    relax_integrality(jump_model)
+
+                    logging && print("o")
+                else
                     x_bar = [value(jump_model[:x][0, i]) for i in 1:length(U_in)]
                     z_bar = value.(jump_model[:z])
 
-                    push!(x_opt, local_search(x_bar, original, U_in, L_in))
-                else
-                    unfix(jump_model[:z][layer, deleted])
+                    logging && print(".")
+
+                    if (x_bar in sampled_points) == false
+                        search_time += @elapsed push!(x_opt, local_search(x_bar, original, U_in, L_in))
+                        push!(sampled_points, x_bar)
+
+                        sample_count += 1
+                        if sample_count % samples_per_iter == 0
+                            break
+                        end
+                    end
                 end
             end
-        end
+
+            if sample_count % samples_per_iter == 0
+                break
+            end
+
+        end # start new iteration
 
         # reset binary variables - start all over
         for var in jump_model[:z]
@@ -98,9 +128,20 @@ function optimize_by_walking!(original::JuMP.Model, U_in, L_in; delta=0.0)
         set_binary.(jump_model[:z])
         relax_integrality(jump_model)
 
+        # lrs = plot(plots..., layout=(20, 10), size=(300*10, 300*20))
+        # savefig(lrs, "spaces.png")
+
     end
 
-    return x_opt
+    println("\n\nLP OPTIMIZATION TIME: $opt_time")
+    println("LOCAL SEARCH TIME: $search_time")
+    println("ACTIVE NEURONS CHECKING TIME: $active_check_time")
+
+    if return_sampled
+        return x_opt, sampled_points
+    else
+        return x_opt
+    end
 
 end
 
@@ -131,6 +172,7 @@ function local_search(start, jump_model, U_in, L_in; epsilon=0.01, show_path=fal
         unfix.(jump_model[:x][0, :])
 
         # find hyperplane corner
+        @assert any(is_binary.(jump_model[:z])) == false || all(is_fixed.(jump_model[:z])) "Model must not have any integer variables."
         optimize!(jump_model)
 
         x1 = [value.(jump_model[:x][0, i]) for i in 1:length(start)]

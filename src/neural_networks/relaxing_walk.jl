@@ -1,17 +1,14 @@
-function optimize_by_walking!(original::JuMP.Model, U_in, L_in; delta=0.01, return_sampled=false, logging=true, iterations=10, samples_per_iter=5)
+function optimize_by_walking!(original::JuMP.Model, nn_model::Flux.Chain, U_in, L_in; delta=0.1, return_sampled=false, logging=true, iterations=10, samples_per_iter=5)
 
     sample(items, weights) = items[findfirst(cumsum(weights) .> rand() * sum(weights))]
+    
     opt_time = 0.0
     search_time = 0.0
-    active_check_time = 0.0
-
-    x_range = LinRange{Float32}(L_in[1], U_in[1], 20)
-    y_range = LinRange{Float32}(L_in[2], U_in[2], 20)
-    plots = Vector{Any}()
 
     n_layers, _ = maximum(keys(original[:x].data))
     
     x_opt = Vector{Vector}() # list of locally optimum solutions
+    opt = Vector{Float64}()
     sampled_points = Vector{Vector}()
 
     # copy model
@@ -26,7 +23,10 @@ function optimize_by_walking!(original::JuMP.Model, U_in, L_in; delta=0.01, retu
     z_tilde = value.(jump_model[:z])
 
     push!(sampled_points, x_tilde)
-    push!(x_opt, local_search(x_tilde, original, U_in, L_in))
+    
+    local_opt, opt_value = local_search(x_tilde, original, nn_model, U_in, L_in)
+    push!(x_opt, local_opt)
+    push!(opt, opt_value)
 
     for iter in 1:iterations # TODO time limit based termination
 
@@ -37,15 +37,9 @@ function optimize_by_walking!(original::JuMP.Model, U_in, L_in; delta=0.01, retu
         z_bar = deepcopy(z_tilde)
 
         # determine active neurons
-        [fix(original[:x][0, i], x_bar[i]) for i in eachindex(x_bar)]
-        active_check_time += @elapsed optimize!(original)
-
-        z_values = value.(original[:z])
-        binary_vars = collect(keys(original[:z].data))
-        filter!(key -> z_values[key] == 1, binary_vars)
-        active = binary_vars
-
-        unfix.(original[:x][0, :])
+        binary_vars = keys(original[:z].data)
+        values_flux = [map(n -> n > 0 ? 1.0 : 0.0, nn_model[1:layer](Float32.(x_bar))) for layer in unique(first.(binary_vars))]
+        active = filter(key -> values_flux[key[1]][key[2]] == 1.0, binary_vars)
 
         for layer in 1:(n_layers-1) # hidden layers
 
@@ -80,11 +74,6 @@ function optimize_by_walking!(original::JuMP.Model, U_in, L_in; delta=0.01, retu
                     fix(jump_model[:z][layer, deleted], 1.0; force=true)
                 end
 
-                # push!(plots, 
-                #     plot(x_range, y_range, (x, y) -> forward_pass!(jump_model, [x, y])[], st=:contourf, c=cgrad(:viridis, scale=:log), lw=0, colorbar=false, axis=false, size=(300, 300), framestyle=:none, margin = 0*Plots.mm)
-                # )
-                # unfix.(jump_model[:x][0, :])
-
                 @assert any(is_binary.(jump_model[:z])) == false || all(is_fixed.(jump_model[:z])) "Model must not have any integer variables."
                 opt_time += @elapsed optimize!(jump_model)
                 if termination_status(jump_model) == INFEASIBLE
@@ -101,7 +90,12 @@ function optimize_by_walking!(original::JuMP.Model, U_in, L_in; delta=0.01, retu
                     logging && print(".")
 
                     if (x_bar in sampled_points) == false
-                        search_time += @elapsed push!(x_opt, local_search(x_bar, original, U_in, L_in))
+                        search_time += @elapsed begin
+                        local_opt, opt_value = local_search(x_bar, original, nn_model, U_in, L_in)
+                        end
+                        push!(x_opt, local_opt)
+                        push!(opt, opt_value)
+                        
                         push!(sampled_points, x_bar)
 
                         sample_count += 1
@@ -127,25 +121,21 @@ function optimize_by_walking!(original::JuMP.Model, U_in, L_in; delta=0.01, retu
 
         set_binary.(jump_model[:z])
         relax_integrality(jump_model)
-
-        # lrs = plot(plots..., layout=(20, 10), size=(300*10, 300*20))
-        # savefig(lrs, "spaces.png")
-
+   
     end
 
     println("\n\nLP OPTIMIZATION TIME: $opt_time")
     println("LOCAL SEARCH TIME: $search_time")
-    println("ACTIVE NEURONS CHECKING TIME: $active_check_time")
 
     if return_sampled
-        return x_opt, sampled_points
+        return x_opt, opt, sampled_points
     else
-        return x_opt
+        return x_opt, opt
     end
 
 end
 
-function local_search(start, jump_model, U_in, L_in; epsilon=0.01, show_path=false, logging=false)
+function local_search(start, jump_model, nn_model, U_in, L_in; epsilon=0.01, show_path=false, logging=false)
 
     x0 = deepcopy(start)
     x1 = deepcopy(x0)
@@ -160,16 +150,9 @@ function local_search(start, jump_model, U_in, L_in; epsilon=0.01, show_path=fal
 
         push!(path, x0)
 
-        [fix(jump_model[:x][0, i], x0[i]) for i in eachindex(start)]
-        optimize!(jump_model)
-        x0_obj = objective_value(jump_model)
-
-        # fix binary variables
-        values = value.(jump_model[:z])
-        [fix(jump_model[:z][key], values[key]) for key in binary_vars]
-
-        # unfix input after forward pass
-        unfix.(jump_model[:x][0, :])
+        values_flux = [map(n -> n > 0 ? 1.0 : 0.0, nn_model[1:layer](Float32.(x0))) for layer in unique(first.(binary_vars))]
+        x0_obj = nn_model(Float32.(x0))[]
+        [fix(jump_model[:z][layer, neuron], values_flux[layer][neuron]) for (layer, neuron) in binary_vars]
 
         # find hyperplane corner
         @assert any(is_binary.(jump_model[:z])) == false || all(is_fixed.(jump_model[:z])) "Model must not have any integer variables."
@@ -203,15 +186,12 @@ function local_search(start, jump_model, U_in, L_in; epsilon=0.01, show_path=fal
         end
 
         if isapprox(x0_obj, x1_obj; atol=1e-5) || x0_obj < x1_obj # TODO what should the tolerance be
-            break 
+            logging && println("Local optimum found: $x1")
+            if show_path 
+                return x1, x1_obj, path
+            else 
+                return x1, x1_obj
+            end
         end
     end
-
-    logging && println("Local optimum found: $x1")
-    if show_path 
-        return x1, path
-    else 
-        return x1
-    end
-
 end

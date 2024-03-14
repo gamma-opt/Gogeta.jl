@@ -70,8 +70,8 @@ function CNN_formulate!(jump_model::JuMP.Model, CNN_model::Flux.Chain, cnnstruct
                     )
                     
                     @constraint(jump_model, c[layer_index, row, col, out_channel] - cs[layer_index, row, col, out_channel] == convolution + biases[out_channel])
-                    @constraint(jump_model, c[layer_index, row, col, out_channel] <= 1.0 * (1-cz[layer_index, row, col, out_channel]))
-                    @constraint(jump_model, cs[layer_index, row, col, out_channel] <= 1.0 * cz[layer_index, row, col, out_channel])
+                    @constraint(jump_model, c[layer_index, row, col, out_channel] <= 1.0 * cz[layer_index, row, col, out_channel])
+                    @constraint(jump_model, cs[layer_index, row, col, out_channel] <= 1.0 * (1-cz[layer_index, row, col, out_channel]))
                 end
             end
 
@@ -138,8 +138,8 @@ function CNN_formulate!(jump_model::JuMP.Model, CNN_model::Flux.Chain, cnnstruct
             if layer_data.σ == relu
                 for neuron in 1:n_neurons
                     @constraint(jump_model, x[layer_index, neuron] >= 0)
-                    @constraint(jump_model, x[layer_index, neuron] <= U_bounds_dense[layer_index][neuron] * (1 - z[layer_index, neuron]))
-                    @constraint(jump_model, s[layer_index, neuron] <= -L_bounds_dense[layer_index][neuron] * z[layer_index, neuron])
+                    @constraint(jump_model, x[layer_index, neuron] <= U_bounds_dense[layer_index][neuron] * z[layer_index, neuron])
+                    @constraint(jump_model, s[layer_index, neuron] <= -L_bounds_dense[layer_index][neuron] * (1-z[layer_index, neuron]))
                     @constraint(jump_model, x[layer_index, neuron] - s[layer_index, neuron] == biases[neuron] + sum(weights[neuron, i] * x[layer_index-1, i] for i in 1:n_previous))
                 end
             elseif layer_data.σ == identity

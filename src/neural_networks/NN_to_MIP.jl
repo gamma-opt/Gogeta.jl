@@ -118,8 +118,8 @@ function NN_formulate!(jump_model::JuMP.Model, NN_model::Flux.Chain, U_in, L_in;
             @constraint(jump_model, s[layer, neuron] >= 0)
             set_binary(z[layer, neuron])
 
-            ucons[layer][neuron] = @constraint(jump_model, x[layer, neuron] <= max(0, U_bounds[layer][neuron]) * (1 - z[layer, neuron]))
-            lcons[layer][neuron] = @constraint(jump_model, s[layer, neuron] <= max(0, -L_bounds[layer][neuron]) * z[layer, neuron])
+            ucons[layer][neuron] = @constraint(jump_model, x[layer, neuron] <= max(0, U_bounds[layer][neuron]) * z[layer, neuron])
+            lcons[layer][neuron] = @constraint(jump_model, s[layer, neuron] <= max(0, -L_bounds[layer][neuron]) * (1-z[layer, neuron]))
 
             @constraint(jump_model, x[layer, neuron] - s[layer, neuron] == b[layer][neuron] + sum(W[layer][neuron, i] * x[layer-1-layers_removed, i] for i in neurons(layer-1-layers_removed)))
         end

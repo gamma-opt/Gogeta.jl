@@ -1,4 +1,4 @@
-function optimize_by_walking!(original::JuMP.Model, nn_model::Flux.Chain, U_in, L_in; delta=0.1, return_sampled=false, logging=true, iterations=10, samples_per_iter=5)
+function optimize_by_walking!(original::JuMP.Model, nn_model::Flux.Chain, U_in, L_in; delta=0.1, return_sampled=false, logging=true, iterations=10, infeasible_per_iter=5)
 
     sample(items, weights) = items[findfirst(cumsum(weights) .> rand() * sum(weights))]
     
@@ -31,7 +31,7 @@ function optimize_by_walking!(original::JuMP.Model, nn_model::Flux.Chain, U_in, 
     for iter in 1:iterations # TODO time limit based termination
 
         logging && println("\n\nIteration: $iter")
-        sample_count = 0
+        infeasible_count = 0
 
         x_bar = deepcopy(x_tilde)
         z_bar = deepcopy(z_tilde)
@@ -83,6 +83,11 @@ function optimize_by_walking!(original::JuMP.Model, nn_model::Flux.Chain, U_in, 
                     relax_integrality(jump_model)
 
                     logging && print("o")
+
+                    infeasible_count += 1
+                    if infeasible_count % infeasible_per_iter == 0
+                        break
+                    end
                 else
                     x_bar = [value(jump_model[:x][0, i]) for i in 1:length(U_in)]
                     z_bar = value.(jump_model[:z])
@@ -97,16 +102,11 @@ function optimize_by_walking!(original::JuMP.Model, nn_model::Flux.Chain, U_in, 
                         push!(opt, opt_value)
                         
                         push!(sampled_points, x_bar)
-
-                        sample_count += 1
-                        if sample_count % samples_per_iter == 0
-                            break
-                        end
                     end
                 end
             end
 
-            if sample_count % samples_per_iter == 0
+            if infeasible_count % infeasible_per_iter == 0
                 break
             end
 
@@ -124,8 +124,8 @@ function optimize_by_walking!(original::JuMP.Model, nn_model::Flux.Chain, U_in, 
    
     end
 
-    println("\n\nLP OPTIMIZATION TIME: $opt_time")
-    println("LOCAL SEARCH TIME: $search_time")
+    logging && println("\n\nLP OPTIMIZATION TIME: $opt_time")
+    logging && println("LOCAL SEARCH TIME: $search_time")
 
     if return_sampled
         return x_opt, opt, sampled_points
@@ -139,6 +139,8 @@ function local_search(start, jump_model, nn_model, U_in, L_in; epsilon=0.01, sho
 
     x0 = deepcopy(start)
     x1 = deepcopy(x0)
+
+    min = objective_sense(jump_model) == MIN_SENSE ? -1 : 1
 
     logging && println("\nStarting local search from: $start")
 
@@ -163,8 +165,17 @@ function local_search(start, jump_model, nn_model, U_in, L_in; epsilon=0.01, sho
         push!(path, x1)
 
         unfix.(jump_model[:z])
+        
+        if isapprox(x0_obj, x1_obj; atol=1e-5) || min * x0_obj > x1_obj * min # TODO what should the tolerance be
+            logging && println("Local optimum found: $x0")
+            if show_path 
+                return x0, x0_obj, path
+            else 
+                return x1, x0_obj
+            end
+        end
 
-        if x1_obj > x0_obj
+        if min * x1_obj > x0_obj * min
             
             dir = x1 - x0
             x0 = x1 + epsilon*dir
@@ -174,24 +185,8 @@ function local_search(start, jump_model, nn_model, U_in, L_in; epsilon=0.01, sho
                     x0[i] = x1[i]
                 end
             end
-
-            # check if next point is better
-            [fix(jump_model[:x][0, i], x0[i]) for i in eachindex(start)]
-            optimize!(jump_model)
-            x0_obj = objective_value(jump_model)
-
-            # unfix the input after forward pass
-            unfix.(jump_model[:x][0, :])
             
         end
 
-        if isapprox(x0_obj, x1_obj; atol=1e-5) || x0_obj < x1_obj # TODO what should the tolerance be
-            logging && println("Local optimum found: $x1")
-            if show_path 
-                return x1, x1_obj, path
-            else 
-                return x1, x1_obj
-            end
-        end
     end
 end

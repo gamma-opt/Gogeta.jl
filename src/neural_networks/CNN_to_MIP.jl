@@ -33,7 +33,7 @@ function CNN_formulate!(jump_model::JuMP.Model, CNN_model::Flux.Chain, cnnstruct
     dense_inds  = cnnstruct.dense_inds
     
     # 2d layers
-    @variable(jump_model, c[layer=union(0, conv_inds, maxpool_inds, meanpool_inds), 1:dims[layer][1], 1:dims[layer][2], 1:channels[layer]] >= 0) # input is always between 0 and 1
+    @variable(jump_model, c[layer=union(0, conv_inds, maxpool_inds, meanpool_inds), 1:dims[layer][1], 1:dims[layer][2], 1:channels[layer]] >= 0)
     @variable(jump_model, cs[layer=conv_inds, 1:dims[layer][1], 1:dims[layer][2], 1:channels[layer]] >= 0)
     @variable(jump_model, cz[layer=conv_inds, 1:dims[layer][1], 1:dims[layer][2], 1:channels[layer]], Bin)
 
@@ -44,6 +44,9 @@ function CNN_formulate!(jump_model::JuMP.Model, CNN_model::Flux.Chain, cnnstruct
 
     U_bounds_dense = Dict{Int, Vector}()
     L_bounds_dense = Dict{Int, Vector}()
+
+    # first layer
+    @constraint(jump_model, [row in 1:dims[0][1], col in 1:dims[0][2], channel in 1:channels[0]], 0.0 <= c[0, row, col, channel] <= 1.0)
 
     pixel_or_pad(layer, row, col, channel) = if haskey(c, (layer, row, col, channel)) c[layer, row, col, channel] else 0.0 end
 
@@ -70,8 +73,8 @@ function CNN_formulate!(jump_model::JuMP.Model, CNN_model::Flux.Chain, cnnstruct
                     )
                     
                     @constraint(jump_model, c[layer_index, row, col, out_channel] - cs[layer_index, row, col, out_channel] == convolution + biases[out_channel])
-                    @constraint(jump_model, c[layer_index, row, col, out_channel] <= 1.0 * cz[layer_index, row, col, out_channel])
-                    @constraint(jump_model, cs[layer_index, row, col, out_channel] <= 1.0 * (1-cz[layer_index, row, col, out_channel]))
+                    @constraint(jump_model, c[layer_index, row, col, out_channel] <= 1000 * cz[layer_index, row, col, out_channel])
+                    @constraint(jump_model, cs[layer_index, row, col, out_channel] <= 1000 * (1-cz[layer_index, row, col, out_channel]))
                 end
             end
 
@@ -91,7 +94,7 @@ function CNN_formulate!(jump_model::JuMP.Model, CNN_model::Flux.Chain, cnnstruct
                     pz = @variable(jump_model, [1:p_height, 1:p_width], Bin)
                     @constraint(jump_model, sum([pz[i, j] for i in 1:p_height, j in 1:p_width]) == 1)
 
-                    @constraint(jump_model, [i in 1:p_height, j in 1:p_width], c[layer_index, row, col, channel] <= pixel_or_pad(layer_index-1, pos[1]+i, pos[2]+j, channel) + (1-pz[i, j]))
+                    @constraint(jump_model, [i in 1:p_height, j in 1:p_width], c[layer_index, row, col, channel] <= pixel_or_pad(layer_index-1, pos[1]+i, pos[2]+j, channel) + 1000*(1-pz[i, j]))
                 end
             end
 

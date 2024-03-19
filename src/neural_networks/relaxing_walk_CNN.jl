@@ -72,6 +72,7 @@ function optimize_by_walking_CNN!(cnn_jump::JuMP.Model, input; iterations=10, sa
                     end
                 else
                     println("Already sampled.")
+                    break
                 end
             end
         end
@@ -115,7 +116,7 @@ function local_search_CNN(start, cnn_jump; epsilon=0.01, max_iter=10, show_path=
         optimize!(cnn_jump)
         x0_obj = objective_value(cnn_jump)
         
-        println("INPUT OBJECTIVE: $x0_obj")
+        println("Input objective: $x0_obj")
 
         binary_vars = filter(is_binary, all_variables(cnn_jump))
         binary_vals = map(value, binary_vars)
@@ -133,7 +134,7 @@ function local_search_CNN(start, cnn_jump; epsilon=0.01, max_iter=10, show_path=
         foreach(unfix, binary_vars)
         restore_integrality()
 
-        println("CORNER OBJECTIVE: $x1_obj")
+        println("Corner objective: $x1_obj")
 
         if isapprox(x1_obj, x0_obj; rtol=0.02)
             println("Not enough improvement to input. Terminating...")

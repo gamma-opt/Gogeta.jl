@@ -50,11 +50,17 @@ function CNN_formulate!(jump_model::JuMP.Model, CNN_model::Flux.Chain, cnnstruct
 
     pixel_or_pad(layer, row, col, channel) = if haskey(c, (layer, row, col, channel)) c[layer, row, col, channel] else 0.0 end
 
-    U_bounds_img = Dict{Int, Vector}()
-    L_bounds_img = Dict{Int, Vector}()
+    U_bounds_img = Dict{Int, Dict}()
+    L_bounds_img = Dict{Int, Dict}()
 
-    U_bounds_img[0] = ones(Float64, 1:dims[layer][1], 1:dims[layer][2], 1:channels[layer])
-    L_bounds_img[0] = zeros(Float64, 1:dims[layer][1], 1:dims[layer][2], 1:channels[layer])
+    onearray = ones(Float64, 1:dims[0][1], 1:dims[0][2], 1:channels[0])
+    zeroarray =  zeros(Float64, 1:dims[0][1], 1:dims[0][2], 1:channels[0])
+
+    U_bounds_img[0] = Dict(index.I => onearray[index] for index in CartesianIndices(onearray))
+    L_bounds_img[0] = Dict(index.I => zeroarray[index] for index in CartesianIndices(zeroarray))
+
+    [U_bounds_img[layer] = typeof(U_bounds_img[0])() for layer in union(conv_inds, maxpool_inds, meanpool_inds)]
+    [L_bounds_img[layer] = typeof(L_bounds_img[0])() for layer in union(conv_inds, maxpool_inds, meanpool_inds)]
 
     for (layer_index, layer_data) in enumerate(CNN_model)
 
@@ -78,20 +84,33 @@ function CNN_formulate!(jump_model::JuMP.Model, CNN_model::Flux.Chain, cnnstruct
                             in_channel in 1:channels[layer_index-1]])
                     )
 
-                    L_bound =
-                        sum([filters[in_channel, out_channel][f_height-i, f_width-j] * pixel_or_pad(layer_index-1, pos[1]+i, pos[2]+j, in_channel)
+                    U_bound = sum([
+                        max(
+                            filters[in_channel, out_channel][f_height-i, f_width-j] * max(0, get(U_bounds_img[layer_index-1], (pos[1]+i, pos[2]+j, in_channel), 0)),
+                            filters[in_channel, out_channel][f_height-i, f_width-j] * max(0, get(L_bounds_img[layer_index-1], (pos[1]+i, pos[2]+j, in_channel), 0))
+                        )
                         for i in 0:f_height-1, 
                             j in 0:f_width-1, 
-                            in_channel in 1:channels[layer_index-1]])
+                            in_channel in 1:channels[layer_index-1]
+                    ]) + biases[out_channel]
 
-                            min(
-                                weights[neuron, previous] * max(0, U_bounds_dense[layer_index-1][previous]), 
-                                weights[neuron, previous] * max(0, L_bounds_dense[layer_index-1][previous])
-                            ) 
+                    U_bounds_img[layer_index][row, col, out_channel] = clamp(U_bound, 0.0, Inf)
+
+                    L_bound = sum([
+                        min(
+                            filters[in_channel, out_channel][f_height-i, f_width-j] * max(0, get(U_bounds_img[layer_index-1], (pos[1]+i, pos[2]+j, in_channel), 0)),
+                            filters[in_channel, out_channel][f_height-i, f_width-j] * max(0, get(L_bounds_img[layer_index-1], (pos[1]+i, pos[2]+j, in_channel), 0))
+                        )
+                        for i in 0:f_height-1, 
+                            j in 0:f_width-1, 
+                            in_channel in 1:channels[layer_index-1]
+                    ]) + biases[out_channel]
+
+                    L_bounds_img[layer_index][row, col, out_channel] = clamp(L_bound, -Inf, 0.0)
                     
                     @constraint(jump_model, c[layer_index, row, col, out_channel] - cs[layer_index, row, col, out_channel] == convolution + biases[out_channel])
-                    @constraint(jump_model, c[layer_index, row, col, out_channel] <= 1000 * cz[layer_index, row, col, out_channel])
-                    @constraint(jump_model, cs[layer_index, row, col, out_channel] <= 1000 * (1-cz[layer_index, row, col, out_channel]))
+                    @constraint(jump_model, c[layer_index, row, col, out_channel] <= U_bounds_img[layer_index][row, col, out_channel] * cz[layer_index, row, col, out_channel])
+                    @constraint(jump_model, cs[layer_index, row, col, out_channel] <= -L_bounds_img[layer_index][row, col, out_channel] * (1-cz[layer_index, row, col, out_channel]))
                 end
             end
 
@@ -111,7 +130,10 @@ function CNN_formulate!(jump_model::JuMP.Model, CNN_model::Flux.Chain, cnnstruct
                     pz = @variable(jump_model, [1:p_height, 1:p_width], Bin)
                     @constraint(jump_model, sum([pz[i, j] for i in 1:p_height, j in 1:p_width]) == 1)
 
-                    @constraint(jump_model, [i in 1:p_height, j in 1:p_width], c[layer_index, row, col, channel] <= pixel_or_pad(layer_index-1, pos[1]+i, pos[2]+j, channel) + 1000 * (1-pz[i, j]))
+                    U_bounds_img[layer_index][row, col, channel] = maximum(get(U_bounds_img[layer_index-1], (pos[1]+i, pos[2]+j, channel), 0) for i in 1:p_height, j in 1:p_width)
+                    L_bounds_img[layer_index][row, col, channel] = maximum(get(L_bounds_img[layer_index-1], (pos[1]+i, pos[2]+j, channel), 0) for i in 1:p_height, j in 1:p_width)
+
+                    @constraint(jump_model, [i in 1:p_height, j in 1:p_width], c[layer_index, row, col, channel] <= pixel_or_pad(layer_index-1, pos[1]+i, pos[2]+j, channel) + U_bounds_img[layer_index][row, col, channel] * (1-pz[i, j]))
                 end
             end
 
@@ -125,6 +147,10 @@ function CNN_formulate!(jump_model::JuMP.Model, CNN_model::Flux.Chain, cnnstruct
                 pos = (layer_data.stride[1]*(row-1) - layer_data.pad[1], layer_data.stride[2]*(col-1) - layer_data.pad[2])
                 
                 for channel in 1:channels[layer_index-1]
+
+                    U_bounds_img[layer_index][row, col, channel] = 1/(p_height*p_width) * sum(get(U_bounds_img[layer_index-1], (pos[1]+i, pos[2]+j, channel), 0) for i in 1:p_height, j in 1:p_width)
+                    L_bounds_img[layer_index][row, col, channel] = 1/(p_height*p_width) * sum(get(L_bounds_img[layer_index-1], (pos[1]+i, pos[2]+j, channel), 0) for i in 1:p_height, j in 1:p_width)
+
                     @constraint(jump_model, c[layer_index, row, col, channel] == 1/(p_height*p_width) * sum(pixel_or_pad(layer_index-1, pos[1]+i, pos[2]+j, channel)
                         for i in 1:p_height, 
                             j in 1:p_width)
@@ -138,6 +164,14 @@ function CNN_formulate!(jump_model::JuMP.Model, CNN_model::Flux.Chain, cnnstruct
                 x[flatten_ind, row + (col-1)*dims[layer_index-1][1] + (channel-1)*prod(dims[layer_index-1])] == c[layer_index-1, row, col, channel]
             )
 
+            U_bounds_dense[layer_index] = Vector{Float64}(undef, dense_lengths[flatten_ind])
+            L_bounds_dense[layer_index] = Vector{Float64}(undef, dense_lengths[flatten_ind])
+
+            for channel in 1:channels[layer_index-1], row in dims[layer_index-1][1]:-1:1, col in 1:dims[layer_index-1][2]
+                U_bounds_dense[layer_index][row + (col-1)*dims[layer_index-1][1] + (channel-1)*prod(dims[layer_index-1])] = U_bounds_img[layer_index-1][row, col, channel]
+                L_bounds_dense[layer_index][row + (col-1)*dims[layer_index-1][1] + (channel-1)*prod(dims[layer_index-1])] = L_bounds_img[layer_index-1][row, col, channel]
+            end
+
         elseif layer_index in dense_inds
             
             weights = Flux.params(layer_data)[1]
@@ -148,31 +182,18 @@ function CNN_formulate!(jump_model::JuMP.Model, CNN_model::Flux.Chain, cnnstruct
 
             # compute heuristic bounds
             if layer_index == minimum(dense_inds)
-                U_bounds_dense[layer_index] = [sum(max(weights[neuron, previous] * 1.0, 0.0) for previous in 1:n_previous) + biases[neuron] for neuron in 1:n_neurons]
-                L_bounds_dense[layer_index] = [sum(min(weights[neuron, previous] * 1.0, 0.0) for previous in 1:n_previous) + biases[neuron] for neuron in 1:n_neurons]
+                U_bounds_dense[layer_index] = [sum(max(weights[neuron, previous] * U_bounds_dense[layer_index-1][previous], weights[neuron, previous] * L_bounds_dense[layer_index-1][previous]) for previous in 1:n_previous) + biases[neuron] for neuron in 1:n_neurons]
+                L_bounds_dense[layer_index] = [sum(min(weights[neuron, previous] * U_bounds_dense[layer_index-1][previous], weights[neuron, previous] * L_bounds_dense[layer_index-1][previous]) for previous in 1:n_previous) + biases[neuron] for neuron in 1:n_neurons]
             else
-                U_bounds_dense[layer_index] = [sum(
-                    max(
-                        weights[neuron, previous] * max(0, U_bounds_dense[layer_index-1][previous]), 
-                        weights[neuron, previous] * max(0, L_bounds_dense[layer_index-1][previous])
-                    ) 
-                    for previous in 1:n_previous)
-                         + biases[neuron] for neuron in 1:n_neurons]
-
-                L_bounds_dense[layer_index] = [sum(
-                    min(
-                        weights[neuron, previous] * max(0, U_bounds_dense[layer_index-1][previous]), 
-                        weights[neuron, previous] * max(0, L_bounds_dense[layer_index-1][previous])
-                    ) 
-                    for previous in 1:n_previous) 
-                        + biases[neuron] for neuron in 1:n_neurons]
+                U_bounds_dense[layer_index] = [sum(max(weights[neuron, previous] * max(0, U_bounds_dense[layer_index-1][previous]), weights[neuron, previous] * max(0, L_bounds_dense[layer_index-1][previous])) for previous in 1:n_previous) + biases[neuron] for neuron in 1:n_neurons]
+                L_bounds_dense[layer_index] = [sum(min(weights[neuron, previous] * max(0, U_bounds_dense[layer_index-1][previous]), weights[neuron, previous] * max(0, L_bounds_dense[layer_index-1][previous])) for previous in 1:n_previous) + biases[neuron] for neuron in 1:n_neurons]
             end
 
             if layer_data.σ == relu
                 for neuron in 1:n_neurons
                     @constraint(jump_model, x[layer_index, neuron] >= 0)
-                    @constraint(jump_model, x[layer_index, neuron] <= U_bounds_dense[layer_index][neuron] * z[layer_index, neuron])
-                    @constraint(jump_model, s[layer_index, neuron] <= -L_bounds_dense[layer_index][neuron] * (1-z[layer_index, neuron]))
+                    @constraint(jump_model, x[layer_index, neuron] <= max(0, U_bounds_dense[layer_index][neuron]) * z[layer_index, neuron])
+                    @constraint(jump_model, s[layer_index, neuron] <= max(0, -L_bounds_dense[layer_index][neuron]) * (1-z[layer_index, neuron]))
                     @constraint(jump_model, x[layer_index, neuron] - s[layer_index, neuron] == biases[neuron] + sum(weights[neuron, i] * x[layer_index-1, i] for i in 1:n_previous))
                 end
             elseif layer_data.σ == identity
@@ -182,4 +203,6 @@ function CNN_formulate!(jump_model::JuMP.Model, CNN_model::Flux.Chain, cnnstruct
     end
 
     @objective(jump_model, Max, 1)
+
+    return U_bounds_img, L_bounds_img, U_bounds_dense, L_bounds_dense
 end

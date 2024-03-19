@@ -50,6 +50,12 @@ function CNN_formulate!(jump_model::JuMP.Model, CNN_model::Flux.Chain, cnnstruct
 
     pixel_or_pad(layer, row, col, channel) = if haskey(c, (layer, row, col, channel)) c[layer, row, col, channel] else 0.0 end
 
+    U_bounds_img = Dict{Int, Vector}()
+    L_bounds_img = Dict{Int, Vector}()
+
+    U_bounds_img[0] = ones(Float64, 1:dims[layer][1], 1:dims[layer][2], 1:channels[layer])
+    L_bounds_img[0] = zeros(Float64, 1:dims[layer][1], 1:dims[layer][2], 1:channels[layer])
+
     for (layer_index, layer_data) in enumerate(CNN_model)
 
         if layer_index in conv_inds
@@ -71,6 +77,17 @@ function CNN_formulate!(jump_model::JuMP.Model, CNN_model::Flux.Chain, cnnstruct
                             j in 0:f_width-1, 
                             in_channel in 1:channels[layer_index-1]])
                     )
+
+                    L_bound =
+                        sum([filters[in_channel, out_channel][f_height-i, f_width-j] * pixel_or_pad(layer_index-1, pos[1]+i, pos[2]+j, in_channel)
+                        for i in 0:f_height-1, 
+                            j in 0:f_width-1, 
+                            in_channel in 1:channels[layer_index-1]])
+
+                            min(
+                                weights[neuron, previous] * max(0, U_bounds_dense[layer_index-1][previous]), 
+                                weights[neuron, previous] * max(0, L_bounds_dense[layer_index-1][previous])
+                            ) 
                     
                     @constraint(jump_model, c[layer_index, row, col, out_channel] - cs[layer_index, row, col, out_channel] == convolution + biases[out_channel])
                     @constraint(jump_model, c[layer_index, row, col, out_channel] <= 1000 * cz[layer_index, row, col, out_channel])
@@ -94,7 +111,7 @@ function CNN_formulate!(jump_model::JuMP.Model, CNN_model::Flux.Chain, cnnstruct
                     pz = @variable(jump_model, [1:p_height, 1:p_width], Bin)
                     @constraint(jump_model, sum([pz[i, j] for i in 1:p_height, j in 1:p_width]) == 1)
 
-                    @constraint(jump_model, [i in 1:p_height, j in 1:p_width], c[layer_index, row, col, channel] <= pixel_or_pad(layer_index-1, pos[1]+i, pos[2]+j, channel) + 1000*(1-pz[i, j]))
+                    @constraint(jump_model, [i in 1:p_height, j in 1:p_width], c[layer_index, row, col, channel] <= pixel_or_pad(layer_index-1, pos[1]+i, pos[2]+j, channel) + 1000 * (1-pz[i, j]))
                 end
             end
 
@@ -134,8 +151,21 @@ function CNN_formulate!(jump_model::JuMP.Model, CNN_model::Flux.Chain, cnnstruct
                 U_bounds_dense[layer_index] = [sum(max(weights[neuron, previous] * 1.0, 0.0) for previous in 1:n_previous) + biases[neuron] for neuron in 1:n_neurons]
                 L_bounds_dense[layer_index] = [sum(min(weights[neuron, previous] * 1.0, 0.0) for previous in 1:n_previous) + biases[neuron] for neuron in 1:n_neurons]
             else
-                U_bounds_dense[layer_index] = [sum(max(weights[neuron, previous] * max(0, U_bounds_dense[layer_index-1][previous]), weights[neuron, previous] * max(0, L_bounds_dense[layer_index-1][previous])) for previous in 1:n_previous) + biases[neuron] for neuron in 1:n_neurons]
-                L_bounds_dense[layer_index] = [sum(min(weights[neuron, previous] * max(0, U_bounds_dense[layer_index-1][previous]), weights[neuron, previous] * max(0, L_bounds_dense[layer_index-1][previous])) for previous in 1:n_previous) + biases[neuron] for neuron in 1:n_neurons]
+                U_bounds_dense[layer_index] = [sum(
+                    max(
+                        weights[neuron, previous] * max(0, U_bounds_dense[layer_index-1][previous]), 
+                        weights[neuron, previous] * max(0, L_bounds_dense[layer_index-1][previous])
+                    ) 
+                    for previous in 1:n_previous)
+                         + biases[neuron] for neuron in 1:n_neurons]
+
+                L_bounds_dense[layer_index] = [sum(
+                    min(
+                        weights[neuron, previous] * max(0, U_bounds_dense[layer_index-1][previous]), 
+                        weights[neuron, previous] * max(0, L_bounds_dense[layer_index-1][previous])
+                    ) 
+                    for previous in 1:n_previous) 
+                        + biases[neuron] for neuron in 1:n_neurons]
             end
 
             if layer_data.σ == relu

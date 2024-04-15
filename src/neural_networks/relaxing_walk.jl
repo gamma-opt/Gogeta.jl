@@ -135,7 +135,7 @@ function optimize_by_walking!(original::JuMP.Model, nn_model::Flux.Chain, U_in, 
 
 end
 
-function local_search(start, jump_model, nn_model, U_in, L_in; epsilon=0.01, show_path=false, logging=false)
+function local_search(start, jump_model, nn_model, U_in, L_in; max_iter=100, epsilon=0.01, show_path=false, logging=false, tolerance=0.001)
 
     x0 = deepcopy(start)
     x1 = deepcopy(x0)
@@ -145,34 +145,42 @@ function local_search(start, jump_model, nn_model, U_in, L_in; epsilon=0.01, sho
     logging && println("\nStarting local search from: $start")
 
     path = Vector{Vector}()
+    x0_obj = min * -Inf
+    binary_vars = filter(is_binary, all_variables(jump_model))
 
-    binary_vars = keys(jump_model[:z].data)
+    for iter in 1:max_iter
 
-    while true
+        logging && println("\nSEARCH STEP: $iter")
 
         push!(path, x0)
+        
+        # determine neuron activations and fix them
+        [fix(jump_model[:x][0, i], x0[i]) for i in 1:length(start)]
+        optimize!(jump_model)
+        x0_obj = objective_value(jump_model)
 
-        values_flux = [map(n -> n > 0 ? 1.0 : 0.0, nn_model[1:layer](Float32.(x0))) for layer in unique(first.(binary_vars))]
-        x0_obj = nn_model(Float32.(x0))[]
-        [fix(jump_model[:z][layer, neuron], values_flux[layer][neuron]) for (layer, neuron) in binary_vars]
+        logging && println("Input objective: $x0_obj")
+
+        binary_vals = map(value, binary_vars)
+        foreach(pair -> fix(pair[1], pair[2]; force=true), zip(binary_vars, binary_vals))
+        
+        unfix.(jump_model[:x][0, :])
 
         # find hyperplane corner
-        @assert any(is_binary.(jump_model[:z])) == false || all(is_fixed.(jump_model[:z])) "Model must not have any integer variables."
+        restore_integrality = relax_integrality(jump_model)
         optimize!(jump_model)
 
-        x1 = [value.(jump_model[:x][0, i]) for i in 1:length(start)]
+        x1 = [value(jump_model[:x][0, i]) for i in 1:length(start)]
         x1_obj = objective_value(jump_model)
-        push!(path, x1)
 
-        unfix.(jump_model[:z])
+        foreach(unfix, binary_vars)
+        restore_integrality()
+
+        logging && println("Corner objective: $x1_obj")
         
-        if isapprox(x0_obj, x1_obj; atol=1e-5) || min * x0_obj > x1_obj * min # TODO what should the tolerance be
+        if isapprox(x0_obj, x1_obj; rtol=tolerance) || min * x0_obj > x1_obj * min
             logging && println("Local optimum found: $x0")
-            if show_path 
-                return x0, x0_obj, path
-            else 
-                return x1, x0_obj
-            end
+            break
         end
 
         if min * x1_obj > x0_obj * min
@@ -189,4 +197,11 @@ function local_search(start, jump_model, nn_model, U_in, L_in; epsilon=0.01, sho
         end
 
     end
+
+    if show_path 
+        return x0, x0_obj, path
+    else 
+        return x0, x0_obj
+    end
+
 end

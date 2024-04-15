@@ -1,61 +1,69 @@
-function optimize_by_walking_CNN!(cnn_jump::JuMP.Model, input; iterations=10, samples_per_iter=5, timelimit=0.5)
+function optimize_by_walking_CNN!(cnn_jump::JuMP.Model, input; iterations=10, samples_per_iter=5, timelimit=1.0, tolerance=1.0)
 
-    foreach(unfix, filter(is_fixed, all_variables(cnn_jump)))
+    nrows, ncols, nchannels, _ = size(input)
 
     copied_model = copy(cnn_jump)
     set_solver!(copied_model)
 
     opt_time = 0.0
+    measure_time = 0.0
+
+    alg_time = @elapsed begin
+
+    var_list = all_variables(copied_model)
     
-    binary_vars = findall(var -> is_binary(var) && name(var) != "", all_variables(copied_model))
+    binary_vars = findall(var -> is_binary(var) && name(var) != "", var_list) # non-maxpool variables
 
     relax_integrality(copied_model)
     opt_time += @elapsed optimize!(copied_model)
-    lp_sol = [value.(copied_model[:c][0, row, col, channel]) for row in eachindex(input[:, 1, 1, 1]), col in eachindex(input[1, :, 1, 1]), channel in eachindex(input[1, 1, :, 1])]
+    lp_sol = [value(copied_model[:c][0, row, col, channel]) for row in 1:nrows, col in 1:ncols, channel in 1:nchannels]
 
     samples = Vector{Array{Float64, 3}}()
+
     for iter in 1:iterations
 
-        [fix(cnn_jump[:c][0, row, col, channel], lp_sol[row, col, channel, 1], force=true) for row in eachindex(lp_sol[:, 1, 1, 1]), col in eachindex(lp_sol[1, :, 1, 1]), channel in eachindex(lp_sol[1, 1, :, 1])]
+        # get the set of active neurons
+        [fix(cnn_jump[:c][0, row, col, channel], lp_sol[row, col, channel, 1], force=true) for row in 1:nrows, col in 1:ncols, channel in 1:nchannels]
         opt_time += @elapsed optimize!(cnn_jump)
 
         active = Set(first.(filter(
             pair -> pair[2] == 1.0,
             map(i -> i => value(all_variables(cnn_jump)[i]), binary_vars)
         )))
-        foreach(unfix, filter(is_fixed, all_variables(cnn_jump))) # unfix input
+        unfix.(cnn_jump[:c][0, :, :, :])
         
         println("\nITERATION $iter")
         
         for s in 1:samples_per_iter
             
             to_be_fixed = rand(binary_vars)
-            while is_fixed(all_variables(copied_model)[to_be_fixed])
+            while is_fixed(var_list[to_be_fixed])
                 to_be_fixed = rand(binary_vars)
             end
 
             if to_be_fixed in active
-                println("\nFixed $(name(all_variables(copied_model)[to_be_fixed])) to 0")
-                fix(all_variables(copied_model)[to_be_fixed], 0.0; force=true)
+                println("\nFixed $(name(var_list[to_be_fixed])) to 0")
+                fix(var_list[to_be_fixed], 0.0; force=true)
             else
-                println("\nFixed $(name(all_variables(copied_model)[to_be_fixed])) to 1")
-                fix(all_variables(copied_model)[to_be_fixed], 1.0; force=true)
+                println("\nFixed $(name(var_list[to_be_fixed])) to 1")
+                fix(var_list[to_be_fixed], 1.0; force=true)
             end
             
-            # re-optimize
+            # find LP solution with some binary variables fixed
             set_attribute(copied_model, "TimeLimit", timelimit)
             opt_time += @elapsed optimize!(copied_model)
             
             if termination_status(copied_model) != OPTIMAL
                 println("Infeasible or timeout")
-                unfix(all_variables(copied_model)[to_be_fixed])
-                set_binary(all_variables(copied_model)[to_be_fixed])
+                unfix(var_list[to_be_fixed])
+                set_binary(var_list[to_be_fixed])
                 relax_integrality(copied_model)
-                break
             else
-                lp_sol = [value.(copied_model[:c][0, row, col, channel]) for row in eachindex(input[:, 1, 1, 1]), col in eachindex(input[1, :, 1, 1]), channel in eachindex(input[1, 1, :, 1])]
+                lp_sol = [value(copied_model[:c][0, row, col, channel]) for row in 1:nrows, col in 1:ncols, channel in 1:nchannels]
 
-                if all(map(sample -> norm(lp_sol-sample, 2) / norm(lp_sol, 2) >= 0.05, samples))
+                measure_time += @elapsed unique_sample = all(map(sample -> norm(lp_sol-sample, 2) >= tolerance, samples)) # different enough from all sampled
+
+                if unique_sample
 
                     push!(samples, lp_sol)
 
@@ -72,7 +80,6 @@ function optimize_by_walking_CNN!(cnn_jump::JuMP.Model, input; iterations=10, sa
                     end
                 else
                     println("Already sampled.")
-                    break
                 end
             end
         end
@@ -85,15 +92,19 @@ function optimize_by_walking_CNN!(cnn_jump::JuMP.Model, input; iterations=10, sa
 
     end
 
+    end
+
     println("\nSampling complete.\n")
     println("Samples: $(length(samples))")
 
-    println("Optimization time: $opt_time")
+    println("TOTAL TIME: $alg_time")
+    println("\t- Optimization time: $opt_time")
+    println("\t- Measure time: $measure_time")
 end
 
-function local_search_CNN(start, cnn_jump; epsilon=0.01, max_iter=10, show_path=false)
+function local_search_CNN(start, cnn_jump; epsilon=0.01, max_iter=10, show_path=false, logging=false, tolerance=0.01)
 
-    nrows, ncols, nchannels, _ = size(start)
+    nrows, ncols, nchannels = size(start)
 
     x0 = deepcopy(start)
     x1 = deepcopy(x0)
@@ -101,13 +112,12 @@ function local_search_CNN(start, cnn_jump; epsilon=0.01, max_iter=10, show_path=
     path = Vector{typeof(x0)}()
     
     min = objective_sense(cnn_jump) == MIN_SENSE ? -1 : 1
-    x0_obj = min * Inf
+    x0_obj = min * -Inf
+    binary_vars = filter(is_binary, all_variables(cnn_jump))
 
     for iter in 1:max_iter
 
-        println("\nSEARCH STEP: $iter")
-
-        # display(heatmap(x0[:, :, 1], background=false, legend=false, title="input", color=:inferno, aspect_ratio=:equal, axis=([], false)))
+        logging && println("\nSEARCH STEP: $iter")
 
         x0 = map(pixel -> if pixel > 1.0 1.0 elseif pixel < 0.0 0.0 else pixel end, x0)
 
@@ -116,9 +126,8 @@ function local_search_CNN(start, cnn_jump; epsilon=0.01, max_iter=10, show_path=
         optimize!(cnn_jump)
         x0_obj = objective_value(cnn_jump)
         
-        println("Input objective: $x0_obj")
+        logging && println("Input objective: $x0_obj")
 
-        binary_vars = filter(is_binary, all_variables(cnn_jump))
         binary_vals = map(value, binary_vars)
         foreach(pair -> fix(pair[1], pair[2]; force=true), zip(binary_vars, binary_vals))
 
@@ -134,10 +143,10 @@ function local_search_CNN(start, cnn_jump; epsilon=0.01, max_iter=10, show_path=
         foreach(unfix, binary_vars)
         restore_integrality()
 
-        println("Corner objective: $x1_obj")
+        logging && println("Corner objective: $x1_obj")
 
-        if isapprox(x1_obj, x0_obj; rtol=0.02)
-            println("Not enough improvement to input. Terminating...")
+        if isapprox(x1_obj, x0_obj; rtol=tolerance) || min * x0_obj > x1_obj * min
+            logging && println("Not enough improvement to input. Terminating...")
             break
         end
 

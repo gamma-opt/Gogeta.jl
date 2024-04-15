@@ -113,9 +113,13 @@ Forward pass an image through the JuMP model representing a convolutional neural
 Returns the output of the network, i.e., a vector of the activations of the last dense layer neurons.
 """
 function image_pass!(jump_model::JuMP.Model, input::Array{Float32, 4})
+    
     [fix(jump_model[:c][0, row, col, channel], input[row, col, channel, 1], force=true) for row in eachindex(input[:, 1, 1, 1]), col in eachindex(input[1, :, 1, 1]), channel in eachindex(input[1, 1, :, 1])]
     optimize!(jump_model)
 
     (last_layer, outputs) = maximum(keys(jump_model[:x].data))
-    return [value(jump_model[:x][last_layer, i]) for i in 1:outputs]
+    result = [value(jump_model[:x][last_layer, i]) for i in 1:outputs]
+    unfix.(jump_model[:c][0, :, :, :])
+
+    return result
 end

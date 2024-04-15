@@ -18,8 +18,11 @@ The convolutional neural network must follow a certain structure:
 - `CNN_model`: `Flux.Chain` containing the CNN
 - `cnnstruct`: holds the layer structure of the CNN
 
+# Optional Parameters
+- `max_to_mean`: formulate maxpool layers as meanpool layers. This can 
+
 """
-function CNN_formulate!(jump_model::JuMP.Model, CNN_model::Flux.Chain, cnnstruct::CNNStructure)
+function CNN_formulate!(jump_model::JuMP.Model, CNN_model::Flux.Chain, cnnstruct::CNNStructure; max_to_mean=false)
 
     empty!(jump_model)
 
@@ -50,6 +53,7 @@ function CNN_formulate!(jump_model::JuMP.Model, CNN_model::Flux.Chain, cnnstruct
 
     pixel_or_pad(layer, row, col, channel) = if haskey(c, (layer, row, col, channel)) c[layer, row, col, channel] else 0.0 end
 
+    # activation bounds
     U_bounds_img = Dict{Int, Dict}()
     L_bounds_img = Dict{Int, Dict}()
 

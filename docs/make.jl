@@ -8,7 +8,8 @@ makedocs(
     format= Documenter.HTML(),
     pages=[
         "Introduction" => "index.md",
-        "Bound tightening" => "bound_tightening.md",
+        "Tree ensembles" => "tree_ensembles.md",
+        "Neural networks" => "neural_networks.md",
         "Public API" => "api.md",
         "Literature" => "literature.md",
         "Reference" => "reference.md",

@@ -6,21 +6,6 @@
 
 *"Gogeta was the result of the Saiyan warriors Son Goku and Vegeta successfully performing the Fusion Dance. Vegeta and Goku usually fused into Gogeta to counteract a significant threat, as Gogeta's power exponentially surpassed the sum of his parts."* [source](https://hero.fandom.com/wiki/Gogeta)
 
-Gogeta.jl (pronounced "Go-gee-ta") enables the user to represent machine-learning models with mathematical programming, more specifically as mixed-integer optimization problems. This, in turn, allows for "fusing" the capabilities of mathematical optimisation solvers and machine learning models to solve problems that neither could solve on their own.
+Gogeta.jl (pronounced "Go-gee-ta") enables the user to represent trained machine learning models with mathematical programming, more specifically as mixed-integer optimization problems. This, in turn, allows for "fusing" the capabilities of mathematical optimization solvers and machine learning models to solve problems that neither could solve on their own.
 
-Currently supported models include neural networks and convolutional neural networks using ReLU activation and tree ensembles.
-
-## Package features
-
-### Tree ensembles
-* **tree ensemble to MIP conversion** - obtain an integer optimization problem from a trained tree ensemble model
-* **tree ensemble optimization** - optimize a trained decision tree model, i.e., find an input that maximizes the ensemble output
-
-### Neural networks
-* **neural network to MIP conversion** - formulate integer programming problem from a neural network
-* **bound tightening** - improve computational feasibility by tightening bounds in the formulation according to input/output bounds
-* **neural network compression** - reduce network size by removing inactive or stably active neurons
-* **neural network optimization** - find the input that maximizes the neural network output
-
-### Convolutional neural networks
-* **convolutional neural network to MIP conversion** - formulate a mixed-integer programming problem from a convolutional neural network
+Currently supported models are tree ensembles and neural networks and convolutional neural networks using ReLU activation.

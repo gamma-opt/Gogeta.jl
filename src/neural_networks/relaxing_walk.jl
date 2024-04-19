@@ -1,3 +1,20 @@
+"""
+    function optimize_by_walking!(original::JuMP.Model, nn_model::Flux.Chain, U_in, L_in; delta=0.1, return_sampled=false, logging=true, iterations=10, infeasible_per_iter=5)
+
+Performs the full relaxing walk algorithm on the given neural network JuMP formulation. See Tong et al. (2024) for more details.
+
+# Parameters
+- `original`: `JuMP` model containing the NN formulation.
+- `nn_model`: the original NN as `Flux.Chain`
+
+# Optional Parameters
+- `delta`: controls how strongly certain neurons are preferred when fixing the binary variables
+- `return_sampled`: return sampled points in addition to the optima 
+- `logging`: print progress info to the console
+- `iterations`: the number of fresh starts from the linear relaxation (no binary variables fixed)
+- `infeasible_per_iter`: the number of infeasible LP relaxations allowed before starting next iteration
+
+"""
 function optimize_by_walking!(original::JuMP.Model, nn_model::Flux.Chain, U_in, L_in; delta=0.1, return_sampled=false, logging=true, iterations=10, infeasible_per_iter=5)
 
     sample(items, weights) = items[findfirst(cumsum(weights) .> rand() * sum(weights))]
@@ -135,7 +152,23 @@ function optimize_by_walking!(original::JuMP.Model, nn_model::Flux.Chain, U_in, 
 
 end
 
-function local_search(start, jump_model, nn_model, U_in, L_in; max_iter=100, epsilon=0.01, show_path=false, logging=false, tolerance=0.001)
+"""
+    function local_search(start, jump_model, nn_model, U_in, L_in; max_iter=100, epsilon=0.01, show_path=false, logging=false, tolerance=0.001)
+
+Performs relaxing walk local search on the given neural network JuMP formulation. See Tong et al. (2024) for more details.
+
+# Parameters
+- `start`: starting point for the search (coordinate in the space)
+- `jump_model`: `JuMP` model containing the NN formulation
+
+# Optional Parameters
+- `epsilon`: controls the step size taken out of the linear region
+- `show_path`: return the path taken by the local search in addition to the optimum
+- `logging`: print progress info to console
+- `tolerance`: minimum relative improvement required at every step to continue the search
+
+"""
+function local_search(start, jump_model, U_in, L_in; max_iter=100, epsilon=0.01, show_path=false, logging=false, tolerance=0.001)
 
     x0 = deepcopy(start)
     x1 = deepcopy(x0)

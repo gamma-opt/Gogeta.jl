@@ -19,10 +19,13 @@ The convolutional neural network must follow a certain structure:
 - `cnnstruct`: holds the layer structure of the CNN
 
 # Optional Parameters
-- `max_to_mean`: formulate maxpool layers as meanpool layers. This can 
+- `max_to_mean`: formulate maxpool layers as meanpool layers. This might improve the convex hull of the model (linear relaxation) for use with relaxing walk algorithm.
+- `logging`: print progress info to console.
 
 """
-function CNN_formulate!(jump_model::JuMP.Model, CNN_model::Flux.Chain, cnnstruct::CNNStructure; max_to_mean=false)
+function CNN_formulate!(jump_model::JuMP.Model, CNN_model::Flux.Chain, cnnstruct::CNNStructure; max_to_mean=false, logging=true)
+
+    logging && println("Formulating CNN as JuMP model...")
 
     empty!(jump_model)
 
@@ -65,6 +68,8 @@ function CNN_formulate!(jump_model::JuMP.Model, CNN_model::Flux.Chain, cnnstruct
 
     [U_bounds_img[layer] = typeof(U_bounds_img[0])() for layer in union(conv_inds, maxpool_inds, meanpool_inds)]
     [L_bounds_img[layer] = typeof(L_bounds_img[0])() for layer in union(conv_inds, maxpool_inds, meanpool_inds)]
+
+    logging && println("Preprocessing completed")
 
     for (layer_index, layer_data) in enumerate(CNN_model)
 
@@ -118,7 +123,9 @@ function CNN_formulate!(jump_model::JuMP.Model, CNN_model::Flux.Chain, cnnstruct
                 end
             end
 
-        elseif layer_index in maxpool_inds
+            logging && println("Added conv layer")
+
+        elseif max_to_mean == false && (layer_index in maxpool_inds)
 
             p_height = layer_data.k[1]
             p_width = layer_data.k[2]
@@ -141,7 +148,9 @@ function CNN_formulate!(jump_model::JuMP.Model, CNN_model::Flux.Chain, cnnstruct
                 end
             end
 
-        elseif layer_index in meanpool_inds
+            logging && println("Added maxpool layer")
+
+        elseif (layer_index in meanpool_inds) || (max_to_mean && (layer_index in maxpool_inds))
 
             p_height = layer_data.k[1]
             p_width = layer_data.k[2]
@@ -162,6 +171,8 @@ function CNN_formulate!(jump_model::JuMP.Model, CNN_model::Flux.Chain, cnnstruct
                 end
             end
 
+            logging && println("Added meanpool layer")
+
         elseif layer_index == flatten_ind
 
             @constraint(jump_model, [channel in 1:channels[layer_index-1], row in dims[layer_index-1][1]:-1:1, col in 1:dims[layer_index-1][2]], 
@@ -175,6 +186,8 @@ function CNN_formulate!(jump_model::JuMP.Model, CNN_model::Flux.Chain, cnnstruct
                 U_bounds_dense[layer_index][row + (col-1)*dims[layer_index-1][1] + (channel-1)*prod(dims[layer_index-1])] = U_bounds_img[layer_index-1][row, col, channel]
                 L_bounds_dense[layer_index][row + (col-1)*dims[layer_index-1][1] + (channel-1)*prod(dims[layer_index-1])] = L_bounds_img[layer_index-1][row, col, channel]
             end
+
+            logging && println("Added flatten layer")
 
         elseif layer_index in dense_inds
             
@@ -203,10 +216,14 @@ function CNN_formulate!(jump_model::JuMP.Model, CNN_model::Flux.Chain, cnnstruct
             elseif layer_data.σ == identity
                 @constraint(jump_model, [neuron in 1:n_neurons], x[layer_index, neuron] == biases[neuron] + sum(weights[neuron, i] * x[layer_index-1, i] for i in 1:n_previous))
             end
+
+            logging && println("Added dense layer")
         end
     end
 
     @objective(jump_model, Max, 1)
+
+    logging && println("Formulation complete.")
 
     return U_bounds_img, L_bounds_img, U_bounds_dense, L_bounds_dense
 end

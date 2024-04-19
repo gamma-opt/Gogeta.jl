@@ -71,7 +71,7 @@ function get_structure(CNN_model::Flux.Chain, input::Array{Float32, 4})
             push!(meanpool_inds, layer_index)
             push!(dims, layer_index => (w, h))
 
-        elseif layer_data == Flux.flatten
+        elseif layer_data == Flux.flatten || string(layer_data) == "flatten"
             flatten_ind = layer_index
             push!(dense_lengths, layer_index => size(CNN_model[1:layer_index](input))[1])
 

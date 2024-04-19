@@ -1,3 +1,19 @@
+"""
+    function optimize_by_walking_CNN!(cnn_jump::JuMP.Model, input; iterations=10, samples_per_iter=5, timelimit=1.0, tolerance=1.0)
+
+Performs the full relaxing walk algorithm on the given convolutional neural network JuMP formulation. See Tong et al. (2024) for more details.
+
+# Parameters
+- `cnn_jump`: `JuMP` model containing the CNN formulation.
+- `input`: An example input to the CNN. Used to extract the input dimensions.
+
+# Optional Parameters
+- `iterations`: the number of fresh starts from the linear relaxation (no binary variables fixed)
+- `samples_per_iter`: maximum number of successful samples per iteration
+- `timelimit`: time limit for the LP relaxation solves
+- `tolerance`: how different new samples must be from any previous one
+
+"""
 function optimize_by_walking_CNN!(cnn_jump::JuMP.Model, input; iterations=10, samples_per_iter=5, timelimit=1.0, tolerance=1.0)
 
     nrows, ncols, nchannels, _ = size(input)
@@ -71,10 +87,10 @@ function optimize_by_walking_CNN!(cnn_jump::JuMP.Model, input; iterations=10, sa
                         println("Zero solution")
                     else
                         println("Objective value: $(CNN_model(reshape(lp_sol, 70, 50, 1, 1))[1])")
-                        display(heatmap(lp_sol[:, :, 1], background=false, legend=false, color=:inferno, aspect_ratio=:equal, axis=([], false)))
+                        # display(heatmap(lp_sol[:, :, 1], background=false, legend=false, color=:inferno, aspect_ratio=:equal, axis=([], false)))
                         
-                        # println("Starting local search...")
-                        # x_opt, val_opt = local_search_CNN(lp_sol, cnn_jump)
+                        println("Starting local search...")
+                        x_opt, val_opt = local_search_CNN(lp_sol, cnn_jump)
 
                         # display(heatmap(x_opt[:, :, 1], background=false, legend=false, color=:inferno, aspect_ratio=:equal, axis=([], false)))
                     end
@@ -102,6 +118,23 @@ function optimize_by_walking_CNN!(cnn_jump::JuMP.Model, input; iterations=10, sa
     println("\t- Measure time: $measure_time")
 end
 
+"""
+    function local_search_CNN(start, cnn_jump; epsilon=0.01, max_iter=10, show_path=false, logging=false, tolerance=0.01)
+
+Performs relaxing walk local search on the given convolutional neural network JuMP formulation. See Tong et al. (2024) for more details.
+
+# Parameters
+- `start`: starting point for the search (coordinate in the image space)
+- `cnn_jump`: `JuMP` model containing the CNN formulation
+
+# Optional Parameters
+- `epsilon`: controls the step size taken out of the linear region
+- `max_iter`: maximum number of search steps
+- `show_path`: return the path taken by the local search in addition to the optimum
+- `logging`: print progress info to console
+- `tolerance`: minimum relative improvement required at every step to continue the search
+
+"""
 function local_search_CNN(start, cnn_jump; epsilon=0.01, max_iter=10, show_path=false, logging=false, tolerance=0.01)
 
     nrows, ncols, nchannels = size(start)

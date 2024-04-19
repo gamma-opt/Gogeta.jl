@@ -60,8 +60,8 @@ function CNN_formulate!(jump_model::JuMP.Model, CNN_model::Flux.Chain, cnnstruct
     U_bounds_img = Dict{Int, Dict}()
     L_bounds_img = Dict{Int, Dict}()
 
-    onearray = ones(Float64, 1:dims[0][1], 1:dims[0][2], 1:channels[0])
-    zeroarray =  zeros(Float64, 1:dims[0][1], 1:dims[0][2], 1:channels[0])
+    onearray = ones(Float64, dims[0][1], dims[0][2], channels[0])
+    zeroarray =  zeros(Float64, dims[0][1], dims[0][2], channels[0])
 
     U_bounds_img[0] = Dict(index.I => onearray[index] for index in CartesianIndices(onearray))
     L_bounds_img[0] = Dict(index.I => zeroarray[index] for index in CartesianIndices(zeroarray))

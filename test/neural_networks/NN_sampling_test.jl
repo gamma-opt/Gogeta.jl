@@ -38,5 +38,5 @@ x_opt, extremum = optimize_by_sampling!(jump_model, samples);
 @test NN_model(Float32.(x_opt))[] ≈ extremum
 
 @info "Testing that optimum is correct (precomputed)."
-@test x_opt ≈ [1.0, 0.731267784484517, 0.0, 0.6963412902527348, 0.9324087029309082, 0.12149594815045718, 0.0, 1.0, 1.0, 1.0]
-@test extremum ≈ -0.7496729517399346
+@test x_opt ≈ [0.7018758035290612, 1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0]
+@test extremum ≈ -0.8235817480215797

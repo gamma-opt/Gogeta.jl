@@ -215,7 +215,6 @@ function forward_pass!(jump_model::JuMP.Model, input)
         optimize!(jump_model)
         (last_layer, outputs) = maximum(keys(jump_model[:x].data))
         result = value.(jump_model[:x][last_layer, :])
-        unfix.(jump_model[:x][0, :])
         return [result[i] for i in 1:outputs]
     catch e
         println("ERROR: $e")

@@ -7,7 +7,6 @@ addprocs(4)
 @everywhere function set_solver!(jump)
     set_optimizer(jump, () -> HiGHS.Optimizer())
     set_silent(jump)
-    set_attribute(jump, "time_limit", 1.0)
 end
 
 @everywhere using Gogeta

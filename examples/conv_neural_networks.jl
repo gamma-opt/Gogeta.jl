@@ -53,7 +53,7 @@ display.(heatmap.(outputs, background=false, legend=false, color = :inferno, asp
 jump = Model(Gurobi.Optimizer)
 set_silent(jump)
 cnns = get_structure(CNN_model, input);
-create_MIP_from_CNN!(jump, CNN_model, cnns)
+CNN_formulate!(jump, CNN_model, cnns)
 
 # Test that jump model produces same outputs for all layers as the CNN
 @time CNN_model[1](input)[:, :, :, 1] ≈ image_pass!(jump, input, cnns, 1)

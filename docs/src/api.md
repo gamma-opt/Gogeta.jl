@@ -31,6 +31,10 @@ These are all of the functions and data structures that the user needs to know i
 ### Forward pass
 * [`forward_pass!`](@ref) - fix the input variables and optimize the model to get the output
 
+### Sampling-based optimization
+* [`optimize_by_sampling!`](@ref) - optimize the JuMP model by using a sampling-based approach
+* [`optimize_by_walking!`](@ref) - optimize the JuMP model by using a more sophisticated sampling-based approach
+
 ## Convolutional neural networks
 
 ### Data structures
@@ -44,3 +48,6 @@ These are all of the functions and data structures that the user needs to know i
 
 ### Forward pass
 * [`image_pass!`](@ref) - fix the input variables and optimize the model to get the ouput
+
+### Sampling-based optimization 
+* [`optimize_by_walking_CNN!`](@ref) - optimize the JuMP model by using a more sophisticated sampling-based approach

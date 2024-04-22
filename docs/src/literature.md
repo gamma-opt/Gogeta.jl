@@ -1,7 +1,7 @@
 # Literature
 
 The mathematical optimization methods implemented in this package are based on the work of many brilliant researchers.
-The most important papers for our work are listed here. In these works, more in-depth information about the formulations and various algorithms we use in can also be found.
+The most important papers for our work are listed here. In these works, more in-depth information about the formulations and various algorithms we use can also be found.
 
 * **(Convolutional) neural network formulation:**
     
@@ -20,6 +20,8 @@ The most important papers for our work are listed here. In these works, more in-
 * **Sampling-based optimization:**
 
     * *Perakis, G., & Tsiourvas, A. (2022). Optimizing Objective Functions from Trained ReLU Neural Networks via Sampling. arXiv preprint arXiv:2205.14189.*
+
+    * *Tong, J., Cai, J., & Serra, T. (2024). Optimization Over Trained Neural Networks: Taking a Relaxing Walk. arXiv preprint arXiv:2401.03451.*
 
 * **Tree ensembles:**
 

@@ -13,7 +13,7 @@ The best (optimum, extremum) solution is returned.
 - `exploitation_rate`: Controls how often the algorithm performs local search versus samples a new point.
 
 """
-function optimize_by_sampling!(jump_model::JuMP.Model, sample_points; enhanced=true, exploitation_rate=0.67)
+function optimize_by_sampling!(jump_model::JuMP.Model, sample_points; enhanced=true, exploitation_rate=0.67, tolerance=1e-5)
 
     input_length = length(jump_model[:x][0, :])
     binary_vars = keys(jump_model[:z].data)
@@ -57,10 +57,12 @@ function optimize_by_sampling!(jump_model::JuMP.Model, sample_points; enhanced=t
             while true
 
                 forward_pass!(jump_model, x_opt)
-
-                # solve mip with z=1 values fixed
-                values = value.(jump_model[:z])
-                [if values[key] == 1 fix(jump_model[:z][key], 1.0) end for key in binary_vars]
+                
+                # solve mip with only neurons with 0 activation (before ReLU) unfixed
+                values_x = value.(jump_model[:x])
+                values_s = value.(jump_model[:s])
+                values_z = value.(jump_model[:z])
+                [if (isapprox(values_x[key], 0.0; atol=tolerance) && isapprox(values_s[key], 0.0; atol=tolerance)) == false fix(jump_model[:z][key], values_z[key]) end for key in binary_vars]
 
                 # unfix the input after forward pass
                 unfix.(jump_model[:x][0, :])
@@ -72,8 +74,10 @@ function optimize_by_sampling!(jump_model::JuMP.Model, sample_points; enhanced=t
                 obj_mip = objective_value(jump_model)
 
                 # restore model - only fixed variables
-                [if values[key] == 1 unfix(jump_model[:z][key]) end for key in binary_vars]
-                [if values[key] == 1 set_binary(jump_model[:z][key]) end for key in binary_vars]
+                unfix.(filter(is_fixed, all_variables(jump_model)))
+                set_binary.(jump_model[:z])
+                # [if values[key] == 1 unfix(jump_model[:z][key]) end for key in binary_vars]
+                # [if values[key] == 1 set_binary(jump_model[:z][key]) end for key in binary_vars]
 
                 # update optimum and repeat if improved
                 if min * obj_mip > obj_lp * min

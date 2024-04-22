@@ -1,7 +1,7 @@
 name = "Gogeta"
 uuid = "8b0c908c-0e18-4590-8d3d-9c2483fd76bf"
-authors = ["Nikita Belyak, Joonatan Linkola, Eetu Reijonen, Vilhelm Toivonen"]
-version = "0.1.0"
+authors = ["Eetu Reijonen, Vilhelm Toivonen, Nikita Belyak, Joonatan Linkola"]
+version = "0.2.0"
 
 [deps]
 Distributed = "8ba89e20-285c-5b6f-9357-94700520ee1b"

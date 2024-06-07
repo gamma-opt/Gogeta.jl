@@ -5,6 +5,7 @@ using JuMP
 using LinearAlgebra: rank, dot
 using EvoTrees
 using Distributed
+using JSON
 
 # NEURAL NETWORKS
 
@@ -33,6 +34,10 @@ export optimize_by_walking!, local_search
 # Relaxing walk CNN
 include("neural_networks/relaxing_walk_CNN.jl")
 export optimize_by_walking_CNN!, local_search_CNN
+
+# ICNNs
+include("icnns/ICNN_to_LP.jl")
+export ICNN_formulate!, forward_pass_ICNN!
 
 # TREE ENSEMBLES
 

@@ -41,7 +41,7 @@ function optimize_by_walking!(original::JuMP.Model, nn_model::Flux.Chain, U_in, 
 
     push!(sampled_points, x_tilde)
     
-    local_opt, opt_value = local_search(x_tilde, original, nn_model, U_in, L_in)
+    local_opt, opt_value = local_search(x_tilde, original, U_in, L_in)
     push!(x_opt, local_opt)
     push!(opt, opt_value)
 
@@ -113,7 +113,7 @@ function optimize_by_walking!(original::JuMP.Model, nn_model::Flux.Chain, U_in, 
 
                     if (x_bar in sampled_points) == false
                         search_time += @elapsed begin
-                        local_opt, opt_value = local_search(x_bar, original, nn_model, U_in, L_in)
+                        local_opt, opt_value = local_search(x_bar, original, U_in, L_in)
                         end
                         push!(x_opt, local_opt)
                         push!(opt, opt_value)
@@ -153,13 +153,15 @@ function optimize_by_walking!(original::JuMP.Model, nn_model::Flux.Chain, U_in, 
 end
 
 """
-    function local_search(start, jump_model, nn_model, U_in, L_in; max_iter=100, epsilon=0.01, show_path=false, logging=false, tolerance=0.001)
+    function local_search(start, jump_model, U_in, L_in; max_iter=100, epsilon=0.01, show_path=false, logging=false, tolerance=0.001)
 
 Performs relaxing walk local search on the given neural network JuMP formulation. See Tong et al. (2024) for more details.
 
 # Parameters
 - `start`: starting point for the search (coordinate in the space)
 - `jump_model`: `JuMP` model containing the NN formulation
+- `U_in`: upper bounds for the domain
+- `L_in`: lower bounds for the domain
 
 # Optional Parameters
 - `epsilon`: controls the step size taken out of the linear region

@@ -34,6 +34,12 @@ export optimize_by_walking!, local_search
 include("neural_networks/relaxing_walk_CNN.jl")
 export optimize_by_walking_CNN!, local_search_CNN
 
+include("neural_networks/NN_Psplit_to_MIP.jl")
+export NN_formulate_Psplit!
+
+include("neural_networks/NN_Psplit_util.jl")
+export Psplits
+
 # TREE ENSEMBLES
 
 include("tree_ensembles/types.jl")

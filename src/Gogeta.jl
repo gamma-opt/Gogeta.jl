@@ -5,6 +5,7 @@ using JuMP
 using LinearAlgebra: rank, dot
 using EvoTrees
 using Distributed
+using Random
 
 # NEURAL NETWORKS
 

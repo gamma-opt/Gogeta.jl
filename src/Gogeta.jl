@@ -35,6 +35,8 @@ export optimize_by_walking!, local_search
 include("neural_networks/relaxing_walk_CNN.jl")
 export optimize_by_walking_CNN!, local_search_CNN
 
+
+# Psplit formulation
 include("neural_networks/NN_Psplit_to_MIP.jl")
 export NN_formulate_Psplit!
 

@@ -39,7 +39,7 @@ include("neural_networks/NN_Psplit_to_MIP.jl")
 export NN_formulate_Psplit!
 
 include("neural_networks/NN_Psplit_util.jl")
-export Psplits
+export Psplits, calculate_bounds_α
 
 # TREE ENSEMBLES
 

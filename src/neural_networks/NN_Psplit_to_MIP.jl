@@ -49,7 +49,7 @@ function NN_formulate_Psplit!(jump_model::JuMP.Model, NN_model::Flux.Chain, P, U
     @assert input_length == length(U_in) == length(L_in) "Initial bounds arrays must be the same length as the input layer"
 
     @variable(jump_model, x[layer = 0:K, neurons(layer)]);
-    @variable(jump_model, sigma[layer = 1:K-1, neurons(layer)]);
+    @variable(jump_model, Σ[layer = 1:K-1, neurons(layer)]);
     @variable(jump_model, z_b[layer = 1:K-1, neurons(layer), p=1:P]);
 
     @constraint(jump_model, [j = 1:input_length], x[0, j] <= U_in[j])
@@ -83,9 +83,9 @@ function NN_formulate_Psplit!(jump_model::JuMP.Model, NN_model::Flux.Chain, P, U
             if bound_tightening == "standard"
                 
                 bounds = if parallel == true # multiprocessing enabled
-                    pmap(neuron -> calculate_bounds(copy_model(jump_model), layer, neuron, W, b, neurons; layers_removed), neurons(layer))
+                    pmap(neuron -> calculate_bounds(copy_model(jump_model), layer, neuron, W, b, neurons), neurons(layer))
                 else
-                    map(neuron -> calculate_bounds(jump_model, layer, neuron, W, b, neurons; layers_removed), neurons(layer))
+                    map(neuron -> calculate_bounds(jump_model, layer, neuron, W, b, neurons), neurons(layer))
                 end
 
                 U_bounds[layer] = min.(U_bounds[layer], [bound[1] for bound in bounds])
@@ -108,10 +108,10 @@ function NN_formulate_Psplit!(jump_model::JuMP.Model, NN_model::Flux.Chain, P, U
         for neuron in neurons(layer)
 
             split_indices = Psplits(W[layer][neuron, :], P, strategy, silent)
-            set_binary(sigma[layer, neuron])
-            @constraint(jump_model, sum(sum(W[layer][neuron, i]*x[layer-1, i] for i in split_indices[p])-z_b[layer, neuron, p] for p in eachindex(split_indices)) + sigma[layer, neuron]*b[layer][neuron]<=0)
-            @constraint(jump_model, sum(z_b[layer, neuron, p] for p in  eachindex(split_indices)) + (1-sigma[layer,neuron])*b[layer][neuron]>=0)
-            @constraint(jump_model, x[layer, neuron] == sum(z_b[layer, neuron, p] for p in eachindex(split_indices)) + (1-sigma[layer,neuron])*b[layer][neuron]) 
+            set_binary(Σ[layer, neuron])
+            @constraint(jump_model, sum(sum(W[layer][neuron, i]*x[layer-1, i] for i in split_indices[p])-z_b[layer, neuron, p] for p in eachindex(split_indices)) + Σ[layer, neuron]*b[layer][neuron]<=0)
+            @constraint(jump_model, sum(z_b[layer, neuron, p] for p in  eachindex(split_indices)) + (1-Σ[layer,neuron])*b[layer][neuron]>=0)
+            @constraint(jump_model, x[layer, neuron] == sum(z_b[layer, neuron, p] for p in eachindex(split_indices)) + (1-Σ[layer,neuron])*b[layer][neuron]) 
     
             
             for p in eachindex(split_indices)
@@ -132,10 +132,10 @@ function NN_formulate_Psplit!(jump_model::JuMP.Model, NN_model::Flux.Chain, P, U
     
                 end
                 
-                @constraint(jump_model, sigma[layer, neuron]*LB_α[layer][neuron][p]<=sum(W[layer][neuron, i]*x[layer-1, i] for i in split_indices[p])-z_b[layer, neuron, p])
-                @constraint(jump_model, sum(W[layer][neuron, i]*x[layer-1, i] for i in split_indices[p])-z_b[layer, neuron, p]<=sigma[layer, neuron]*UB_α[layer][neuron][p]) 
-                @constraint(jump_model, (1-sigma[layer, neuron])*LB_α[layer][neuron][p]<=z_b[layer, neuron, p])
-                @constraint(jump_model, z_b[layer, neuron, p]<=(1-sigma[layer, neuron])*UB_α[layer][neuron][p])
+                @constraint(jump_model, Σ[layer, neuron]*LB_α[layer][neuron][p]<=sum(W[layer][neuron, i]*x[layer-1, i] for i in split_indices[p])-z_b[layer, neuron, p])
+                @constraint(jump_model, sum(W[layer][neuron, i]*x[layer-1, i] for i in split_indices[p])-z_b[layer, neuron, p]<=Σ[layer, neuron]*UB_α[layer][neuron][p]) 
+                @constraint(jump_model, (1-Σ[layer, neuron])*LB_α[layer][neuron][p]<=z_b[layer, neuron, p])
+                @constraint(jump_model, z_b[layer, neuron, p]<=(1-Σ[layer, neuron])*UB_α[layer][neuron][p])
 
             end
         end

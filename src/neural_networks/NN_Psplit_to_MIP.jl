@@ -128,7 +128,7 @@ function NN_formulate_Psplit!(jump_model::JuMP.Model, NN_model::Flux.Chain, P, U
                 
                     bounds = calculate_bounds_α(jump_model, layer, neuron, W, split_indices[p])
                     UB_α[layer][neuron][p] = min.(UB_α[layer][neuron][p], bounds[1])
-                    LB_α[layer][neuron][p] = max.(UB_α[layer][neuron][p], bounds[2])
+                    LB_α[layer][neuron][p] = max.(LB_α[layer][neuron][p], bounds[2])
     
                 end
                 

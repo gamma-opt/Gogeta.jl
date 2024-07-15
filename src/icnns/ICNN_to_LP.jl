@@ -82,7 +82,7 @@ Calculates the forward pass through the ICNN (the output that is produced with t
 - `input_vars`: references to the ICNN input variables
 
 """
-function forward_pass_ICNN!(jump, input, output_var, input_vars)
+function forward_pass_ICNN!(jump, input, output_var, input_vars...)
 
     input_var = [var for var in input_vars]
     [fix(input_var[neuron], input[neuron]) for neuron in eachindex(input)]
@@ -94,5 +94,54 @@ function forward_pass_ICNN!(jump, input, output_var, input_vars)
         println("Error with forward pass: $e")
         @warn "Input or output outside of bounds or incorrectly constructed model."
         return NaN
+    end
+end
+
+"""
+    function check_ICNN(optimizer, filepath, output_value, input_values...; show_output=true, negated=false)
+
+Verifies that the output of an ICNN contained in a larger optimization problem formulation is correct. 
+Verification is needed because the ICNN LP formulation cannot detect infeasibility.
+
+Returns true if ICNN output is correct and false otherwise.
+
+# Arguments
+
+- `optimizer`: JuMP optimizer object
+- `filepath`: relative path to the JSON file containing the model parameters
+- `output_value`: ICNN output in the optimal solution of the larger optimization problem
+- `input_values`: the values of the ICNN inputs at the optimal solution of the larger optimization problem
+
+# Keyword Arguments
+
+- `show_output`: print additional information to the console
+- `negated`: set 'true' if the ICNN has been trained with the data negated
+
+"""
+function check_ICNN(optimizer, filepath, output_value, input_values...; show_output=true, negated=false)
+    
+    in_values = [val for val in input_values]
+    multiplier = negated ? -1 : 1
+
+    icnn = Model()
+    set_optimizer(icnn, optimizer)
+    set_silent(icnn)
+    @objective(icnn, Max, 0)
+
+    @variable(icnn, inputs[1:length(in_values)])
+    @variable(icnn, output)
+
+    ICNN_formulate!(icnn, filepath, output, inputs...)
+    icnn_value = multiplier * forward_pass_ICNN!(icnn, in_values, output, inputs...)
+
+    show_output && println("Output should be: $output_value")
+    show_output && println("ICNN output with given input: $icnn_value")
+    
+    if icnn_value ≈ output_value
+        show_output && printstyled("ICNN output matches full problem\n"; color=:green)
+        return true
+    else
+        show_output && printstyled("ICNN output does not match\n"; color=:red)
+        return false
     end
 end

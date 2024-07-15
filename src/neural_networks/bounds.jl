@@ -15,13 +15,20 @@ function copy_model(input_model)
 end
 
 """
-    function calculate_bounds(model::JuMP.Model, layer, neuron, W, b, neurons; layers_removed=0)
+    function calculate_bounds(model::JuMP.Model, layer, neuron, W, b, neurons; x=nothing, layers_removed=0)
 
 Calculates the upper and lower activation bounds for a neuron in a ReLU-activated neural network.
 """
-function calculate_bounds(model::JuMP.Model, layer, neuron, W, b, neurons; layers_removed=0)
+function calculate_bounds(model::JuMP.Model, layer, neuron, W, b, neurons; x=nothing, layers_removed=0)
 
-    @objective(model, Max, b[layer][neuron] + sum(W[layer][neuron, i] * model[:x][layer-1-layers_removed, i] for i in neurons(layer-1-layers_removed)))
+    og_obj = objective_function(model)
+    og_sense = objective_sense(model)
+
+    if x === nothing 
+        x = model[:x] 
+    end
+
+    @objective(model, Max, b[neuron] + sum(W[neuron, i] * x[layer-1-layers_removed, i] for i in neurons(layer-1-layers_removed)))
     optimize!(model)
     
     upper_bound = if termination_status(model) == OPTIMAL
@@ -42,6 +49,8 @@ function calculate_bounds(model::JuMP.Model, layer, neuron, W, b, neurons; layer
     end
 
     println("Neuron: $neuron, bounds: [$lower_bound, $upper_bound]")
+
+    @objective(model, og_sense, og_obj)
 
     return upper_bound, lower_bound
 end

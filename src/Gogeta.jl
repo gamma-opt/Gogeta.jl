@@ -24,20 +24,24 @@ include("neural_networks/CNN_to_MIP.jl")
 export CNN_formulate!
 
 # Sampling
-include("neural_networks/sampling.jl")
+include("neural_networks/heuristic_algorithms/sampling.jl")
 export optimize_by_sampling!
 
 # Relaxing walk
-include("neural_networks/relaxing_walk.jl")
+include("neural_networks/heuristic_algorithms/relaxing_walk.jl")
 export optimize_by_walking!, local_search
 
 # Relaxing walk CNN
-include("neural_networks/relaxing_walk_CNN.jl")
+include("neural_networks/heuristic_algorithms/relaxing_walk_CNN.jl")
 export optimize_by_walking_CNN!, local_search_CNN
 
 # ICNNs
 include("icnns/ICNN_to_LP.jl")
-export ICNN_formulate!, forward_pass_ICNN!
+export ICNN_formulate!, forward_pass_ICNN!, check_ICNN
+
+# NN from TF model
+include("neural_networks/NN_from_file.jl")
+export NN_formulate!, forward_pass_NN!
 
 # TREE ENSEMBLES
 

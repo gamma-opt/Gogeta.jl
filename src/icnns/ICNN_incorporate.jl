@@ -1,7 +1,7 @@
 """
-    function ICNN_formulate!(jump::JuMP.Model, filepath::String, output_var, input_vars...)
+    function ICNN_incorporate!(jump::JuMP.Model, filepath::String, output_var, input_vars...)
 
-Formulates the input convex neural network (ICNN) as an LP into a JuMP model. The model parameters must be contained in a JSON file located in the given filepath. For more information about ICNNs see Amos et al. (2017).
+Incorporates the input convex neural network (ICNN) as an LP into a JuMP model. The model parameters must be contained in a JSON file located in the given filepath. For more information about ICNNs see Amos et al. (2017).
 
 JSON file structure:
 - Parameter sets must be named based on the layer type  - either "FCx" or "SKIPx" where 'x' indicates the layer number.
@@ -13,13 +13,13 @@ This function modifies the JuMP model given as input. The input and output varia
 
 # Arguments
 
-- `jump`: JuMP model where the LP formulation should be saved
+- `jump`: JuMP model where the LP formulation should be incorporated
 - `filepath`: relative path to the JSON file containing the model parameters
 - `output_var`: reference to the variable that should be linked to the ICNN output
 - `input_vars`: references to the variables that will be used as the ICNN inputs
 
 """
-function ICNN_formulate!(jump::JuMP.Model, filepath::String, output_var, input_vars...)
+function ICNN_incorporate!(jump::JuMP.Model, filepath::String, output_var, input_vars...)
 
     @assert objective_sense(jump) in [MAX_SENSE, MIN_SENSE] "Objective sense (Min/Max) must be set."
 
@@ -77,7 +77,7 @@ Calculates the forward pass through the ICNN (the output that is produced with t
 # Arguments
 
 - `jump`: JuMP model with the ICNN
-- `input`: value to be forwaard passed
+- `input`: value to be forward passed
 - `output_var`: reference to the ICNN output variable
 - `input_vars`: references to the ICNN input variables
 
@@ -131,7 +131,7 @@ function check_ICNN(optimizer, filepath, output_value, input_values...; show_out
     @variable(icnn, inputs[1:length(in_values)])
     @variable(icnn, output)
 
-    ICNN_formulate!(icnn, filepath, output, inputs...)
+    ICNN_incorporate!(icnn, filepath, output, inputs...)
     icnn_value = multiplier * forward_pass_ICNN!(icnn, in_values, output, inputs...)
 
     show_output && println("Output should be: $output_value")

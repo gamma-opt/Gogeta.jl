@@ -49,6 +49,7 @@ end
     function prune!(W, b, removed_neurons, layers_removed, neuron_count, layer, bounds_U, bounds_L)
 
 Removes stabily active or inactive neurons in a network by updating the weights and the biases and the removed neurons list accordingly.
+Helper function of NN_compress.
 """
 function prune!(W, b, removed_neurons, layers_removed, neuron_count, layer, bounds_U, bounds_L)
 
@@ -131,6 +132,7 @@ end
 
 Builds a new `Flux.Chain` model from the given weights and biases.
 Modifies the `W` and `b` arrays.
+Helper function of NN_compress.
 
 Returns the new `Flux.Chain` model.
 """

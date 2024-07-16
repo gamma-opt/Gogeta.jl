@@ -4,6 +4,7 @@ using Plots
 using Gogeta
 
 icnn_jump = Model(GLPK.Optimizer)
+@variable
 
 input_vars, output_var = ICNN_formulate!(icnn_jump, "examples/model_weights.json");
 

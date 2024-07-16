@@ -17,6 +17,9 @@ include("neural_networks/NN_to_MIP.jl")
 export NN_formulate!
 export forward_pass!
 
+include("neural_networks/NN_incorporate.jl")
+export NN_incorporate!, forward_pass_NN!
+
 include("neural_networks/CNN_util.jl")
 export CNNStructure, get_structure, image_pass!
 
@@ -36,12 +39,8 @@ include("neural_networks/heuristic_algorithms/relaxing_walk_CNN.jl")
 export optimize_by_walking_CNN!, local_search_CNN
 
 # ICNNs
-include("icnns/ICNN_to_LP.jl")
-export ICNN_formulate!, forward_pass_ICNN!, check_ICNN
-
-# NN from TF model
-include("neural_networks/NN_from_file.jl")
-export NN_formulate!, forward_pass_NN!
+include("icnns/ICNN_incorporate.jl")
+export ICNN_incorporate!, forward_pass_ICNN!, check_ICNN
 
 # TREE ENSEMBLES
 

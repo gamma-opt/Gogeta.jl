@@ -96,7 +96,7 @@ function NN_formulate!(jump_model::JuMP.Model, NN_model::Flux.Chain, U_in, L_in;
                 bounds = if parallel == true # multiprocessing enabled
                     pmap(neuron -> calculate_bounds(copy_model(jump_model), layer, neuron, W[layer], b[layer], neurons; layers_removed), neurons(layer))
                 else
-                    map(neuron -> calculate_bounds(jump_model, layer, neuron, W[layer], b[layer], neurons; x, layers_removed), neurons(layer))
+                    map(neuron -> calculate_bounds(jump_model, layer, neuron, W[layer], b[layer], neurons; layers_removed), neurons(layer))
                 end
                 # only change if bound is improved
                 U_bounds[layer] = min.(U_bounds[layer], [bound[1] for bound in bounds])
@@ -149,7 +149,7 @@ function NN_formulate!(jump_model::JuMP.Model, NN_model::Flux.Chain, U_in, L_in;
             bounds = if parallel == true # multiprocessing enabled
                 pmap(neuron -> calculate_bounds(copy_model(jump_model), layer, neuron, W[layer], b[layer], neurons; layers_removed), neurons(layer))
             else
-                map(neuron -> calculate_bounds(jump_model, layer, neuron, W[layer], b[layer], neurons; x, layers_removed), neurons(layer))
+                map(neuron -> calculate_bounds(jump_model, layer, neuron, W[layer], b[layer], neurons; layers_removed), neurons(layer))
             end
 
             # only change if bound is improved

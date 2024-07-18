@@ -11,15 +11,17 @@ A dummy objective function of 1 is added to the model. The objective is left for
 - `jump_model`: The constraints and variables will be saved to this optimization model.
 - `NN_model`: Neural network model to be formulated.
 - `P`: The number of splits
-- `init_U`: Upper bounds for the input variables.
-- `init_L`: Lower bounds for the input variables.
+- `U_in`: Upper bounds for the input variables.
+- `L_in`: Lower bounds for the input variables.
 
 # Optional arguments
-- `strategy`: Controls the partioning strategy. Available options are `equalrange`, `equalsize`, `random`, `snake`
-- `silent`: Controls console ouput.
+- `strategy`: Controls the partioning strategy. Available options are `equalsize` (default), `equalrange`, `random`, `snake`
+- `bound_tightening`: How the bounds for neurons are produced. Available options are `fast`(default), `standard`, `precomputed`
+- `parallel`: Is used in standard bounding, for speeding up the formulation default is `false`
+- `U_bounds`, `L_bounds`: Upper and lower bounds used in only for `precomputed` bound-tightening. 
+- `silent`: Controls console ouput. Default is true.
 
 """
-
 function NN_formulate_Psplit!(jump_model::JuMP.Model, NN_model::Flux.Chain, P, U_in, L_in; strategy="equalsize", bound_tightening="fast", parallel=false, U_bounds=nothing, L_bounds=nothing, silent=true)
 
     oldstdout = stdout
@@ -107,7 +109,7 @@ function NN_formulate_Psplit!(jump_model::JuMP.Model, NN_model::Flux.Chain, P, U
 
         for neuron in neurons(layer)
 
-            split_indices = Psplits(W[layer][neuron, :], P, strategy, silent)
+            split_indices = Psplits(W[layer][neuron, :], P, strategy, silent=silent)
             set_binary(Σ[layer, neuron])
             @constraint(jump_model, sum(sum(W[layer][neuron, i]*x[layer-1, i] for i in split_indices[p])-z_b[layer, neuron, p] for p in eachindex(split_indices)) + Σ[layer, neuron]*b[layer][neuron]<=0)
             @constraint(jump_model, sum(z_b[layer, neuron, p] for p in  eachindex(split_indices)) + (1-Σ[layer,neuron])*b[layer][neuron]>=0)
@@ -148,7 +150,11 @@ function NN_formulate_Psplit!(jump_model::JuMP.Model, NN_model::Flux.Chain, P, U
 
     #A dummy objective
     @objective(jump_model, Max, 1);
+
     redirect_stdout(oldstdout)
 
-    return U_bounds, L_bounds
+    if bound_tightening!="precomputed"
+        return U_bounds, L_bounds
+    end
+    
 end

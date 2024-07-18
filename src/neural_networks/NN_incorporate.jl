@@ -34,7 +34,7 @@ Different bound tightening modes and compression can be used. To use bound tight
 - `U_in`: vector of upper bounds for the input variables
 - `L_in`: vector of lower bounds for the input variables
 - `compress`: reduce NN size by removing stable and linearly dependent neurons
-- `bound_tightening`: which bound tightening mode to use: "fast", "standard", "standard_linear", "output"
+- `bound_tightening`: which bound tightening mode to use: "fast", "standard", "output"
 - `parallel`: use multiprocessing for bound tightening
 
 """
@@ -50,9 +50,9 @@ function NN_incorporate!(
     parallel=false
 )
 
-    W, b = if typeof(param_source) == String
+    W, b = if param_source isa String
         get_JSON_params(param_source)
-    elseif typeof(param_source) == Flux.Chain
+    elseif param_source isa Flux.Chain
         get_Flux_params(param_source)
     else
         @error "Model must be either a Flux.Chain or a filepath containing a JSON file."
@@ -80,10 +80,6 @@ function NN_incorporate!(
             
         @constraint(jump_model, [j = 1:input_length], x[0, j] <= U_in[j])
         @constraint(jump_model, [j = 1:input_length], x[0, j] >= L_in[j])
-
-        if bound_tightening == "standard_linear"
-            relax_integrality(jump_model)
-        end
     
         # upper bound and lower bound constraints for output bound tightening
         ucons = Vector{Vector{ConstraintRef}}(undef, K)
@@ -96,6 +92,8 @@ function NN_incorporate!(
     layers_removed = 0 # how many strictly preceding layers have been removed at current loop iteration 
 
     for layer in 1:K # hidden layers and bounds for output layer
+
+        println("LAYER: $layer")
 
         # compute loose bounds
         if layer - layers_removed == 1
@@ -154,6 +152,8 @@ function NN_incorporate!(
 
         @constraint(jump_model, [neuron in 1:neuron_count[K]], x[K, neuron] >= L_out[neuron])
         @constraint(jump_model, [neuron in 1:neuron_count[K]], x[K, neuron] <= U_out[neuron])
+
+        println("LAYER: $layer")
 
         for layer in 1:K-1
 
@@ -262,10 +262,10 @@ This function can be used when the NN formulation is incorporated into a larger 
 - `input_vars`: references to the NN input variables
 
 """
-function forward_pass_NN!(jump, input, output_var, input_vars)
+function forward_pass_NN!(jump, input, output_var, input_vars...)
 
     input_var = [var for var in input_vars]
-    [fix(input_var[neuron], input[neuron]) for neuron in eachindex(input)]
+    [fix(input_var[neuron], input[neuron], force=true) for neuron in eachindex(input)]
     
     try
         optimize!(jump)

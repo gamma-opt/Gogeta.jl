@@ -165,6 +165,20 @@ function set_solver!(jump)
 end
 ```
 
+## NN with partitions
+
+The formulation of NN is done with function `NN_formulate_Psplit!`. It has next set of input parameters</br>
+<ul>
+<li><code>jump_model</code>: The constraints and variables will be saved to this optimization model.</li>
+<li><code>NN_model</code>: Neural network model to be formulated.</li>
+<li><code>P</code>: The number of splits</li>
+<li><code>U_in</code>: Upper bounds for the input variables.</li>
+<li><code>L_in</code>: Lower bounds for the input variables.</li>
+<li> <code>strategy</code> (optional): the way partitioning is done, possible options include: "equalsize", "equalrange", "random". Default is "equalsize".</li>
+<li> <code>silent</code>(optional): Controls console ouput.</li>
+<li><code>bound_tightening</code> (optional): possible options include: "standart", "precomputed", and "fast" (default)</li>
+</ul>
+
 ## Recommendations
 
 The choice of the best neural network bound tightening and compression procedures depends heavily on your specific use case. 

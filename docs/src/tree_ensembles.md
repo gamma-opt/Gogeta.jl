@@ -1,5 +1,9 @@
 # Tree ensembles
 
+!!! note
+
+    Currently only `EvoTrees` tree ensemble models are supported. However, if one wants to use a different tree ensemble training package, such as [XGBoost.jl](https://github.com/dmlc/XGBoost.jl) or some Python package, a new parameter extraction function can simply be implemented. Studying the code for [`TEModel`](@ref) and [`extract_evotrees_info`](@ref) will be useful for this task.
+
 ## Formulation
 
 First, one must create and train an `EvoTrees` tree ensemble model.

@@ -2,10 +2,14 @@
 
 With neural networks, the hidden layers must use the $ReLU$ activation function, and the output layer must use the identity activation.
 
-A neural networks satifying these requirements can be formulated into a mixed-integer optimization problem. 
+A neural networks satifying these requirements can be formulated into a mixed-integer linear optimization problem (MILP). 
 Along with formulation, the neuron activation bounds can be calculated, which improves computational performance as well as enables compression.
 
 The network is compressed by pruning neurons that are either stabily active or inactive. The activation bounds are used to identify these neurons.
+
+!!! note
+
+    This section describes how to formulate a `Flux.Chain` neural network model as a MILP. Further constraints can be added and the objective function can be changed but if one is using neural networks as surrogate models in a larger optimization problem, [this section](nns_in_larger.md) has a guide on how to accomplish this effectively and formulate the neural network with anonymous variables.
 
 ## Formulation
 
@@ -123,7 +127,11 @@ A detailed discussion on bound tightening techniques can be found in [Grimstad a
 
 ## Sampling
 
-Instead of just solving the MIP, the neural network can be optimized (finding the output maximizing/minimizing input) by using a sampling approach. Note that these features are experimental and cannot be guranteed to find the global optimum.
+Instead of just solving the MIP, the neural network can be optimized (finding the output maximizing/minimizing input) by using a sampling approach. Note that these features are experimental and cannot be guaranteed to find the global optimum.
+
+!!! note
+
+    Much more effective algorithms for finding the optimum of a trained neural network exist, such as projected gradient descent. The sampling-based optimization algorithms implemented in this package are best intended for satisfying one's curiosity and understanding the problem structure better.
 
 ```julia
 using QuasiMonteCarlo
@@ -142,7 +150,7 @@ x_opt, optimum = optimize_by_sampling!(jump_model, samples);
 
 ### Relaxing walk algorithm
 
-Another method for heuristically optimizing the JuMP model is the so-called relaxing walk algorithm. It is based on a sampling approach that utilizes LP relaxations of the original problem and a pseudo gradient descent -algorithm.
+Another method for heuristically optimizing the `JuMP` model is the so-called relaxing walk algorithm. It is based on a sampling approach that utilizes LP relaxations of the original problem and a pseudo gradient descent -algorithm.
 
 ```julia
 jump_model = Model(Gurobi.Optimizer)
@@ -171,9 +179,9 @@ The choice of the best neural network bound tightening and compression procedure
 Based on some limited computational tests of our own as well as knowledge from the field, we can make the following general recommendations:
 
 * Wide but shallow neural networks should be preferred. The bound tightening gets exponentially harder with deeper layers.
-* For small neural network models, using the "fast" bound tightening option is probably the best, since the resulting formulations are easy to solve even with loose bounds.
-* For larger neural networks, "standard" bound tightening will produce tighter bounds but take more time. However, when using the `JuMP` model, the tighter bounds might make it more computationally feasible.
-* For large neural networks where the output bounds are known, "output" bound tightening can be used. This bound tightening is very slow but might be necessary to increase the computational feasibility of the resulting `JuMP` model.
-* If the model has many so-called "dead" neurons, creating the JuMP model by using compression is beneficial, since the formulation will have fewer constraints and the bound tightening will be faster, reducing total formulation time.
+* For small neural network models, using the `fast` bound tightening option is probably the best, since the resulting formulations are easy to solve even with loose bounds.
+* For larger neural networks, `standard` bound tightening will produce tighter bounds but take more time. However, when using the `JuMP` model, the tighter bounds might make it more computationally feasible.
+* For large neural networks where the output bounds are known, `output` bound tightening can be used. This bound tightening is very slow but might be necessary to increase the computational feasibility of the resulting `JuMP` model.
+* If the model has many so-called "dead" neurons, creating the `JuMP` model by using compression is beneficial, since the formulation will have fewer constraints and the bound tightening will be faster, reducing total formulation time.
 
 These are only general recommendations based on limited evidence, and the user should validate the performance of each bound tightening and compression procedure in relation to her own work.

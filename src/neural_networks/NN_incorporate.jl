@@ -8,7 +8,9 @@
         L_in,
         compress=false,
         bound_tightening="fast",
-        parallel=false
+        parallel=false,
+        U_out=nothing,
+        L_out=nothing
     )
 
 Formulates the neural network (NN) as a MIP into a JuMP model. The model parameters must be contained in a JSON file located at the given filepath OR in a Flux.Chain model.
@@ -36,6 +38,9 @@ Different bound tightening modes and compression can be used. To use bound tight
 - `compress`: reduce NN size by removing stable and linearly dependent neurons
 - `bound_tightening`: which bound tightening mode to use: "fast", "standard", "output"
 - `parallel`: use multiprocessing for bound tightening
+- `silent`: suppress console output
+- `U_out`: vector of upper bounds for the output variables - necessary when output bound tightening is used
+- `L_out`: vector of lower bounds for the output variables - necessary when output bound tightening is used
 
 """
 function NN_incorporate!(
@@ -47,8 +52,14 @@ function NN_incorporate!(
     L_in,
     compress=false,
     bound_tightening="fast",
-    parallel=false
+    parallel=false,
+    silent=false,
+    U_out=nothing,
+    L_out=nothing
 )
+
+    oldstdout = stdout
+    if silent redirect_stdout(devnull) end
 
     W, b = if param_source isa String
         get_JSON_params(param_source)
@@ -198,6 +209,8 @@ function NN_incorporate!(
     end
 
     anon_NN_from_bounds!(jump_original, W, b, output_var, input_vars...; U_in, L_in, U_bounds, L_bounds)
+
+    redirect_stdout(oldstdout)
 
 end
 

@@ -8,4 +8,4 @@
 
 Gogeta.jl (pronounced "Go-gee-ta") enables the user to represent trained machine learning models with mathematical programming, more specifically as mixed-integer optimization problems. This, in turn, allows for "fusing" the capabilities of mathematical optimization solvers and machine learning models to solve problems that neither could solve on their own.
 
-Currently supported models are tree ensembles and neural networks and convolutional neural networks using ReLU activation.
+Currently supported models are tree ensembles, input convex neural networks, and neural networks and convolutional neural networks using ReLU activation.

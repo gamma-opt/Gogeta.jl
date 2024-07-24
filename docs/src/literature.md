@@ -1,6 +1,6 @@
 # Literature
 
-The mathematical optimization methods implemented in this package are based on the work of many brilliant researchers.
+The mathematical optimization methods and algorithms implemented in this package are based on the work of many brilliant researchers.
 The most important papers for our work are listed here. In these works, more in-depth information about the formulations and various algorithms we use can also be found.
 
 * **(Convolutional) neural network formulation:**
@@ -26,3 +26,7 @@ The most important papers for our work are listed here. In these works, more in-
 * **Tree ensembles:**
 
     * *Mišić, V. V. (2020). Optimization of tree ensembles. Operations Research, 68(5), 1605-1624.*
+
+* **Input convex neural networks**
+
+    * *Amos, B., Xu, L., & Kolter, J. Z. (2017, July). Input convex neural networks. In International conference on machine learning (pp. 146-155). PMLR.*

@@ -22,6 +22,8 @@ The most important papers for our work are listed here. In these works, more in-
     * *Perakis, G., & Tsiourvas, A. (2022). Optimizing Objective Functions from Trained ReLU Neural Networks via Sampling. arXiv preprint arXiv:2205.14189.*
 
     * *Tong, J., Cai, J., & Serra, T. (2024). Optimization Over Trained Neural Networks: Taking a Relaxing Walk. arXiv preprint arXiv:2401.03451.*
+* **Partition based formulation of NN:**
+    * *Calvin Tsay, Jan Kronqvist, Alexander Thebelt, & Ruth Misener. (2021). Partition-based formulations for mixed-integer optimization of trained ReLU neural networks.*
 
 * **Tree ensembles:**
 

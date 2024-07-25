@@ -1,13 +1,13 @@
 # Neural networks
-With `Gogeta` library it is currently possible to formulate deep neural networks (NNs) and convolutional neural networks (CNNs) as a mixed integer problems (MIP). We would start discussion from the NNs. More detailed discussion on each formulation can be found in the [example jupyter notebooks](https://github.com/gamma-opt/Gogeta.jl/tree/main/examples).
+With the `Gogeta` library, it is currently possible to formulate deep neural networks (NNs) and convolutional neural networks (CNNs) as a mixed integer problems (MIP). We will start the discussion from the NNs. More detailed discussion on each formulation can be found in the [example jupyter notebooks](https://github.com/gamma-opt/Gogeta.jl/tree/main/examples).
 
 ## Formulation of NNs
 
-Being able to formulate NN as a MIP gives us posibility to optimize over "black box" model. Imagine that we have a dataset with some information about houses and their associated prices. With trained NN on this dataset and MIP formulation, we can house with the minimum and maximum prices. We could also add some additional constraints to the "target" house and see what is possible range of prices. The use cases are limited to your imagination.
+Being able to formulate NN as a MIP gives us the possibility to optimize over a "black box" model. Imagine that we have a dataset with some information about houses and their associated prices. With trained NN on this dataset and MIP formulation, we can house with the minimum and maximum prices. We could also add some additional constraints to the "target" house and see what possible range of prices is. The use cases are limited to your imagination.
 
 ### Requirements for the architecture of NN
 
-Currently, we are able to formulate NNs use the $ReLU$ activation function at each hidden layer, and the output layer must use the identity activation. See the example below:
+Currently, we are able to formulate NNs using the $ReLU$ activation function at each hidden layer, and the output layer must use the identity activation. See the example below:
 
 ```julia
 using Flux
@@ -30,7 +30,7 @@ init_L = [-1.5, -0.5];
 
 Before proceeding to formulations of NNs, we should introduce some definitions. The formulations require to calculate boundary values for each neuron. `bound_tightening` refers to the way how the boundaries are calculated.
 
-The *(default)* way to do this is called `fast`, but you may also face with `standard`,`precomputed`, `output`.
+The *(default)* way to do this is called `fast`, but you may also use `standard`,`precomputed`, `output`.
 
 1. The `fast` mode uses a heuristic algorithm to determine the neuron activation bounds only based on the activation bounds of the previous layer. This algorithm practically doesn't increase the formulation time, so it is enabled by default. 
 2. The `standard` mode considers the whole mixed-integer problem with variables and constraints defined up to the previous layer from the neuron under bound tightening. It uses optimization to find the neuron activation bounds and is therefore significantly slower than the `fast` mode but is able to produce tighter bounds (smaller big-M values).
@@ -43,14 +43,14 @@ A detailed discussion on bound tightening techniques can be found in [Grimstad a
 ### Formulation of NN with big-M approach
 The first way to formulate NN as a MIP is to use function [`NN_formulate!`](@ref). This formulation is based on the following paper: [Fischetti and Jo (2018)](literature.md).
 
-This formulation enables compression by setting `compress=true`, running bound-tightening in parallel (only used in `standard` bound-tightening). Possible bound-tightening strategies include: `fast` (default), `standard`, `output`, `precomputed`.
+This formulation enables compression by setting `compress=true`, running bound-tightening in parallel (only used in `standard` bound-tightening). Possible bound-tightening strategies include: `fast` (default), `standard`, `output`, and `precomputed`.
 #### Example
 ```julia
 jump_model = Model(Gurobi.Optimizer)
 set_silent(jump_model) # set desired parameters
 bounds_U, bounds_L = NN_formulate!(jump_model, NN_model, init_U, init_L; bound_tightening="standard", compress=true, parallel=true)
 ```
-The function returns boundaries for each neuron, the `jump_model` is updated in the function. By default objective function of the `jump_model` is set to dummy function *"Max 1"*.
+The function returns boundaries for each neuron, the `jump_model` is updated in the function. By default objective function of the `jump_model` is set to the dummy function *"Max 1"*.
 
 ***Note:*** When you use `precomputed` bound-tightening, you should also provide boundaries for the neurons and nothing is returned.
 
@@ -58,20 +58,20 @@ The function returns boundaries for each neuron, the `jump_model` is updated in 
  NN_formulate!(jump_model, NN_model, init_U, init_L; bound_tightening="precomputed", U_bounds=bounds_U, L_bounds=bounds_L compress=true, parallel=true)
 ```
 
-### Formulation of NN with partition-based approach
+### Formulation of NN with the partition-based approach
 
-The partition-based approach implemented in our library is based on the paper written by [Tsay et al. (2021)](literature.md). The idea behind this approach is to split weigth into non-overlapping partitions while formulation. 
+The partition-based approach implemented in our library is based on the paper written by [Tsay et al. (2021)](literature.md). The idea behind this approach is to split weight into non-overlapping partitions while formulation. 
 
 #### Partition strategies
-There are four different partition strategies availble: `equalsize` (default), `equalrange`, `snake`, `random`.
+There are four different partition strategies available: `equalsize` (default), `equalrange`, `snake`, `random`.
 <ul>
-<li><code>equalsize</code> Sorts weight and split them into $P$ non-overlaping sets of the same size in order</li>
-<li><code>equalrange</code>Sorts weight, puts all weigths less than 5% percentile of data to the first partition and all weigths more than 95% percentile into the last partition. All sets are ensured to have the same range of weights. Minimum number of partitoons is 3</li>
+<li><code>equalsize</code> Sorts weights and splits them into $P$ non-overlapping sets of the same size in order</li>
+<li><code>equalrange</code>Sorts weights, puts all weights less than 5% percentile of data to the first partition and all weigths more than 95% percentile into the last partition. All sets are ensured to have the same range of weights. The minimum number of partitions is 3</li>
 <li><code>random</code>Randomly assigns weights to $P$ sets</li>
 <li><code>snake</code> Sorts the weights and assigns weights to sets in snake order</li>
 </ul>
 
-It is adviced to use  `equalsize`  and `equalrange` partitions strategies, since they ensure that weights in the sets would be of relatively the same order. `random` and `snake` are proposed to be oposing strategies to these to and expecte to perform much worse.
+It is advised to use  `equalsize`  and `equalrange` partitions strategies since they ensure that weights in the sets would be of relatively the same order. `random` and `snake` are expected to perform much worse and are used for comparison purposes. 
 
 #### Example
 ```julia
@@ -112,7 +112,7 @@ compressed, removed = NN_compress(NN_model, init_U, init_L, bounds_U, bounds_L)
 These two features can be used for formulations with big-M approach only. 
 
 #### Sampling
-Instead of just solving the MIP, the neural network can be optimized (finding the output maximizing/minimizing input) by using a sampling approach. Note that these features are experimental and cannot be guranteed to find the global optimum.
+Instead of just solving the MIP, the neural network can be optimized (finding the output maximizing/minimizing input) by using a sampling approach. Note that these features are experimental and cannot be guaranteed to find the global optimum.
 
 At first we formulate NN as a MIP
 
@@ -123,14 +123,14 @@ jump_model = Model(Gurobi.Optimizer)
 set_silent(jump_model)
 NN_formulate!(jump_model, NN_model, init_U, init_L; bound_tightening="fast");
 ```
-Then, we set objective function to either minimizing or maximizing of the output neuron.
+Then, we set objective function to either minimize or maximize the output neuron.
 
 ```julia
 # set objective function as the last layer output
 last_layer, _ = maximum(keys(jump_model[:x].data))
 @objective(jump_model, Max, jump_model[:x][last_layer, 1])
 ```
-Randomly generate samples that aling with lower and upper bounds. Call function `optimize_by_sampling!` that return nearly optimum solution.
+Randomly generate samples that aling with lower and upper bounds. Call function `optimize_by_sampling!` that returns nearly optimum solution.
 ```julia
 samples = QuasiMonteCarlo.sample(1000, init_L, init_U, LatinHypercubeSample());
 x_opt, optimum = optimize_by_sampling!(jump_model, samples);
@@ -210,7 +210,7 @@ Based on some limited computational tests of our own as well as knowledge from t
 * For small neural network models, using the "fast" bound tightening option is probably the best, since the resulting formulations are easy to solve even with loose bounds.
 * For larger neural networks, "standard" bound tightening will produce tighter bounds but take more time. However, when using the `JuMP` model, the tighter bounds might make it more computationally feasible.
 * For large neural networks where the output bounds are known, "output" bound tightening can be used. This bound tightening is very slow but might be necessary to increase the computational feasibility of the resulting `JuMP` model.
-* If the model has many so-called "dead" neurons, creating the JuMP model by using compression is beneficial, since the formulation will have fewer constraints and the bound tightening will be faster, reducing total formulation time.
-* With partition based formulation, choose number of partitions wisely, since it greatly increases size of the MIP problem. You are interested in chosing the minimum number of partitions that result in the tightest bounds for the neurons.
+* If the model has many so-called "dead" neurons, creating the JuMP model by using compression is beneficial since the formulation will have fewer constraints and the bound tightening will be faster, reducing total formulation time.
+* With partition based formulation, choose a number of partitions wisely, since it greatly increases size of the MIP problem. You are interested in chosing the minimum number of partitions that result in the tightest bounds for the neurons.
 
 These are only general recommendations based on limited evidence, and the user should validate the performance of each bound tightening and compression procedure in relation to her own work.

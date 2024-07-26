@@ -16,7 +16,6 @@ Performs the full relaxing walk algorithm on the given neural network JuMP formu
 
 """
 function optimize_by_walking!(original::JuMP.Model, nn_model::Flux.Chain, U_in, L_in; delta=0.1, return_sampled=false, logging=true, iterations=10, infeasible_per_iter=5)
-
     sample(items, weights) = items[findfirst(cumsum(weights) .> rand() * sum(weights))]
     
     opt_time = 0.0
@@ -41,7 +40,7 @@ function optimize_by_walking!(original::JuMP.Model, nn_model::Flux.Chain, U_in, 
 
     push!(sampled_points, x_tilde)
     
-    local_opt, opt_value = local_search(x_tilde, original, nn_model, U_in, L_in)
+    local_opt, opt_value = local_search(x_tilde, original, U_in, L_in,  logging=logging)
     push!(x_opt, local_opt)
     push!(opt, opt_value)
 
@@ -113,7 +112,7 @@ function optimize_by_walking!(original::JuMP.Model, nn_model::Flux.Chain, U_in, 
 
                     if (x_bar in sampled_points) == false
                         search_time += @elapsed begin
-                        local_opt, opt_value = local_search(x_bar, original, nn_model, U_in, L_in)
+                        local_opt, opt_value = local_search(x_bar, original, U_in, L_in,  logging=logging)
                         end
                         push!(x_opt, local_opt)
                         push!(opt, opt_value)
@@ -149,9 +148,7 @@ function optimize_by_walking!(original::JuMP.Model, nn_model::Flux.Chain, U_in, 
     else
         return x_opt, opt
     end
-
 end
-
 """
     function local_search(start, jump_model, nn_model, U_in, L_in; max_iter=100, epsilon=0.01, show_path=false, logging=false, tolerance=0.001)
 

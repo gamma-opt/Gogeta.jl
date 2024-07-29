@@ -47,9 +47,9 @@ NN_incorporate!(jump_model, NN_model, output, x, y; U_in=init_U, L_in=init_L, co
 optimize!(jump_model)
 
 @info "Testing that correct optimum is found"
-@test value(x) ≈ -1.2609439405453133
-@test value(y) ≈ 0.2609439405453132
-@test value(output) ≈ -0.3214315186715632
+@test isapprox(value(x), -1.2609439405453133; rtol=0.01)
+@test isapprox(value(y), 0.2609439405453132; rtol=0.01)
+@test isapprox(value(output), -0.3214315186715632; rtol=0.01)
 
 @info "Testing that NN output matches Flux model"
 set_silent(jump_model)

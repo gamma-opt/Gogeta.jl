@@ -21,7 +21,7 @@ Calculates the upper and lower activation bounds for a neuron in a ReLU-activate
 """
 function calculate_bounds(model::JuMP.Model, layer, neuron, W, b, neurons; layers_removed=0)
 
-    @objective(model, Max, b[layer][neuron] + sum(W[layer][neuron, i] * model[:x][layer-1-layers_removed, i] for i in neurons(layer-1-layers_removed)))
+    @objective(model, Max, b[neuron] + sum(W[neuron, i] * model[:x][layer-1-layers_removed, i] for i in neurons(layer-1-layers_removed)))
     optimize!(model)
     
     upper_bound = if termination_status(model) == OPTIMAL

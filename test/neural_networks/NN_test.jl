@@ -10,8 +10,7 @@ begin
 
     NN_model = Chain(
         Dense(2 => 10, relu),
-        Dense(10 => 50, relu),
-        Dense(50 => 20, relu),
+        Dense(10 => 20, relu),
         Dense(20 => 5, relu),
         Dense(5 => 1)
     )

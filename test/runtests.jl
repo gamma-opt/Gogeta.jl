@@ -1,40 +1,30 @@
 using Gogeta
 using Test
-
-@testset "Gogeta.jl" begin
-
-    println("\n\n####################")
-    println("Neural network tests")
-    println("####################\n\n")
     
-    # tests for neural networks
+@testset "Neural networks" begin
     include("neural_networks/NN_test.jl")
-    
-    println("\n\n####################")
-    println("Neural network parallel tests")
-    println("####################\n\n")
-    
-    # parallel tests for neural networks
+end
+
+@testset "Parallel tests" begin
     include("neural_networks/NN_parallel_test.jl")
+end
 
-    println("\n\n####################")
-    println("Neural network sampling tests")
-    println("####################\n\n")
-    
-    # parallel tests for neural networks
+@testset "Sampling tests" begin
     include("neural_networks/NN_sampling_test.jl")
-    
-    println("\n\n####################")
-    println("Convolutional neural network tests")
-    println("####################\n\n")
-    
-    # tests for convolutional neural networks
-    include("neural_networks/CNN_test.jl")
-    
-    println("\n\n###################")
-    println("Tree ensemble tests")
-    println("###################\n\n")
+end
 
-    # tests for tree ensembles
+@testset "Larger formulation tests" begin
+    include("neural_networks/NN_in_larger_problem.jl")
+end
+
+@testset "ICNN tests" begin
+    include("icnns/ICNN_in_larger_problem.jl")
+end
+
+@testset "CNN tests" begin
+    include("neural_networks/CNN_test.jl")
+end
+
+@testset "Tree ensemble tests" begin
     include("tree_ensembles/TE_test.jl")
 end

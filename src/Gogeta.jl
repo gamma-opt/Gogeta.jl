@@ -5,6 +5,7 @@ using JuMP
 using LinearAlgebra: rank, dot
 using EvoTrees
 using Distributed
+using JSON
 
 # NEURAL NETWORKS
 
@@ -16,6 +17,9 @@ include("neural_networks/NN_to_MIP.jl")
 export NN_formulate!
 export forward_pass!
 
+include("neural_networks/NN_incorporate.jl")
+export NN_incorporate!, forward_pass_NN!
+
 include("neural_networks/CNN_util.jl")
 export CNNStructure, get_structure, image_pass!
 
@@ -23,16 +27,20 @@ include("neural_networks/CNN_to_MIP.jl")
 export CNN_formulate!
 
 # Sampling
-include("neural_networks/sampling.jl")
+include("neural_networks/heuristic_algorithms/sampling.jl")
 export optimize_by_sampling!
 
 # Relaxing walk
-include("neural_networks/relaxing_walk.jl")
+include("neural_networks/heuristic_algorithms/relaxing_walk.jl")
 export optimize_by_walking!, local_search
 
 # Relaxing walk CNN
-include("neural_networks/relaxing_walk_CNN.jl")
+include("neural_networks/heuristic_algorithms/relaxing_walk_CNN.jl")
 export optimize_by_walking_CNN!, local_search_CNN
+
+# ICNNs
+include("icnns/ICNN_incorporate.jl")
+export ICNN_incorporate!, forward_pass_ICNN!, check_ICNN
 
 # TREE ENSEMBLES
 

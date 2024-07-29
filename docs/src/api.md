@@ -24,16 +24,30 @@ These are all of the functions and data structures that the user needs to know i
 
 ### MIP formulation
 * [`NN_formulate!`](@ref) - formulate a `JuMP` model, perform simultaneous bound tightening and possibly compression
+* [`NN_incorporate!`](@ref) - formulate a neural network MILP to be part of a larger `JuMP` model by linking the input and output variables
 
 ### Compression
 * [`NN_compress`](@ref) - compress a neural network using precomputed activation bounds
 
 ### Forward pass
 * [`forward_pass!`](@ref) - fix the input variables and optimize the model to get the output
+* [`forward_pass_NN!`](@ref) - forward pass in a model with anonymous variables with the input and output variables given as arguments
 
 ### Sampling-based optimization
 * [`optimize_by_sampling!`](@ref) - optimize the JuMP model by using a sampling-based approach
 * [`optimize_by_walking!`](@ref) - optimize the JuMP model by using a more sophisticated sampling-based approach
+
+## Input convex neural networks
+
+### LP formulation
+* [`ICNN_incorporate!`](@ref) - formulate an ICNN LP to be part of a larger `JuMP` model by linking the input and output variables
+
+### Forward pass
+* [`forward_pass_ICNN!`](@ref) - fix the input variables and optimize the model to get the output
+
+### Feasibility
+* [`check_ICNN`](@ref) - check whether the given inputs and outputs satisfy the ICNN
+
 
 ## Convolutional neural networks
 

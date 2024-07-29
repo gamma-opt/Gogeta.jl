@@ -10,6 +10,8 @@ makedocs(
         "Introduction" => "index.md",
         "Tree ensembles" => "tree_ensembles.md",
         "Neural networks" => "neural_networks.md",
+        "Neural networks in larger optimization problems" => "nns_in_larger.md",
+        "Input convex neural networks" => "icnns.md",
         "Public API" => "api.md",
         "Literature" => "literature.md",
         "Reference" => "reference.md",

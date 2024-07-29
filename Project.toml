@@ -7,6 +7,7 @@ version = "0.2.0"
 Distributed = "8ba89e20-285c-5b6f-9357-94700520ee1b"
 EvoTrees = "f6006082-12f8-11e9-0c9c-0d5d367ab1e5"
 Flux = "587475ba-b771-5e3f-ad9e-33799f191a9c"
+JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
 JuMP = "4076af6c-e467-56ae-b986-b466b2749572"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 
@@ -20,9 +21,9 @@ julia = "1"
 BSON = "fbb218c0-5317-5bc6-957e-2ee96dd4b1f0"
 GLPK = "60bf3e95-4087-53dc-ae20-288a0d20c6a6"
 HiGHS = "87dc4568-4c63-4d18-b0c0-bb2238e4078b"
+QuasiMonteCarlo = "8a4e6c94-4038-4cdc-81c3-7e6ffdb2a71b"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
-QuasiMonteCarlo = "8a4e6c94-4038-4cdc-81c3-7e6ffdb2a71b"
 
 [targets]
 test = ["Test", "Random", "BSON", "GLPK", "HiGHS", "QuasiMonteCarlo"]

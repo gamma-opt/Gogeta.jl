@@ -3,7 +3,7 @@ With `Gogeta` library it is currently possible to formulate deep neural networks
 
 ## Formulation of NNs
 
-Being able to formulate NN as a MIP gives us posibility to optimize over "black box" model. Imagine that we have a dataset with some information about houses and their associated prices. With trained NN on this dataset and MIP formulation, we can house with the minimum and maximum prices. We could also add some additional constraints to the "target" house and see what is possible range of prices. The use cases are limited to your imagination.
+Being able to formulate NN as a MIP gives us posibility to optimize over "black box" model. Consider that we have a dataset with some information about housing prices. With a NN trained on this dataset and MIP formulation of it, we can find housing with the minimum and maximum prices. We could also add some additional constraints to the "target" housing and see what is a possible range of prices. 
 
 ### Requirements for the architecture of NN
 

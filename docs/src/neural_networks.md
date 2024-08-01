@@ -1,6 +1,10 @@
 # Neural networks
 With `Gogeta` library it is currently possible to formulate deep neural networks (NNs) and convolutional neural networks (CNNs) as a mixed integer problems (MIP). We would start discussion from the NNs. More detailed discussion on each formulation can be found in the [example jupyter notebooks](https://github.com/gamma-opt/Gogeta.jl/tree/main/examples).
 
+!!! note
+
+    This section describes how to formulate a `Flux.Chain` neural network model as a MILP. Further constraints can be added and the objective function can be changed but if one is using neural networks as surrogate models in a larger optimization problem, [this section](nns_in_larger.md) has a guide on how to accomplish this effectively and formulate the neural network with anonymous variables.
+
 ## Formulation of NNs
 
 Being able to formulate NN as a MIP gives us posibility to optimize over "black box" model. Imagine that we have a dataset with some information about houses and their associated prices. With trained NN on this dataset and MIP formulation, we can house with the minimum and maximum prices. We could also add some additional constraints to the "target" house and see what is possible range of prices. The use cases are limited to your imagination.
@@ -65,9 +69,9 @@ The partition-based approach implemented in our library is based on the paper wr
 #### Partition strategies
 There are four different partition strategies available: `equalsize` (default), `equalrange`, `snake`, `random`.
 <ul>
-<li><code>equalsize</code> Sorts weights and splits them into $P$ non-overlapping sets of the same size in order</li>
+<li><code>equalsize</code> Sorts weights and splits them into <b>P</b> non-overlapping sets of the same size in order</li>
 <li><code>equalrange</code>Sorts weights, puts all weights less than 5% percentile of data to the first partition and all weigths more than 95% percentile into the last partition. All sets are ensured to have the same range of weights. The minimum number of partitions is 3</li>
-<li><code>random</code>Randomly assigns weights to $P$ sets</li>
+<li><code>random</code>Randomly assigns weights to <b>P</b> sets</li>
 <li><code>snake</code> Sorts the weights and assigns weights to sets in snake order</li>
 </ul>
 
@@ -112,7 +116,12 @@ compressed, removed = NN_compress(NN_model, init_U, init_L, bounds_U, bounds_L)
 These two features can be used for formulations with big-M approach only. 
 
 #### Sampling
-Instead of just solving the MIP, the neural network can be optimized (finding the output maximizing/minimizing input) by using a sampling approach. Note that these features are experimental and cannot be guaranteed to find the global optimum.
+Instead of just solving the MIP, the neural network can be optimized (finding the output maximizing/minimizing input) by using a sampling approach. 
+
+!!! note
+    Much more effective algorithms for finding the optimum of a trained neural network exist, such as projected gradient descent. The sampling-based optimization algorithms implemented in this package are best intended for satisfying one's curiosity and understanding the problem structure better.
+
+
 
 At first we formulate NN as a MIP
 

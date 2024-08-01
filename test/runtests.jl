@@ -31,6 +31,14 @@ using Test
     # tests for convolutional neural networks
     include("neural_networks/CNN_test.jl")
     
+    println("\n\n####################")
+    println("Partition formulation neural network tests")
+    println("####################\n\n")
+    
+    # tests for convolutional neural networks
+    include("neural_networks/NN_partition_test.jl")
+    
+
     println("\n\n###################")
     println("Tree ensemble tests")
     println("###################\n\n")

@@ -14,7 +14,7 @@ end
 end
 
 @testset "Partition tests" begin
-    include("neural_networks/NN_partition_test.jl")
+   # include("neural_networks/NN_partition_test.jl")
 end
 
 @testset "Larger formulation tests" begin

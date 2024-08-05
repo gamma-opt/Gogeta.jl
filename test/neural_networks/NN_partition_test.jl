@@ -1,7 +1,6 @@
 using Flux
 using Flux: Chain, Dense, relu, mse, train!, params, ADAM
-using Gogeta
-using Gurobi
+using GLPK
 using JuMP
 using LinearAlgebra
 using Test 
@@ -55,7 +54,7 @@ num_samples = 100
 x = transpose(rand(100, dimension).* transpose(init_U .- init_L).+ transpose(init_L)) .|> Float32;
 
 @info "Formulating the MIP with with strategy='equalsize' and bound_tightening='fast'"
-jump_model = Model(Gurobi.Optimizer);
+jump_model = Model(GLPK.Optimizer);
 set_silent(jump_model)
 NN_formulate_Psplit!(jump_model, NN_model, 3, init_U, init_L; strategy="equalsize", bound_tightening="fast");
 

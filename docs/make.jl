@@ -5,7 +5,7 @@ makedocs(
     modules=[Gogeta],
     authors="Eetu Reijonen",
     sitename="Gogeta.jl",
-    format= Documenter.HTML(),
+    format=Documenter.HTML(),
     pages=[
         "Introduction" => "index.md",
         "Tree ensembles" => "tree_ensembles.md",

@@ -85,9 +85,9 @@ function NN_formulate_Psplit!(jump_model::JuMP.Model, NN_model::Flux.Chain, P, U
             if bound_tightening == "standard"
                 
                 bounds = if parallel == true # multiprocessing enabled
-                    pmap(neuron -> calculate_bounds(copy_model(jump_model), layer, neuron, W, b, neurons), neurons(layer))
+                    pmap(neuron -> calculate_bounds(copy_model(jump_model), layer, neuron, W[layer], b[layer], neurons), neurons(layer))
                 else
-                    map(neuron -> calculate_bounds(jump_model, layer, neuron, W, b, neurons), neurons(layer))
+                    map(neuron -> calculate_bounds(jump_model, layer, neuron, W[layer], b[layer], neurons), neurons(layer))
                 end
 
                 U_bounds[layer] = min.(U_bounds[layer], [bound[1] for bound in bounds])

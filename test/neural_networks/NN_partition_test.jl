@@ -1,5 +1,4 @@
 using Flux
-using Flux: Chain, Dense, relu, mse, train!, params, ADAM
 using GLPK
 using JuMP
 using LinearAlgebra
@@ -12,9 +11,9 @@ dimension = 4
 
 Random.seed!(1234)
 NN_model = Chain(
-    Dense(dimension , 16, relu),
-    Dense(16, 32, relu),
-    Dense(32, 1),
+    Dense(dimension, 16, relu),
+    Dense(16, 8, relu),
+    Dense(8, 1),
 )
 
 # Set upper and lower input bounds
@@ -69,7 +68,7 @@ NN_formulate_Psplit!(jump_model, NN_model, 5, init_U, init_L; strategy="equalsiz
 @info "Testing that corresponding JuMP model has the same output as NN, P=5"
 @test vec(NN_model(x)) ≈ [forward_pass!(jump_model, input)[] for input in eachcol(x)]
 
-@info "Formulating the MIP with with strategy='equalsize' and bound_tightening='fast', P=4"
+@info "Formulating the MIP with with strategy='equalsize' and bound_tightening='standard', P=4"
 NN_formulate_Psplit!(jump_model, NN_model, 4, init_U, init_L, bound_tightening = "standard", strategy = "equalsize");
 @info "Testing that corresponding JuMP model has the same output as NN,  strategy = 'equalsize'"
 @test vec(NN_model(x)) ≈ [forward_pass!(jump_model, input)[] for input in eachcol(x)]

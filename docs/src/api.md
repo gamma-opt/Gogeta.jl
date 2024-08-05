@@ -26,6 +26,8 @@ These are all of the functions and data structures that the user needs to know i
 * [`NN_formulate!`](@ref) - formulate a `JuMP` model, perform simultaneous bound tightening and possibly compression
 * [`NN_incorporate!`](@ref) - formulate a neural network MILP to be part of a larger `JuMP` model by linking the input and output variables
 
+* [`NN_formulate_Psplit!`](@ref) - formulate a `JuMP` model, perform simultaneous bound tightening with partition based approach.
+
 ### Compression
 * [`NN_compress`](@ref) - compress a neural network using precomputed activation bounds
 

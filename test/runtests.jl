@@ -13,6 +13,10 @@ end
     include("neural_networks/NN_sampling_test.jl")
 end
 
+@testset "Partition tests" begin
+    include("neural_networks/NN_partition_test.jl")
+end
+
 @testset "Larger formulation tests" begin
     include("neural_networks/NN_in_larger_problem.jl")
 end

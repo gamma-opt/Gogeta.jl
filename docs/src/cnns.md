@@ -1,7 +1,7 @@
 # Formulation of CNNs
 
 With our library, you can also formulate CNNs.
-The convolutional neural network requirements can be found in the [`CNN_formulate!`](@ref) documentation.
+The convolutional neural network requirements can be found in the [`CNN_formulate!`](@ref) documentation. See [this jupyter notebook](https://github.com/gamma-opt/Gogeta.jl/blob/main/examples/cnns/conv_neural_networks.ipynb) for a more detailed example.
 
 First, create some kind of input (or load an image from your computer).
 

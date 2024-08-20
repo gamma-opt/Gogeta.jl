@@ -61,7 +61,7 @@ forward_pass!(jump_model, [-1.0, 0.0])
 
 !!! tip
 
-    If formulation with `standard` bound-tightening takes too slow, you can reduce computation time by running formulation in parallel. For this you need to innitialize 'workers' and set `parallel = true`.  See next [jupyter notebook](https://github.com/gamma-opt/Gogeta.jl/tree/psplits/examples/neural_networks/example_2_neural_networks_parallel) for a more detailed explanation.
+    If formulation with `standard` bound-tightening takes too slow, you can reduce computation time by running formulation in parallel. For this you need to innitialize 'workers' and set `parallel = true`.  See next [jupyter notebook](https://github.com/gamma-opt/Gogeta.jl/tree/main/examples/neural_networks/example_2_neural_networks_parallel) for a more detailed explanation.
 
 ```julia
 # Create the workers

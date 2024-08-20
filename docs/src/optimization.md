@@ -62,8 +62,8 @@ jump_model = Model(Gurobi.Optimizer)
 set_silent(jump_model)
 NN_formulate!(jump_model, NN_model, init_U, init_L; bound_tightening="fast")
 # set objective function as the last layer output
-last_layer, _ = maximum(keys(jump_model[:x].data))
-@objective(jump_model, Max, jump_model[:x][last_layer, 1])
+output_neuron = jump_model[:x][maximum(keys(jump_model[:x].data))]
+@objective(jump_model, Max, output_neuron)
 x_opt, optimum = optimize_by_walking!(jump_model, NN_model, init_U, init_L)
 ```
 

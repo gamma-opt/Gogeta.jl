@@ -1,6 +1,6 @@
 # Formulation of NN with the partition-based approach
 
-We implemented partition-based (or Psplit) approach based on the paper written by [Tsay et al. (2021)](literature.md). The idea behind this approach is to split weights of neurons into non-overlapping partitions while formulation. 
+We implemented partition-based (or Psplit) approach based on the paper written by [Tsay et al. (2021)](literature.md). The idea behind this approach is to split weights of neurons into non-overlapping partitions while formulation. A more detailed example can be found in the next [juputer notebook](https://github.com/gamma-opt/Gogeta.jl/blob/main/examples/neural_networks/example_5_nn_partition_formulation.ipynb).
 
 In order to formulate NN as `JuMP` model, you should call [`NN_formulate_Psplit!`](@ref). It has parameter `P` that controls how many partitions are created.
 
@@ -26,7 +26,7 @@ With Psplit approach, you can also select a `strategy` how the partitions are fo
 * Compression is not yet available.
 * The function can be also runned in parallel in the same was as in [Big-M formulation](neural_networks.md). 
 * Requirements for the neural network are exactly the same. 
-* The output of the formulation can be calculated using function [forward_pass!](@ref) as  in [Big-M formulation](neural_networks.md).
+* The output of the formulation can be calculated using function [`forward_pass!`](@ref) as  in [Big-M formulation](neural_networks.md).
 
 ## Example
 

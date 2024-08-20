@@ -8,10 +8,18 @@ makedocs(
     format=Documenter.HTML(),
     pages=[
         "Introduction" => "index.md",
-        "Tree ensembles" => "tree_ensembles.md",
-        "Neural networks" => "neural_networks.md",
-        "Neural networks in larger optimization problems" => "nns_in_larger.md",
-        "Input convex neural networks" => "icnns.md",
+        "Tutorial" => [
+            "Neural networks" => [
+                "Practicalities related to NNs" => "nns_introduction.md",
+                "Big-M formulations of NNs" => "neural_networks.md",
+                "Psplit formulation of NN" => "psplit_nns.md",
+                "Optimization of formulation" => "optimization.md",
+                "Neural networks in larger optimization problems" => "nns_in_larger.md",
+                "Input convex neural networks" => "icnns.md",
+            ],
+            "CNNS" => "cnns.md",
+            "Tree ensembles" => "tree_ensembles.md",
+        ],
         "Public API" => "api.md",
         "Literature" => "literature.md",
         "Reference" => "reference.md",

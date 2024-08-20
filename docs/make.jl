@@ -13,7 +13,7 @@ makedocs(
                 "Practicalities related to NNs" => "nns_introduction.md",
                 "Big-M formulation of NNs" => "neural_networks.md",
                 "Psplit formulation of NNs" => "psplit_nns.md",
-                "Optimization of formulation" => "optimization.md",
+                "Optimization" => "optimization.md",
                 "Neural networks in larger optimization problems" => "nns_in_larger.md",
                 "Input convex neural networks" => "icnns.md",
             ],

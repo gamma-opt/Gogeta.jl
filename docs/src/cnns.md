@@ -1,6 +1,5 @@
 # Formulation of CNNs
 
-With our library, you can also formulate CNNs.
 The convolutional neural network requirements can be found in the [`CNN_formulate!`](@ref) documentation. See [this jupyter notebook](https://github.com/gamma-opt/Gogeta.jl/blob/main/examples/cnns/conv_neural_networks.ipynb) for a more detailed example.
 
 First, create some kind of input (or load an image from your computer).
@@ -35,7 +34,7 @@ cnns = get_structure(CNN_model, input);
 CNN_formulate!(jump, CNN_model, cnns)
 ```
 
-Check that the `JuMP` model produces the same outputs as the `Flux.Chain`.
+It can be checked that the `JuMP` model produces the same outputs as the `Flux.Chain`.
 
 ```julia
 vec(CNN_model(input)) ≈ image_pass!(jump, input)

@@ -50,5 +50,3 @@ NN_incorporate!(jump_model, "folder/parameters.json", output, x, y; U_in=init_U,
 ```
 
 Where "folder/parameters.json" is the relative path of the JSON file containing the neural network parameters.
-
-In the next section, we look at the special case of the neural networks.

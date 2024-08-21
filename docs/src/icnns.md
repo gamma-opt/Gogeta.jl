@@ -1,5 +1,9 @@
 # Input convex neural networks (ICNNs)
 
+!!! warning
+
+    ICNNs are an experimental feature. It is unclear when the LP formulation will produce feasible solutions and when ICNNs are useful in general. Currently, there is no better method to see the compatibility other than to check the feasibility after obtaining a solution.
+
 In input convex neural networks, the neuron weights are constrained to be nonnegative and weighted skip connections are added from the input layer to each layer. More details can be found in [Amos et al. (2017)](literature.md). These changes make the network output convex with respect to the inputs. A convex piecewise linear function can be formulated as a linear programming problem (LP) which is much more computationally efficient than the MILP formulations of "regular" neural networks. This is the reason for implementing ICNN functionality into this package. ICNNs are a viable option when the data or function being modeled is approximately convex and/or some prediction accuracy must be sacrificed for computational performance.
 
 ## Training

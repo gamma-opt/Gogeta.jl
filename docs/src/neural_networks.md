@@ -1,8 +1,8 @@
-# Formulation of NN with big-M approach
+# Formulation of NNs with the big-M approach
 
-The first way to formulate NN as a MIP is to use function [`NN_formulate!`](@ref). This formulation is based on the following paper: [Fischetti and Jo (2018)](literature.md). For more detailed information with examples, please see next [jupyter notebook](https://github.com/gamma-opt/Gogeta.jl/blob/main/examples/neural_networks/example_1_neural_networks.ipynb).
+Neural networks can be formulated as MIPs using the function [`NN_formulate!`](@ref). The formulation is based on the following paper: [Fischetti and Jo (2018)](literature.md). For more detailed information with examples, please see the [jupyter notebook](https://github.com/gamma-opt/Gogeta.jl/blob/main/examples/neural_networks/example_1_neural_networks.ipynb).
 
-Suppose you have a trained neural network `NN_model` with known boundaries for input variables (`init_U`, `init_L`), then a trained NN can be formulated as `JuMP` model:
+Assuming you have a trained neural network `NN_model` with known boundaries for input variables (`init_U`, `init_L`), a trained NN can be formulated as `JuMP` model:
 
 ```julia
 using Flux
@@ -21,15 +21,15 @@ set_silent(jump_model) # set desired parameters
 bounds_U, bounds_L = NN_formulate!(jump_model, NN_model, init_U, init_L; bound_tightening="standard", compress=true)
 ```
 
-The function returns boundaries for each neuron and the `jump_model` is updated in the function. By default objective function of the `jump_model` is set to the dummy function *"Max 1"*.
+The function returns boundaries for each neuron and the `jump_model` is updated by the function. By default, the objective function of the `jump_model` is set to the dummy function *"Max 1"*.
 
-This formulation enables compression by setting `compress=true`. Compression drops inactive neurons (or dead neurons) and decreases size of the MILP.
+With this function, compression can be enabled by setting `compress=true`. Compression drops inactive neurons (dead neurons) and thus decreases size of the MILP.
 
 Possible bound-tightening strategies include: `fast` (default), `standard`, `output`, and `precomputed`.
 
 !!! note
 
-    When you use `precomputed` bound-tightening, you should also provide upper and loswer boundaries for the neurons (`U_bounds`, `L_bounds`) and nothing is returned.
+    When you use `precomputed` bound-tightening, you should also provide upper and lower boundaries for the neurons (`U_bounds`, `L_bounds`) and nothing is returned.
 
 ```julia
  NN_formulate!(jump_model, NN_model, init_U, init_L; bound_tightening="precomputed", U_bounds=bounds_U, L_bounds=bounds_L, compress=true)
@@ -42,26 +42,26 @@ Possible bound-tightening strategies include: `fast` (default), `standard`, `out
 ```julia
  NN_formulate!(jump_model, NN_model, init_U, init_L; bound_tightening="output", U_out=U_out, L_out=L_out, compress=true)
 ```
-## Compression of the NN using bounds 
+## Compression of the NN using precomputed bounds 
 
-Given lower and upper bounds (`bounds_U`, `bounds_L`) for neurons, the NN can be compressed. The function [`NN_compress`](@ref) will return modified compressed NN along with indexes of dropped neurons.
+Given lower and upper bounds (`bounds_U`, `bounds_L`) for neurons, the NN can be compressed. The function [`NN_compress`](@ref) will return the modified compressed NN along with indexes of dropped neurons.
 
 ```julia
 compressed, removed = NN_compress(NN_model, init_U, init_L, bounds_U, bounds_L)
 ```
 
-## Calculation of the formulation output
+## Calculation of the model output
 
-When you have a ready formulation of the neural network, you can calculate the output of `JuMP` model with a function [`forward_pass!`](@ref)
+When you have a ready formulation of the neural network, you can calculate the output of `JuMP` model with the function [`forward_pass!`](@ref)
 
 ```julia
 forward_pass!(jump_model, [-1.0, 0.0])
 ```
-## Running the formulation in parallel
+## Performing the formulation in parallel
 
 !!! tip
 
-    If formulation with `standard` bound-tightening takes too slow, you can reduce computation time by running formulation in parallel. For this you need to innitialize 'workers' and set `parallel = true`.  See next [jupyter notebook](https://github.com/gamma-opt/Gogeta.jl/tree/main/examples/neural_networks/example_2_neural_networks_parallel) for a more detailed explanation.
+    If formulation with `standard` bound-tightening is too slow, computational time can be reduced by running the formulation in parallel. For this, workers need to be initialized and `parallel`-argument set to true.  See the [jupyter notebook](https://github.com/gamma-opt/Gogeta.jl/tree/main/examples/neural_networks/example_2_neural_networks_parallel) for a more detailed explanation.
 
 ```julia
 # Create the workers
@@ -95,4 +95,5 @@ end
 jump = NN_model()
 @time U, L = NN_formulate!(jump_model, NN_model, init_U, init_L; bound_tightening="standard", silent=false, parallel=true);
 ```
-In the next section, we will look at the Psplit formulation of NNs.
+
+Here Gurobi is used. For other solvers this procedure might be simpler, since an environment doesn't have to be created for each of the workers.

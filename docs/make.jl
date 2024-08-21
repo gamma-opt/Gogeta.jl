@@ -3,24 +3,23 @@ using Gogeta
 
 makedocs(
     modules=[Gogeta],
-    authors="Eetu Reijonen",
+    authors="Eetu Reijonen, Milana Begantsova",
     sitename="Gogeta.jl",
     format=Documenter.HTML(),
     pages=[
         "Introduction" => "index.md",
-        "Tutorials" => [
+        "Features" => [
             "Neural networks" => [
-                "Practicalities related to NNs" => "nns_introduction.md",
-                "Big-M formulation of NNs" => "neural_networks.md",
-                "Psplit formulation of NNs" => "psplit_nns.md",
+                "General" => "nns_introduction.md",
+                "Big-M formulation" => "neural_networks.md",
+                "Partition-based formulation" => "psplit_nns.md",
                 "Optimization" => "optimization.md",
-                "Neural networks in larger optimization problems" => "nns_in_larger.md",
-                "Input convex neural networks" => "icnns.md",
+                "Use as surrogates" => "nns_in_larger.md"
             ],
-            "CNNS" => "cnns.md",
+            "Input convex neural networks" => "icnns.md",
+            "Convolutional neural networks" => "cnns.md",
             "Tree ensembles" => "tree_ensembles.md",
         ],
-        "Public API" => "api.md",
         "Literature" => "literature.md",
         "Reference" => "reference.md",
     ],

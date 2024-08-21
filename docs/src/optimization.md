@@ -1,17 +1,17 @@
-# Finding optimum of the neural network
+# Finding the optimum of the neural network
 
-Being able to formulate NN as a MIP gives us posibility to optimize over "black box" model. Imagine that we have a dataset with some information about houses and their associated prices. With trained NN on this dataset and MIP formulation, we can find housing with the minimum and maximum prices. We could also add some additional constraints to the "target" house and see what is the possible range of prices (see [NNs in larger optimization problems](nns_in_larger.md)).
+Being able to formulate NNs as a MIPs gives us the possibility to optimize over "black box" models. For instance, imagine that we have a dataset with some information about houses and their associated prices. With a NN trained on this dataset and its MIP formulation, we can find what kind of houses would be the most affordable and the most expensive. We could also add some additional constraints to the "target" house and see what is the possible range of prices.
 
-In this section, we will optimize over the output neuron of NNs, but you can choose any objective function. The variable associated with output neuron can be extracted in the next way:
+In this section, we will optimize over the output neuron of NNs, but you can choose any objective function. The variable associated with the output neuron can be extracted in the following way:
 
 ```julia
 output_neuron = jump_model[:x][maximum(keys(jump_model[:x].data))]
 @objective(jump_model, Max, output_neuron) # maximize the output neuron
 ```
 
-## Optimize directly
+## Direct optimization
 
-We can just optimize the model directly.
+We can optimize the model directly.
 
 ```julia
 optimize!(jump_model)
@@ -22,14 +22,14 @@ objective_value(jump_model) # neural network output at maximum
 ## Sampling
 
 !!! warning
-    This method works only with Big-M formulation
+    This method works only with the Big-M formulation
 
 Instead of just solving the MILP, the neural network can be optimized (finding the output maximizing/minimizing input) by using a sampling approach. See [jupyter notebook](https://github.com/gamma-opt/Gogeta.jl/blob/main/examples/neural_networks/example_4_nn_relaxing_walk.ipynb) for a more detailed example.
 
 !!! note
     Much more effective algorithms for finding the optimum of a trained neural network exist, such as projected gradient descent. The sampling-based optimization algorithms implemented in this package are best intended for satisfying one's curiosity and understanding the problem structure better.
 
-At first we formulate NN as a MIP
+First we formulate the NN as a MIP
 
 ```julia
 using QuasiMonteCarlo
@@ -75,7 +75,5 @@ function set_solver!(jump)
     set_silent(jump)
 end
 ```
-
-In this section, we optimizing over the formulation of neural network. But what if neural network is a part of larger optimization problem. `Gogeta` library has a functuanality to address this problem. See next section.
 
 

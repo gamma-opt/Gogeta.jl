@@ -23,6 +23,7 @@ The most important papers for our work are listed here. In these works, more in-
 
     * *Tong, J., Cai, J., & Serra, T. (2024). Optimization Over Trained Neural Networks: Taking a Relaxing Walk. arXiv preprint arXiv:2401.03451.*
 * **Partition based formulation of NN:**
+
     * *Calvin Tsay, Jan Kronqvist, Alexander Thebelt, & Ruth Misener. (2021). Partition-based formulations for mixed-integer optimization of trained ReLU neural networks.*
 
 * **Tree ensembles:**

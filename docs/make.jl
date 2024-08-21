@@ -3,16 +3,23 @@ using Gogeta
 
 makedocs(
     modules=[Gogeta],
-    authors="Eetu Reijonen",
+    authors="Eetu Reijonen, Milana Begantsova",
     sitename="Gogeta.jl",
     format=Documenter.HTML(),
     pages=[
         "Introduction" => "index.md",
-        "Tree ensembles" => "tree_ensembles.md",
-        "Neural networks" => "neural_networks.md",
-        "Neural networks in larger optimization problems" => "nns_in_larger.md",
-        "Input convex neural networks" => "icnns.md",
-        "Public API" => "api.md",
+        "Features" => [
+            "Neural networks" => [
+                "General" => "nns_introduction.md",
+                "Big-M formulation" => "neural_networks.md",
+                "Partition-based formulation" => "psplit_nns.md",
+                "Optimization" => "optimization.md",
+                "Use as surrogates" => "nns_in_larger.md"
+            ],
+            "Input convex neural networks" => "icnns.md",
+            "Convolutional neural networks" => "cnns.md",
+            "Tree ensembles" => "tree_ensembles.md",
+        ],
         "Literature" => "literature.md",
         "Reference" => "reference.md",
     ],

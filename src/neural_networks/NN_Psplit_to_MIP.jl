@@ -89,7 +89,7 @@ function NN_formulate_Psplit!(jump_model::JuMP.Model, NN_model::Flux.Chain, P, U
                 else
                     map(neuron -> calculate_bounds(jump_model, layer, neuron, W[layer], b[layer], neurons), neurons(layer))
                 end
-
+                println()
                 U_bounds[layer] = min.(U_bounds[layer], [bound[1] for bound in bounds])
                 L_bounds[layer] = max.(L_bounds[layer], [bound[2] for bound in bounds])
 

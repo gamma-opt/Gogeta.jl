@@ -1,7 +1,7 @@
 name = "Gogeta"
 uuid = "8b0c908c-0e18-4590-8d3d-9c2483fd76bf"
-authors = ["Eetu Reijonen, Vilhelm Toivonen, Nikita Belyak, Joonatan Linkola"]
-version = "0.2.0"
+authors = ["Eetu Reijonen, Milana Begantsova, Marina Amorim, Vilhelm Toivonen, Nikita Belyak, Joonatan Linkola"]
+version = "0.3.0"
 
 [deps]
 Distributed = "8ba89e20-285c-5b6f-9357-94700520ee1b"
@@ -10,12 +10,16 @@ Flux = "587475ba-b771-5e3f-ad9e-33799f191a9c"
 JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
 JuMP = "4076af6c-e467-56ae-b986-b466b2749572"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 
 [compat]
 EvoTrees = "0.16"
 Flux = "0.14"
 JuMP = "1"
 julia = "1"
+JSON = "0.21"
+Statistics = "1"
 
 [extras]
 BSON = "fbb218c0-5317-5bc6-957e-2ee96dd4b1f0"

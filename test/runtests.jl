@@ -28,3 +28,7 @@ end
 @testset "Tree ensemble tests" begin
     include("tree_ensembles/TE_test.jl")
 end
+
+@testset "Partition tests" begin
+   include("neural_networks/NN_partition_test.jl")
+end

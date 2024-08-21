@@ -1,5 +1,5 @@
 """
-    function optimize_by_walking!(original::JuMP.Model, nn_model::Flux.Chain, U_in, L_in; delta=0.1, return_sampled=false, logging=true, iterations=10, infeasible_per_iter=5)
+    function optimize_by_walking!(original::JuMP.Model, nn_model::Flux.Chain, U_in, L_in; delta=0.1, return_sampled=false, silent=true, iterations=10, infeasible_per_iter=5)
 
 Performs the full relaxing walk algorithm on the given neural network JuMP formulation. See Tong et al. (2024) for more details.
 
@@ -10,13 +10,12 @@ Performs the full relaxing walk algorithm on the given neural network JuMP formu
 # Optional Parameters
 - `delta`: controls how strongly certain neurons are preferred when fixing the binary variables
 - `return_sampled`: return sampled points in addition to the optima 
-- `logging`: print progress info to the console
+- `silent`: print progress info to the console
 - `iterations`: the number of fresh starts from the linear relaxation (no binary variables fixed)
 - `infeasible_per_iter`: the number of infeasible LP relaxations allowed before starting next iteration
 
 """
-function optimize_by_walking!(original::JuMP.Model, nn_model::Flux.Chain, U_in, L_in; delta=0.1, return_sampled=false, logging=true, iterations=10, infeasible_per_iter=5)
-
+function optimize_by_walking!(original::JuMP.Model, nn_model::Flux.Chain, U_in, L_in; delta=0.1, return_sampled=false, silent=true, iterations=10, infeasible_per_iter=5)
     sample(items, weights) = items[findfirst(cumsum(weights) .> rand() * sum(weights))]
     
     opt_time = 0.0
@@ -41,13 +40,13 @@ function optimize_by_walking!(original::JuMP.Model, nn_model::Flux.Chain, U_in, 
 
     push!(sampled_points, x_tilde)
     
-    local_opt, opt_value = local_search(x_tilde, original, U_in, L_in)
+    local_opt, opt_value = local_search(x_tilde, original, U_in, L_in, silent = silent)
     push!(x_opt, local_opt)
     push!(opt, opt_value)
 
     for iter in 1:iterations # TODO time limit based termination
 
-        logging && println("\n\nIteration: $iter")
+        !silent && println("\n\nIteration: $iter")
         infeasible_count = 0
 
         x_bar = deepcopy(x_tilde)
@@ -60,7 +59,7 @@ function optimize_by_walking!(original::JuMP.Model, nn_model::Flux.Chain, U_in, 
 
         for layer in 1:(n_layers-1) # hidden layers
 
-            logging && println("\n--------------Layer: $layer--------------")
+            !silent && println("\n--------------Layer: $layer--------------")
 
             n_neurons = first(maximum(keys(original[:x][layer, :].data)))
             neurons = Set(1:n_neurons)
@@ -99,7 +98,7 @@ function optimize_by_walking!(original::JuMP.Model, nn_model::Flux.Chain, U_in, 
                     set_binary(jump_model[:z][layer, deleted])
                     relax_integrality(jump_model)
 
-                    logging && print("o")
+                    !silent && print("o")
 
                     infeasible_count += 1
                     if infeasible_count % infeasible_per_iter == 0
@@ -109,11 +108,11 @@ function optimize_by_walking!(original::JuMP.Model, nn_model::Flux.Chain, U_in, 
                     x_bar = [value(jump_model[:x][0, i]) for i in 1:length(U_in)]
                     z_bar = value.(jump_model[:z])
 
-                    logging && print(".")
+                    !silent && print(".")
 
                     if (x_bar in sampled_points) == false
                         search_time += @elapsed begin
-                        local_opt, opt_value = local_search(x_bar, original, U_in, L_in)
+                        local_opt, opt_value = local_search(x_bar, original, U_in, L_in,  silent = silent)
                         end
                         push!(x_opt, local_opt)
                         push!(opt, opt_value)
@@ -141,19 +140,17 @@ function optimize_by_walking!(original::JuMP.Model, nn_model::Flux.Chain, U_in, 
    
     end
 
-    logging && println("\n\nLP OPTIMIZATION TIME: $opt_time")
-    logging && println("LOCAL SEARCH TIME: $search_time")
+    !silent && println("\n\nLP OPTIMIZATION TIME: $opt_time")
+    !silent && println("LOCAL SEARCH TIME: $search_time")
 
     if return_sampled
         return x_opt, opt, sampled_points
     else
         return x_opt, opt
     end
-
 end
-
 """
-    function local_search(start, jump_model, U_in, L_in; max_iter=100, epsilon=0.01, show_path=false, logging=false, tolerance=0.001)
+    function local_search(start, jump_model, U_in, L_in; max_iter=100, epsilon=0.01, show_path=false, silent=true, tolerance=0.001)
 
 Performs relaxing walk local search on the given neural network JuMP formulation. See Tong et al. (2024) for more details.
 
@@ -166,18 +163,18 @@ Performs relaxing walk local search on the given neural network JuMP formulation
 # Optional Parameters
 - `epsilon`: controls the step size taken out of the linear region
 - `show_path`: return the path taken by the local search in addition to the optimum
-- `logging`: print progress info to console
+- `silent`: print progress info to console
 - `tolerance`: minimum relative improvement required at every step to continue the search
 
 """
-function local_search(start, jump_model, U_in, L_in; max_iter=100, epsilon=0.01, show_path=false, logging=false, tolerance=0.001)
+function local_search(start, jump_model, U_in, L_in; max_iter=100, epsilon=0.01, show_path=false, silent=true, tolerance=0.001)
 
     x0 = deepcopy(start)
     x1 = deepcopy(x0)
 
     min = objective_sense(jump_model) == MIN_SENSE ? -1 : 1
 
-    logging && println("\nStarting local search from: $start")
+    !silent && println("\nStarting local search from: $start")
 
     path = Vector{Vector}()
     x0_obj = min * -Inf
@@ -185,7 +182,7 @@ function local_search(start, jump_model, U_in, L_in; max_iter=100, epsilon=0.01,
 
     for iter in 1:max_iter
 
-        logging && println("\nSEARCH STEP: $iter")
+        !silent && println("\nSEARCH STEP: $iter")
 
         push!(path, x0)
         
@@ -194,7 +191,7 @@ function local_search(start, jump_model, U_in, L_in; max_iter=100, epsilon=0.01,
         optimize!(jump_model)
         x0_obj = objective_value(jump_model)
 
-        logging && println("Input objective: $x0_obj")
+        !silent && println("Input objective: $x0_obj")
 
         binary_vals = map(value, binary_vars)
         foreach(pair -> fix(pair[1], pair[2]; force=true), zip(binary_vars, binary_vals))
@@ -211,10 +208,10 @@ function local_search(start, jump_model, U_in, L_in; max_iter=100, epsilon=0.01,
         foreach(unfix, binary_vars)
         restore_integrality()
 
-        logging && println("Corner objective: $x1_obj")
+        !silent && println("Corner objective: $x1_obj")
         
         if isapprox(x0_obj, x1_obj; rtol=tolerance) || min * x0_obj > x1_obj * min
-            logging && println("Local optimum found: $x0")
+            !silent && println("Local optimum found: $x0")
             break
         end
 

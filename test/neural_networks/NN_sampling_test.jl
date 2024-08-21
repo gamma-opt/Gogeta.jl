@@ -1,6 +1,5 @@
 using Flux
 using Random
-using Gogeta
 using GLPK
 using JuMP
 using QuasiMonteCarlo

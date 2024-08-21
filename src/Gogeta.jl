@@ -6,6 +6,8 @@ using LinearAlgebra: rank, dot
 using EvoTrees
 using Distributed
 using JSON
+using Random
+using Statistics
 
 # NEURAL NETWORKS
 
@@ -41,6 +43,14 @@ export optimize_by_walking_CNN!, local_search_CNN
 # ICNNs
 include("icnns/ICNN_incorporate.jl")
 export ICNN_incorporate!, forward_pass_ICNN!, check_ICNN
+
+# Psplit formulation
+include("neural_networks/NN_Psplit_util.jl")
+export Psplits
+
+include("neural_networks/NN_Psplit_to_MIP.jl")
+export NN_formulate_Psplit!
+
 
 # TREE ENSEMBLES
 

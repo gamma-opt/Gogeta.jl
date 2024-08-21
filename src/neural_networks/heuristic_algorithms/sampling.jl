@@ -26,7 +26,6 @@ function optimize_by_sampling!(jump_model::JuMP.Model, sample_points; enhanced=t
     optimum = Vector{Float64}()
 
     for (sample, input) in enumerate(eachcol(sample_points))
-
         forward_pass!(jump_model, input)
 
         # fix binary variables

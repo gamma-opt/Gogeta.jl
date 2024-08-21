@@ -26,7 +26,7 @@ Replace `<branch-name>` with the name of the branch you want to add.
 
 ## How can this package be used?
 
-Formulating trained machine learning (ML) models as mixed-integer linear programming (MILP) problems opens up multiple possibilities. Firstly, it allows for global optimization - finding the input that provably maximizes or minimizes the ML model output. Secondly, changing the objective function in the MILP formulation and/or adding additional constraints makes it possible to solve problems related to the ML model, such as finding adversarial inputs. Lastly, the MILP formulation of a ML model can be incorporated into a larger optimization problem. This is useful in a surrogate modeling context where an ML model can be trained to approximate a complex function that itself cannot be used in an optimization problem.
+Formulating trained machine learning (ML) models as mixed-integer linear programming (MILP) problems opens up multiple possibilities. Firstly, it allows for global optimization - finding the input that probably maximizes or minimizes the ML model output. Secondly, changing the objective function in the MILP formulation and/or adding additional constraints makes it possible to solve problems related to the ML model, such as finding adversarial inputs. Lastly, the MILP formulation of a ML model can be embedded into a larger optimization problem. This is useful in a surrogate modeling context where an ML model is trained to approximate a complex function that itself cannot be used in an optimization problem.
 
 Despite its usefulness, modeling ML models as MILP problems has significant limitations. The biggest limitation is the capability of MILP solvers which limits the ML model size.  With neural networks, for example, only models with at most hundreds of neurons can be effectively formulated as MILPs and then optimized. In practice, formulating into MILPs and optimizing all large modern ML models such as convolutional neural networks and transformer networks is computationally infeasible. However, if small neural networks are all that is required for the specific application, the methods implemented in this package can be useful. Secondly, only piecewise linear ML models can be formulated as MILP problems. For example, with neural networks this entails using activation functions such as $ReLU$.
 
@@ -34,5 +34,5 @@ Input convex neural networks (ICNNs) are a special type of machine learning mode
 
 ## Getting started
 
-The following sections [Tree ensembles](tree_ensembles.md), [Neural networks](neural_networks.md), [Neural networks in larger optimization problems](nns_in_larger.md) and [Input convex neural networks](icnns.md) give simple demonstrations on how to use the package. 
-Examples on multiprocessing features as well as more detailed code can be found in the `examples/`-folder of the [package repository](https://github.com/gamma-opt/Gogeta.jl).
+The following Features-section gives simple demonstrations on how to use the package. 
+More examples and detailed code can be found in the `examples/`-folder of the [package repository](https://github.com/gamma-opt/Gogeta.jl).
